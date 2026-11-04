@@ -3,12 +3,14 @@
 # Notterizmus 1.0
 
 A GNOME outline editor for book chapter notes. Numbering (`Ⅱ.1.a)`) and tree
-connectors (`├ └ │`) are generated automatically; **Copy for TopCoding** puts the
-result on the clipboard as HTML, ready to paste into `app.topcoding.bg/assignments`.
+connectors (`├ └ │`) are generated as you type, and **Copy for TopCoding** puts
+the outline on the clipboard as HTML that pastes cleanly into the chapter notes
+editor at `app.topcoding.bg/assignments`. Made for personal book notes in
+English and Bulgarian; it is not a general word processor or Markdown editor.
 
-Stack: Python 3 + GTK 4 + libadwaita (PyGObject). No other dependencies.
-
-Feature list: [FEATURES.md](FEATURES.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
+Updated 2026-11-04 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
+[FEATURES.md](FEATURES.md) · [CHANGELOG.md](CHANGELOG.md) ·
+[PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (briefing for coding agents)
 
 ## Install
 
@@ -23,21 +25,16 @@ sudo add-apt-repository ppa:simeonandreev/ppa-library
 sudo apt install notterizmus
 ```
 
-Requires Ubuntu 25.10 or newer (libadwaita 1.8+). Your notes in
-`~/Documents/Notterizmus` and settings in `~/.config/notterizmus` are kept when
-the app is removed.
+Requires Ubuntu 25.10 or newer (libadwaita 1.8+); the package is currently built
+for 26.04 (`resolute`) only. Notes and settings are kept when the app is removed.
 
-## Run from the source folder (development)
+## Using it
 
-```bash
-./notterizmus.sh
-```
-
-`./install.sh` adds this checkout to the app grid for your user only, and
-`./install.sh --uninstall` removes it. Don't keep it alongside the packaged
-app, or the app appears twice.
-
-## Writing notes
+1. **New Chapter** (Ctrl+N): enter book, chapter number and optional title.
+2. Type the outline. Start an item with `# ` for a numbered item, `* ` `+ ` `- `
+   for a note, pro or con bullet. Tab / Shift+Tab change the level.
+3. **Copy for TopCoding** (Ctrl+Shift+C), then Ctrl+V in TopCoding's notes editor.
+   Bold, italic, spacing and tables come through; keep the app open while pasting.
 
 | Do this | Key |
 |---|---|
@@ -48,8 +45,6 @@ app, or the app appears twice.
 | Make it a sub-item / move it back out | Tab / Shift+Tab |
 | Move the item up or down | Alt+↑ / Alt+↓ |
 | Change item type | Ctrl+Space, or click its prefix |
-| Numbered item | type `# ` at the start |
-| Bullet `•`, pro `+`, con `-` | type `* `, `+ `, `- ` at the start |
 | Bold / italic | Ctrl+B / Ctrl+I |
 | Undo / redo (one word, deletion run, or structural change per step) | Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) |
 | Expand / shrink selection: word → item text → item → section → all | Ctrl+W / Ctrl+Shift+W |
@@ -61,94 +56,101 @@ app, or the app appears twice.
 | Paste as plain text, joined into the current item | Ctrl+Shift+V |
 | Insert table | Ctrl+T (in a cell: Tab moves to the next one and adds a row at the end) |
 | Delete an empty item / join with the line above | Backspace at the start |
-| Copy for TopCoding | Ctrl+Shift+C, then Ctrl+V in TopCoding |
+| All shortcuts | Ctrl+? |
 
 Enter on an empty sub-item moves it out one level; on an empty bullet under a
-numbered item it becomes that item's next sibling. Items at the top level are
-always numbered.
+numbered item it becomes that item's next sibling. Top-level items are always
+numbered.
 
-Pasting recognises the app's own output, TopCoding's HTML and hand-written notes
-(`Ⅱ.1)`, `II.1)`, `2.1)`, `•`/`+`/`-`/`*` bullets nested by indentation), and
-renumbers everything. After a structured paste, the notification offers
-**Paste as Plain Text** to undo it and paste the text into one item instead.
-Text without any outline markers (e.g. paragraphs from a PDF) goes into the
-current item as one paragraph, re-joining words hyphenated across lines; the
-notification offers **One Item per Paragraph** to split it at blank lines.
+**Pasting in.** Ctrl+V recognises the app's own output, TopCoding's HTML and
+hand-written notes (`Ⅱ.1)`, `II.1)`, `2.1)`, `•`/`+`/`-`/`*` bullets nested by
+indentation) and renumbers everything; the notification offers **Paste as Plain
+Text** to undo that. Text without outline markers, such as paragraphs from a PDF,
+goes into the current item as one paragraph with line-break hyphenation removed;
+the notification offers **One Item per Paragraph**.
 
-Spell checking uses Enchant/Hunspell, the engine GNOME apps use. The language
-button in the header bar (e.g. `EN-US`) switches language or turns checking off;
-the same list is in the right-click menu under Spelling. A new chapter picks its
-language from its text, and the choice is saved in the chapter file. Words in the
-other alphabet are checked automatically with a matching dictionary (English for
-Latin words, Bulgarian for Cyrillic), so mixed notes work. "Add to Dictionary"
-goes to your personal Enchant word list.
+**Spelling.** The language button in the header bar (e.g. `EN-US`) switches
+language or turns checking off. A new chapter picks its language from its text,
+and the choice is saved in the chapter file. Words in the other alphabet use a
+matching dictionary automatically (English for Latin, Bulgarian for Cyrillic).
+"Add to Dictionary" writes to your personal Enchant word list.
+
+**Known limits.**
+- TopCoding shows notes in a proportional font, so tree connectors drift a few
+  pixels there. Rule `export.code_prefix = true` aligns them perfectly but
+  TopCoding then draws a code background behind them.
+- An item is one paragraph; line breaks inside an item are not supported.
+- No drawings yet (TopCoding supports Excalidraw; see "Adding a block type").
+- Undo history lasts until the chapter is closed.
 
 ## Files
 
-One file per book + chapter:
-`~/Documents/Notterizmus/<Book>/<NN> <Chapter title>.notz` (JSON). Changes
-autosave. The last chapter you had open reopens on start.
+| What | Where |
+|---|---|
+| Chapter notes, one autosaved JSON file per book + chapter | `<Documents>/Notterizmus/<Book>/<NN> <Title>.notz` — `<Documents>` is the localized XDG folder, e.g. `~/Документи` |
+| Formatting rules (optional) | `~/.config/notterizmus/rules.toml`, created from [`rules.example.toml`](notterizmus/rules.example.toml) by menu → **Edit Formatting Rules**; apply with **Reload Formatting Rules** |
+| Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
 
-## Formatting rules
+Rules cover numbering format per level, connector characters, spacing, spacer
+and blank lines, and your own bullet markers.
 
-Menu → **Edit Formatting Rules** creates `~/.config/notterizmus/rules.toml` from
-[`notterizmus/rules.example.toml`](notterizmus/rules.example.toml). There you can
-change numbering formats per level, connector characters, spacing, and blank or
-spacer lines, and add your own bullet markers. Then use **Reload Formatting Rules**.
+## Development
 
-## Code layout
+```bash
+./notterizmus.sh
+```
+
+```bash
+python3 -m unittest tests.test_layout tests.test_importer
+```
+
+`./install.sh` adds this checkout to the app grid for your user (`--uninstall`
+removes it); don't keep it alongside the packaged app or it appears twice.
+`NOTTERIZMUS_SNAPSHOT=/path/out.png ./notterizmus.sh <file.notz>` renders the
+window to a PNG and quits. How the code fits together, its invariants and how UI
+changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 
 | File | Role |
 |---|---|
 | `notterizmus/model.py` | Node tree, tree operations, `.notz` load/save (no GTK) |
-| `notterizmus/rules.py` | Defaults, user overrides, numbering formats |
+| `notterizmus/rules.py` | Formatting defaults, user overrides, numbering formats |
 | `notterizmus/layout.py` | Tree → lines with labels and connectors |
-| `notterizmus/export.py` | Lines → HTML (for TopCoding's Lexical editor) and plain text |
+| `notterizmus/export.py` | Lines → HTML for TopCoding, and plain text |
 | `notterizmus/importer.py` | Pasted HTML/text → outline nodes |
 | `notterizmus/spell.py` | Enchant spell checker (ctypes) |
-| `notterizmus/ui/` | GTK widgets: outline editor, row types, window |
-| `data/` | Icons, desktop entry, AppStream metadata, `.notz` file type |
-| `debian/` | Debian packaging for the Launchpad PPA |
-| `scripts/release.sh` | Builds the `.deb` / signed source package and uploads to the PPA |
+| `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
+| `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |
+| `notterizmus/ui/window.py`, `app.py` | Window, header bar, dialogs, file handling, spelling menu |
+| `data/` | Icons, desktop entry, AppStream metadata, `.notz` MIME type |
+| `debian/`, `scripts/release.sh` | Ubuntu packaging and the PPA release script |
 
 ### Adding a block type (e.g. Excalidraw drawings, planned)
 
 1. `model.py`: add a codec to `DATA_CODECS` for the node's `data`.
 2. `layout.py`: emit a `Line` for it (like `table`).
-3. `export.py`: HTML/plain output for that line kind.
+3. `export.py`: HTML and plain-text output for that line kind.
 4. `ui/rows.py`: a row widget, registered in `ROW_TYPES`.
 
 ## Releasing to the PPA
 
-One-time setup:
-
-1. Install the packaging tools:
-   `sudo apt install debhelper dh-python devscripts dput`
-2. Create a signing key for the maintainer identity in `debian/changelog`, with
-   an encryption subkey (Launchpad confirms keys by sending an encrypted email):
-   `gpg --quick-generate-key "Simo Andreev <simeon.zlatanov.andreev@pm.me>" rsa4096 sign 3y`
-   then `gpg --quick-add-key <FINGERPRINT> rsa4096 encr 3y`
-3. Publish it: `gpg --keyserver keyserver.ubuntu.com --send-keys <FINGERPRINT>`,
-   add the fingerprint at Launchpad → your profile → OpenPGP keys, and confirm
-   the encrypted email Launchpad sends.
+One-time setup: `sudo apt install debhelper dh-python devscripts dput lintian`,
+and a GPG key for the maintainer identity in `debian/changelog`, published to
+`keyserver.ubuntu.com` and confirmed on Launchpad (profile → OpenPGP keys). The
+key needs an encryption subkey, because Launchpad confirms keys by encrypted
+email.
 
 Each release:
 
-1. Bump `VERSION` in `notterizmus/__init__.py`, add a `<release>` to
-   `data/dev.simo.Notterizmus.metainfo.xml`, a section to `CHANGELOG.md`, and a
-   `debian/changelog` entry (`dch -v 1.0.1 "What changed"`, then
-   `dch -r -D resolute`).
-2. Commit, then try it locally: `scripts/release.sh deb` and install
-   `dist/notterizmus_<version>_all.deb`.
-3. Upload: `scripts/release.sh ppa`. Launchpad builds it within minutes to an
-   hour and emails you; users then get the update in Software Updater.
+1. Bump the version in all four places: `VERSION` in `notterizmus/__init__.py`,
+   a `<release>` in `data/dev.simo.Notterizmus.metainfo.xml`, a section in
+   `CHANGELOG.md`, and `debian/changelog` (`dch -v 1.0.1 "What changed"`, then
+   `dch -r -D resolute`). Update `FEATURES.md` if features changed.
+2. Commit, then `scripts/release.sh deb`, install `dist/notterizmus_<version>_all.deb`
+   and try it; `lintian dist/*.deb` should show nothing above pedantic.
+3. `scripts/release.sh ppa` signs and uploads (a passphrase prompt appears).
+   Launchpad emails on acceptance and build result; tag the commit `v<version>`.
 
-A PPA only accepts each version once per Ubuntu series. To build the same
-release for another series (e.g. `questing`), add a changelog entry with a
-suffixed version such as `1.0.0~questing1` targeting that series.
-
-## Tests
-
-```bash
-python3 -m unittest tests.test_layout tests.test_importer
-```
+The script refuses uncommitted changes and a `VERSION`/`debian/changelog`
+mismatch; it does not check the metainfo or `CHANGELOG.md`. A PPA accepts each
+version once per Ubuntu series; for another series add an entry like
+`1.0.0~questing1` targeting it.

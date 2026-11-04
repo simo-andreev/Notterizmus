@@ -47,7 +47,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Suggestions, "Add to Dictionary" (your personal Enchant word list) and "Ignore".
 
 ## Files and desktop
-- One autosaved `.notz` file (JSON) per book and chapter, under `~/Documents/Notterizmus/<Book>/`.
+- One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).
 - The last chapter you had open reopens on start.
 - Native GTK 4 / libadwaita app: dark and light themes, keyboard shortcuts dialog (Ctrl+?), About dialog (F1).
 - `install.sh` adds the app and its icon to the GNOME app grid. No root needed.
