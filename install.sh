@@ -4,10 +4,13 @@ set -euo pipefail
 HERE="$(dirname "$(readlink -f "$0")")"
 DEST="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$DEST"
-ICON_DEST="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
-mkdir -p "$ICON_DEST"
-cp "$HERE/data/icons/hicolor/scalable/apps/dev.simo.Notterizmus.svg" "$ICON_DEST/"
-gtk-update-icon-cache -q -t "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor" 2>/dev/null || true
+ICON_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
+for f in "$HERE"/data/icons/hicolor/*/apps/dev.simo.Notterizmus.png; do
+    size_dir="$(basename "$(dirname "$(dirname "$f")")")"
+    mkdir -p "$ICON_ROOT/$size_dir/apps"
+    cp "$f" "$ICON_ROOT/$size_dir/apps/"
+done
+gtk-update-icon-cache -q -t "$ICON_ROOT" 2>/dev/null || true
 cat > "$DEST/dev.simo.Notterizmus.desktop" <<DESK
 [Desktop Entry]
 Type=Application

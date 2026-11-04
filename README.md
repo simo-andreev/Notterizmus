@@ -1,4 +1,4 @@
-<img src="data/icons/hicolor/scalable/apps/dev.simo.Notterizmus.svg" width="96" align="right" alt="">
+<img src="data/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png" width="96" align="right" alt="">
 
 # Notterizmus 1.0
 
