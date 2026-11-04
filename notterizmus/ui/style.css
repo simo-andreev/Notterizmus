@@ -1,0 +1,68 @@
+.outline {
+  padding: 24px 28px 120px 28px;
+}
+
+.prefix {
+  font-size: 11pt;
+}
+
+textview.rt,
+textview.rt text {
+  background: transparent;
+  font-size: 11pt;
+}
+
+.kind-heading > textview.rt {
+  font-weight: 600;
+}
+
+label.spacer,
+label.blank {
+  min-height: 1.3em;
+}
+
+/* tables */
+.ntz-table {
+  border: 1px solid alpha(currentColor, 0.25);
+  border-radius: 6px;
+}
+textview.cell {
+  border-right: 1px solid alpha(currentColor, 0.18);
+  border-bottom: 1px solid alpha(currentColor, 0.18);
+}
+textview.header-cell {
+  font-weight: bold;
+}
+textview.cell:focus-within {
+  background: alpha(@accent_bg_color, 0.10);
+}
+.table-bar button {
+  padding: 2px 8px;
+  min-height: 24px;
+  font-size: 9pt;
+}
+
+/* item selection (Ctrl+A, Ctrl+W, Shift+arrows) */
+.row.node-selected {
+  background: alpha(@accent_bg_color, 0.22);
+  border-radius: 4px;
+}
+
+/* Alt+Insert and item menus (plain list, never scrolls) */
+popover.ntz-menu > contents {
+  padding: 6px;
+}
+popover.ntz-menu list {
+  background: transparent;
+}
+popover.ntz-menu row {
+  padding: 6px 10px;
+  border-radius: 6px;
+  min-height: 0;
+}
+popover.ntz-menu row.sep {
+  padding: 4px 0;
+}
+popover.ntz-menu row.head {
+  padding: 6px 10px 2px 10px;
+}

@@ -1,0 +1,57 @@
+# Notterizmus formatting rules.
+# Everything here is optional; anything you leave out keeps its built-in default.
+# After editing: menu → "Reload Formatting Rules".
+
+[numbering]
+# One format per depth; the last repeats for deeper levels.
+# Available: roman_upper (Ⅰ Ⅱ … single characters), roman_lower (ⅰ ⅱ …),
+#            arabic (1 2 …), alpha_lower (a b …), alpha_upper (A B …)
+levels = ["roman_upper", "arabic", "alpha_lower", "roman_lower"]
+separator = "."
+suffix = ")"
+bold_label = false
+
+[tree]
+branch = "├ "
+last = "└ "
+pipe = "│ "
+space = "  "
+trunk = "│"
+spacer_lines = true         # "│ │" line before each numbered sub-item
+spacer_after_leaf = false   # also add it when the previous line is a bullet
+blank_between_top_level = true
+bold_connectors = false
+
+[bullets]
+indent = 5          # bullet column = parent label column + indent
+nested_indent = 4   # extra columns per nested bullet level
+
+[heading]
+trigger = "#"       # type "# " at the start of an item to make it numbered
+
+[export]
+# true: tree prefixes are pasted as inline code -> monospace, perfectly aligned,
+# but TopCoding draws a code background behind them.
+code_prefix = false
+
+# Bullet markers. Add your own: a table name, the symbol shown,
+# the trigger typed at line start (followed by a space), and a menu label.
+[markers.dot]
+symbol = "•"
+trigger = "*"
+label = "Bullet"
+
+[markers.plus]
+symbol = "+"
+trigger = "+"
+label = "Pro"
+
+[markers.minus]
+symbol = "-"
+trigger = "-"
+label = "Con"
+
+# [markers.question]
+# symbol = "?"
+# trigger = "?"
+# label = "Open question"
