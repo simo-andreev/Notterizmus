@@ -1,0 +1,37 @@
+.TH NOTTERIZMUS 1 "2026-11-04" "notterizmus 1.0.0" "User Commands"
+.SH NAME
+notterizmus \- outline editor for book chapter notes
+.SH SYNOPSIS
+.B notterizmus
+.RI [ FILE.notz ]
+.SH DESCRIPTION
+.B notterizmus
+is a GNOME outline editor for taking notes on book chapters.
+Items are numbered automatically (Roman numerals such as I, I.1, I.1.a)
+and joined by tree connectors; the
+.B Copy for TopCoding
+button copies the outline as formatted HTML that pastes cleanly into TopCoding.
+.PP
+Each book chapter is stored as one autosaved
+.I .notz
+file under
+.IR ~/Documents/Notterizmus/<Book>/ .
+Without a
+.I FILE
+argument the last opened chapter is reopened.
+.PP
+Press
+.B Ctrl+?
+in the application for the list of keyboard shortcuts.
+.SH FILES
+.TP
+.I ~/.config/notterizmus/rules.toml
+Optional formatting rules: numbering formats, connector characters, spacing and
+bullet markers.
+.TP
+.I ~/.config/notterizmus/state.json
+Last opened chapter and spell-checking preferences.
+.SH SEE ALSO
+.I /usr/share/doc/notterizmus/FEATURES.md
+.SH AUTHOR
+Simo Andreev <simeon.zlatanov.andreev@pm.me>
