@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.simo.Notterizmus</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Notterizmus</name>
+  <summary>Outline editor for book chapter notes</summary>
+  <developer id="dev.simo">
+    <name>Simo Andreev</name>
+  </developer>
+  <description>
+    <p>
+      Notterizmus is an outline editor for taking notes on book chapters. It numbers
+      items automatically (Ⅰ, Ⅰ.1, Ⅰ.1.a) and draws tree lines between them, and it
+      copies the result as formatted text that pastes cleanly into TopCoding.
+    </p>
+    <ul>
+      <li>Automatic numbering with Unicode Roman numerals and tree connectors</li>
+      <li>Bullets for notes, pros and cons; bold, italic and tables</li>
+      <li>Paste that recognises outline structure and renumbers it</li>
+      <li>Undo and redo for text and structure, selection scopes and multiple cursors</li>
+      <li>Spell checking in English and Bulgarian, chosen per chapter</li>
+      <li>One autosaved file per book chapter</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">dev.simo.Notterizmus.desktop</launchable>
+  <provides>
+    <binary>notterizmus</binary>
+    <mediatype>application/x-notterizmus</mediatype>
+  </provides>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-11-04">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

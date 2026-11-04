@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launcher installed as /usr/bin/notterizmus by the Debian package.
+export PYTHONPATH="/usr/share/notterizmus${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m notterizmus "$@"

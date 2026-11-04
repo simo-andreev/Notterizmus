@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with python3
+
+# The app lives in a private directory, not in Python's site-packages.
+override_dh_python3:
+	dh_python3 /usr/share/notterizmus
+
+override_dh_auto_test:
+	python3 -m unittest tests.test_layout tests.test_importer

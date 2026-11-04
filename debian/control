@@ -1,0 +1,27 @@
+Source: notterizmus
+Section: editors
+Priority: optional
+Maintainer: Simo Andreev <simeon.zlatanov.andreev@pm.me>
+Build-Depends: debhelper-compat (= 13), dh-python, python3:any
+Standards-Version: 4.7.0
+Homepage: https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library
+Rules-Requires-Root: no
+
+Package: notterizmus
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends},
+         python3 (>= 3.11),
+         python3-gi,
+         gir1.2-gtk-4.0,
+         gir1.2-adw-1 (>= 1.8),
+         libenchant-2-2
+Recommends: hunspell-en-us | hunspell-dictionary
+Description: outline editor for book chapter notes
+ Notterizmus is a GNOME outline editor for taking notes on book chapters.
+ Items are numbered automatically (Ⅰ, Ⅰ.1, Ⅰ.1.a) with tree connectors, and
+ the result is copied as formatted HTML that pastes cleanly into TopCoding.
+ .
+ It supports bullets for notes, pros and cons, bold and italic text, tables,
+ structure-aware paste, document-wide undo, selection scopes, multiple
+ cursors and spell checking.

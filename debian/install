@@ -1,0 +1,6 @@
+notterizmus usr/share/notterizmus/
+bin/notterizmus usr/bin/
+data/dev.simo.Notterizmus.desktop usr/share/applications/
+data/dev.simo.Notterizmus.metainfo.xml usr/share/metainfo/
+data/dev.simo.Notterizmus.mime.xml usr/share/mime/packages/
+data/icons/hicolor usr/share/icons/

@@ -1,0 +1,4 @@
+tar-ignore = "__pycache__"
+tar-ignore = "*.pyc"
+tar-ignore = "dist"
+tar-ignore = ".claude"

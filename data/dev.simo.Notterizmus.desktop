@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Notterizmus
+GenericName=Outline Notes Editor
+Comment=Outline editor for book chapter notes, formatted for TopCoding
+Exec=notterizmus %F
+Icon=dev.simo.Notterizmus
+Terminal=false
+Categories=Office;GTK;
+Keywords=notes;outline;chapter;book;topcoding;
+MimeType=application/x-notterizmus;
+StartupNotify=true

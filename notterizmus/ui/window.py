@@ -100,7 +100,7 @@ class Window(Adw.ApplicationWindow):
         self.editor.connect("message", lambda _e, msg: self.toast(msg))
         self.editor.connect("toast", lambda _e, msg, button, cb: self.toast(msg, button, cb))
 
-        empty = Adw.StatusPage(icon_name="accessories-text-editor-symbolic", title="No Chapter Open",
+        empty = Adw.StatusPage(icon_name=APP_ID, title="No Chapter Open",
                                description="Create a chapter for a book, or open an existing one.")
         bb = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
         nb = Gtk.Button(label="New Chapter", action_name="win.new", css_classes=["pill", "suggested-action"])
