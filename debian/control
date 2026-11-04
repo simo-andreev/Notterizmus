@@ -1,11 +1,9 @@
 Source: notterizmus
 Section: editors
-Priority: optional
 Maintainer: Simo Andreev <simeon.zlatanov.andreev@pm.me>
 Build-Depends: debhelper-compat (= 13), dh-python, python3:any
 Standards-Version: 4.7.0
 Homepage: https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library
-Rules-Requires-Root: no
 
 Package: notterizmus
 Architecture: all
