@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Ctrl+Space: spelling fixes and word completion (chapter, book, dictionary). Item type cycling moved to Ctrl+Shift+Space.
+- Number hotkeys (1–9, 0) in the Alt+Insert, item and Ctrl+Space popups.
 - Notes stay in the real Documents folder when running as a snap.
 - Snap packaging (`snap/snapcraft.yaml`), not yet published.
 

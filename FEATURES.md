@@ -20,6 +20,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Enter adds an item. Tab / Shift+Tab indent and outdent. Alt+↑/↓ moves an item.
 - Enter on an empty bullet under `Ⅰ.1.a)` turns it into `Ⅰ.1.b)`. Ctrl+Enter adds the next numbered item at the current level.
 - Alt+Insert opens an "add" menu that previews the labels new items will get: next, sub-level, parent-level, bullets, table.
+- The Alt+Insert, item-prefix and Ctrl+Space popups number their first ten choices 1–9, 0; pressing the digit (top row or keypad) picks it.
 - Clicking an item's prefix opens a menu to change its type, add items next to it, or delete it.
 - Right-click menu: spelling suggestions, formatting, item type, add, selection, plain paste, undo/redo.
 - Undo/redo across the whole chapter, covering text and structure. Each step is one word, one run of deletions, or one structural change.

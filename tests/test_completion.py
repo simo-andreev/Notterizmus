@@ -14,6 +14,14 @@ class CompletionTest(unittest.TestCase):
         self.assertEqual(complete("sca", cur), ["scaling", "scalability", "scale"])
         self.assertEqual(complete("Sca", cur)[0], "Scaling")
 
+    def test_sentence_start_capital_is_not_kept(self):
+        cur = count_words(["Scaling is hard. Replication helps", "used with Kafka and kafka-like tools: Sharding"])
+        self.assertIn("scaling", cur)
+        self.assertIn("replication", cur)
+        self.assertIn("sharding", cur)
+        self.assertEqual(cur["Kafka"], 1)  # capital mid-sentence stays
+        self.assertEqual(complete("sca", cur), ["scaling"])
+
     def test_case_follows_prefix_and_excludes_prefix(self):
         cur = Counter({"replication": 3, "replica": 1})
         self.assertEqual(complete("Repl", cur), ["Replication", "Replica"])

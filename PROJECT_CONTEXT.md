@@ -11,7 +11,7 @@
 - Every document mutation in the editor goes through `with self._op():` or `self._commit(group)` in `ui/outline.py`; otherwise it is neither undoable nor autosaved.
 - Never remove and re-append row widgets: `refresh()` reorders children in place (`reorder_child_after`) and reuses rows by node id and spacer labels. Re-adding rows makes the text jump (bug reported and fixed).
 - New text views: call `size_new_views()` (min height = one line) and let `_requeue_views()` re-measure after 20 ms; GtkTextView measures its height before it knows its width.
-- Don't use `Gtk.PopoverMenu` for app menus (it mis-measures and scrolls); use `OutlineEditor._popup()` (ListBox popover). The right-click menu is GtkTextView's own, extended via `set_extra_menu` in `_prepare_context()`.
+- Don't use `Gtk.PopoverMenu` for app menus (it mis-measures and scrolls); use `OutlineEditor._popup()` (ListBox popover). Rows flagged `_choice = True` get number hotkeys 1–9, 0 from `_number_rows()`; keep that for any new popup. The right-click menu is GtkTextView's own, extended via `set_extra_menu` in `_prepare_context()`.
 - Roman numerals are the single Unicode characters `Ⅰ`–`Ⅻ` (user requirement), composed beyond 12 (`ⅩⅢ`).
 - When a version changes, update all four: `notterizmus/__init__.py` `VERSION`, `data/*.metainfo.xml` `<release>`, `CHANGELOG.md`, `debian/changelog`.
 - `APP_ID = dev.simo.Notterizmus` is also the icon name, desktop-file name, metainfo id and Wayland app id; keep them identical.

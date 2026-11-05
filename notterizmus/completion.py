@@ -40,9 +40,18 @@ def _json_texts(items):
 
 
 def count_words(texts):
+    """Word counts. A capital that's only there because the word starts the item or
+    a sentence ("Scaling is…") is dropped; capitals elsewhere ("…with Kafka") stay."""
     c = Counter()
     for t in texts:
-        c.update(w for w in WORD_RE.findall(t) if len(w) >= MIN_WORD)
+        for m in WORD_RE.finditer(t):
+            w = m.group()
+            if len(w) < MIN_WORD:
+                continue
+            before = t[:m.start()].rstrip(" \t\u00a0\"'“‘(")
+            if w[:1].isupper() and w[1:].islower() and (not before or before[-1] in ".!?:"):
+                w = w.lower()
+            c[w] += 1
     return c
 
 

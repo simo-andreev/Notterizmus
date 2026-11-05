@@ -63,6 +63,37 @@ def _top_level(nodes):
     return out
 
 
+def _digit(keyval):
+    """Digit keys (top row or keypad) as menu numbers: 1–9 → 1–9, 0 → 10; else None."""
+    name = Gdk.keyval_name(keyval) or ""
+    if name.startswith("KP_"):
+        name = name[3:]
+    return (int(name) or 10) if len(name) == 1 and name.isdigit() else None
+
+
+def _number_rows(lb):
+    """Put 1–9, 0 in front of the first ten choices of a menu list; returns {number: row}.
+    Greyed-out choices get a blank in the number column so the text stays aligned."""
+    numbered = {}
+    r = lb.get_first_child()
+    while r is not None:
+        if isinstance(r, Gtk.ListBoxRow) and getattr(r, "_choice", False):
+            n = len(numbered) + 1
+            on = r.get_sensitive() and n <= 10
+            num = Gtk.Label(label=str(n % 10) if on else "", width_chars=1, css_classes=["menu-num"])
+            child = r.get_child()
+            r.set_child(None)
+            child.set_hexpand(True)
+            box = Gtk.Box(spacing=10)
+            box.append(num)
+            box.append(child)
+            r.set_child(box)
+            if on:
+                numbered[n] = r
+        r = r.get_next_sibling()
+    return numbered
+
+
 class OutlineEditor(Gtk.ScrolledWindow):
     __gtype_name__ = "NtzOutlineEditor"
     __gsignals__ = {
@@ -1204,11 +1235,13 @@ class OutlineEditor(Gtk.ScrolledWindow):
                 row.set_child(box)
                 row.set_sensitive(ga is None or ga.get_enabled())
                 row._act, row._target = act, target
+                row._choice = True
                 lb.append(row)
                 if not first and row.get_sensitive():
                     first.append(row)
 
         add_rows(model)
+        numbered = _number_rows(lb)
 
         def activated(_lb, row):
             pop.popdown()
@@ -1222,6 +1255,19 @@ class OutlineEditor(Gtk.ScrolledWindow):
             GLib.idle_add(run)
 
         lb.connect("row-activated", activated)
+
+        def on_key(_c, keyval, _kc, state):
+            ctrl, _shift, alt = _mods(state)
+            n = None if ctrl or alt else _digit(keyval)
+            if n in numbered:
+                activated(lb, numbered[n])
+                return True
+            return False
+
+        keys = Gtk.EventControllerKey()
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        keys.connect("key-pressed", on_key)
+        pop.add_controller(keys)
         pop.set_child(lb)
         pop.set_parent(parent)
         pos = Gtk.PositionType.BOTTOM
@@ -1434,6 +1480,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
             if kind:
                 row.add_css_class(kind)
             row._cb = cb
+            row._choice = kind == "choice"
             lb.append(row)
             return row
 
@@ -1448,13 +1495,17 @@ class OutlineEditor(Gtk.ScrolledWindow):
                 head = Gtk.Label(label=title, xalign=0, css_classes=["heading", "dim-label"])
                 add_row(head, kind="head")
                 for label, cb in rows:
-                    r = add_row(Gtk.Label(label=label, xalign=0), cb)
+                    r = add_row(Gtk.Label(label=label, xalign=0), cb, kind="choice")
                     r.set_sensitive(cb is not None)
                     first = first or (r if cb else None)
             if not sections:
                 add_row(Gtk.Label(label="No suggestions", xalign=0, css_classes=["dim-label"]))
+            numbered.clear()
+            numbered.update(_number_rows(lb))
             place()
             return first, bool(sections)
+
+        numbered = {}
 
         def pick(row):
             if row is None or row._cb is None:
@@ -1468,6 +1519,10 @@ class OutlineEditor(Gtk.ScrolledWindow):
         def on_key(_c, keyval, _kc, state):
             name = Gdk.keyval_name(keyval)
             ctrl, shift, alt = _mods(state)
+            n = None if ctrl or alt else _digit(keyval)
+            if n in numbered:
+                pick(numbered[n])
+                return True
             if name in ("Up", "Down", "Page_Up", "Page_Down", "Return", "KP_Enter", "space") \
                     and not ctrl:
                 return False if name != "space" else self._assist_type(view, " ", pop)

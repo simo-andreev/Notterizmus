@@ -46,6 +46,7 @@ for 26.04 (`resolute`) only. Notes and settings are kept when the app is removed
 | Move the item up or down | Alt+↑ / Alt+↓ |
 | Spelling fixes and word completion at the cursor (keep typing to filter, Enter or Tab picks) | Ctrl+Space |
 | Change item type | Ctrl+Shift+Space, or click its prefix |
+| Pick a choice in the Alt+Insert, item or Ctrl+Space popup | its number, 1–9 then 0 (keypad too) |
 | Bold / italic | Ctrl+B / Ctrl+I |
 | Undo / redo (one word, deletion run, or structural change per step) | Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) |
 | Expand / shrink selection: word → item text → item → section → all | Ctrl+W / Ctrl+Shift+W |
