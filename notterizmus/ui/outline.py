@@ -109,6 +109,13 @@ class OutlineEditor(Gtk.ScrolledWindow):
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.box.add_css_class("outline")
         self.set_child(Adw.Clamp(maximum_size=1200, tightening_threshold=900, child=self.box))
+        # GTK only scrolls to a newly focused widget as a whole (and not at all for rows
+        # that have no position yet); ensure_visible() follows the cursor instead.
+        self.get_child().set_scroll_to_focus(False)
+        self._ensure_view = None
+        self._ensure_tick = None
+        self._ensure_tries = 0
+        self._click_time = 0.0
         self.rows = {}
         self._labels = []  # reusable spacer/blank line labels
         self._line_h = 0   # height of one text line, once known
@@ -392,6 +399,61 @@ class OutlineEditor(Gtk.ScrolledWindow):
     def set_current(self, node, view=None):
         self.current = node
         self.cur_view = view
+        if view is not None:
+            self.ensure_visible(view)
+
+    # -- keep the cursor on screen -------------------------------------------------------
+
+    def track_cursor(self, view):
+        """Scroll to the cursor whenever it moves or the text changes in a focused view."""
+        buf = view.get_buffer()
+        buf.connect_after("mark-set", lambda b, _it, m: m == b.get_insert() and view.has_focus()
+                          and self.ensure_visible(view))
+        buf.connect_after("changed", lambda b: view.has_focus() and self.ensure_visible(view))
+
+    def ensure_visible(self, view):
+        """Scroll so `view`'s cursor is on screen. Runs on the coming frames, once pending
+        layout has given new rows their size and position."""
+        self._ensure_view = view
+        self._ensure_tries = 0
+        if self._ensure_tick is None:
+            self._ensure_tick = self.add_tick_callback(self._ensure_step)
+
+    def _ensure_step(self, _widget, _clock):
+        self._ensure_tries += 1
+        v = self._ensure_view
+        if v is None or self._scroll_to_cursor(v) or self._ensure_tries > 12:
+            self._ensure_tick = None
+            return False
+        return True
+
+    def _scroll_to_cursor(self, v):
+        """True once the cursor is inside the visible area or can't be measured."""
+        if v.get_root() is None or not v.get_mapped():
+            return True
+        if v.get_height() <= 0:
+            return False  # not laid out yet
+        content = self.get_child().get_child()
+        loc = v.get_iter_location(v.cursor_iter())
+        x, y = v.buffer_to_window_coords(Gtk.TextWindowType.WIDGET, loc.x, loc.y)
+        ok, pt = v.compute_point(content, Graphene.Point().init(x, y))
+        if not ok:
+            return False
+        # Keep some context around the cursor, except right after a mouse click, so
+        # clicking near the window edge doesn't shift the text under the pointer.
+        clicked = time.monotonic() - self._click_time < 0.4
+        margin = 0 if clicked else max(self._line_h, 20) * 1.5
+        top, bottom = pt.y - margin, pt.y + loc.height + margin
+        adj = self.get_vadjustment()
+        value, page, upper = adj.get_value(), adj.get_page_size(), adj.get_upper()
+        if top < value:
+            adj.set_value(max(0.0, top))
+        elif bottom > value + page:
+            want = bottom - page
+            adj.set_value(min(want, upper - page))
+            if want > upper - page + 0.5:
+                return False  # the content hasn't grown to its new size yet
+        return True
 
     def mark_changed(self, node, structural=False):
         if structural:
@@ -1303,6 +1365,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
         self._popup(m, row.prefix, node=node)
 
     def on_click(self, row, view, gesture, x, y):
+        self._click_time = time.monotonic()
         self.clear_carets()
         btn = gesture.get_current_button()
         if btn == 3:

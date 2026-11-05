@@ -42,6 +42,7 @@ def wire_view(editor, row, view):
                                                editor.paste(row, v)))
     view.connect("copy-clipboard", lambda v: editor.copy_text(v, cut=False) and v.stop_emission_by_name("copy-clipboard"))
     view.connect("cut-clipboard", lambda v: editor.copy_text(v, cut=True) and v.stop_emission_by_name("cut-clipboard"))
+    editor.track_cursor(view)
 
 
 class _PrefixRow(Gtk.Box):
@@ -164,6 +165,7 @@ class TableRow(_PrefixRow):
                 fc = Gtk.EventControllerFocus()
                 fc.connect("enter", self._cell_focus, rt, r, c)
                 rt.add_controller(fc)
+                self.editor.track_cursor(rt)
                 self.grid.attach(rt, c, r, 1, 1)
                 self.cells[(r, c)] = rt
         self.editor.size_new_views(self.cells.values())
