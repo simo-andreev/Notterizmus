@@ -32,6 +32,7 @@ class RichText(Gtk.TextView):
         self._spell_src = None
         self.carets = []  # extra (multi-cursor) carets: GtkTextMarks
         self.last_edit = None  # ("ins"|"del", text, start offset) for undo grouping
+        self._size_fix = None
         buf.connect("insert-text", self._before_insert)
         buf.connect_after("insert-text", self._after_insert)
         buf.connect("changed", self._on_changed)
@@ -267,6 +268,22 @@ class RichText(Gtk.TextView):
     def caret_iters(self):
         buf = self.get_buffer()
         return [buf.get_iter_at_mark(m) for m in self.carets]
+
+    def do_size_allocate(self, width, height, baseline):
+        Gtk.TextView.do_size_allocate(self, width, height, baseline)
+        # GtkTextView doesn't always ask for a new size when its text re-wraps, e.g. a
+        # line laid out before the view had a width keeps that (very tall) height. When
+        # the height it's given is off from what its text needs, re-measure, once per
+        # distinct situation so a parent that legitimately differs can't cause a loop.
+        need = self.measure(Gtk.Orientation.VERTICAL, width)[1]
+        key = (width, height, need)
+        if abs(need - height) > 4 and key != self._size_fix:
+            self._size_fix = key
+            GLib.idle_add(self._requeue)
+
+    def _requeue(self):
+        self.queue_resize()
+        return False
 
     def do_snapshot_layer(self, layer, snapshot):
         if layer != Gtk.TextViewLayer.ABOVE_TEXT or not self.carets:

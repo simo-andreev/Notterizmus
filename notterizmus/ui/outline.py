@@ -114,6 +114,8 @@ class OutlineEditor(Gtk.ScrolledWindow):
         self.get_child().set_scroll_to_focus(False)
         self._ensure_view = None
         self._ensure_tick = None
+        self._focus_pending = None
+        self._focus_wait = None
         self._ensure_tries = 0
         self._click_time = 0.0
         self.rows = {}
@@ -301,9 +303,27 @@ class OutlineEditor(Gtk.ScrolledWindow):
     def _focus_node(self, node, offset):
         row = self.rows.get(node.id)
         if row:
+            views = row.views()
+            if views and views[0].get_width() <= 1 and self.get_root() is not None:
+                # Not laid out yet. Placing the cursor now makes GTK lay the line out at
+                # zero width (one letter per line); wait for the frame that sizes it.
+                self._focus_pending = (node, offset)
+                if self._focus_wait is None:
+                    self._focus_wait = self.add_tick_callback(self._focus_when_sized)
+                return False
             row.focus(0 if offset is None else offset)
             self.current = node
         self._focus_hint = None
+        return False
+
+    def _focus_when_sized(self, _widget, _clock):
+        node, offset = self._focus_pending
+        row = self.rows.get(node.id)
+        views = row.views() if row else []
+        if views and views[0].get_width() <= 1:
+            return True
+        self._focus_wait = None
+        self._focus_node(node, offset)
         return False
 
     # -- history ---------------------------------------------------------------------
