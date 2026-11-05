@@ -1,7 +1,7 @@
 # Notterizmus — context for coding agents
 
 ## Purpose
-- GNOME desktop outline editor for book chapter notes; output is pasted into TopCoding's notes editor (`app.topcoding.bg/assignments`). Snapshot: v1.0.0, 2026-11-04.
+- GNOME desktop outline editor for book chapter notes; output is pasted into TopCoding's notes editor (`app.topcoding.bg/assignments`). Snapshot: v1.1.0, 2026-11-05.
 - Single main user: Ubuntu 26.04 (`resolute`), GNOME 50, Wayland, locale `bg_BG.UTF-8`, notes in English and Bulgarian.
 - Distributed as a Debian package via `ppa:simeonandreev/ppa-library`; GPL-3.0-or-later.
 
@@ -14,7 +14,7 @@
 - New text views: call `size_new_views()` (min height = one line) and let `_requeue_views()` re-measure after 20 ms; GtkTextView measures its height before it knows its width.
 - Don't use `Gtk.PopoverMenu` for app menus (it mis-measures and scrolls); use `OutlineEditor._popup()` (ListBox popover). Rows flagged `_choice = True` get number hotkeys 1–9, 0 from `_number_rows()`; keep that for any new popup. The right-click menu is GtkTextView's own, extended via `set_extra_menu` in `_prepare_context()`.
 - Roman numerals are the single Unicode characters `Ⅰ`–`Ⅻ` (user requirement), composed beyond 12 (`ⅩⅢ`).
-- When a version changes, update all four: `notterizmus/__init__.py` `VERSION`, `data/*.metainfo.xml` `<release>`, `CHANGELOG.md`, `debian/changelog`.
+- When a version changes, update: `notterizmus/__init__.py` `VERSION`, `data/*.metainfo.xml` `<release>` (also the About dialog's release notes), `CHANGELOG.md`, `debian/notterizmus.1` header, `debian/changelog` (via `dch` with `DEBEMAIL` = maintainer email). `tests/test_release.py` enforces it.
 - `APP_ID = dev.simo.Notterizmus` is also the icon name, desktop-file name, metainfo id and Wayland app id; keep them identical.
 - Ask before pushing, uploading to the PPA, or publishing anything; commit only when asked.
 

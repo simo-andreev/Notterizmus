@@ -1,6 +1,6 @@
 <img src="data/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png" width="96" align="right" alt="">
 
-# Notterizmus 1.0
+# Notterizmus 1.1
 
 A GNOME outline editor for book chapter notes. Numbering (`Ⅱ.1.a)`) and tree
 connectors (`├ └ │`) are generated as you type, and **Copy for TopCoding** puts
@@ -8,7 +8,7 @@ the outline on the clipboard as HTML that pastes cleanly into the chapter notes
 editor at `app.topcoding.bg/assignments`. Made for personal book notes in
 English and Bulgarian; it is not a general word processor or Markdown editor.
 
-Updated 2026-11-04 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
+Updated 2026-11-05 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
 [FEATURES.md](FEATURES.md) · [CHANGELOG.md](CHANGELOG.md) ·
 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (briefing for coding agents)
 
@@ -145,16 +145,19 @@ email.
 
 Each release:
 
-1. Bump the version in all four places: `VERSION` in `notterizmus/__init__.py`,
-   a `<release>` in `data/dev.simo.Notterizmus.metainfo.xml`, a section in
-   `CHANGELOG.md`, and `debian/changelog` (`dch -v 1.0.1 "What changed"`, then
-   `dch -r -D resolute`). Update `FEATURES.md` if features changed.
+1. Bump the version: `VERSION` in `notterizmus/__init__.py`, a `<release>` with
+   notes in `data/dev.simo.Notterizmus.metainfo.xml` (App Center and the About
+   dialog show them), a section in `CHANGELOG.md`, the man page header in
+   `debian/notterizmus.1`, and `debian/changelog`:
+   `DEBFULLNAME="Simo Andreev" DEBEMAIL="simeon.zlatanov.andreev@pm.me" dch -v 1.2.0 "What changed"`,
+   then the same with `dch -r -D resolute ""`. Update `FEATURES.md` if features
+   changed. `tests/test_release.py` fails the build if these disagree.
 2. Commit, then `scripts/release.sh deb`, install `dist/notterizmus_<version>_all.deb`
    and try it; `lintian dist/*.deb` should show nothing above pedantic.
 3. `scripts/release.sh ppa` signs and uploads (a passphrase prompt appears).
    Launchpad emails on acceptance and build result; tag the commit `v<version>`.
 
 The script refuses uncommitted changes and a `VERSION`/`debian/changelog`
-mismatch; it does not check the metainfo or `CHANGELOG.md`. A PPA accepts each
+mismatch. A PPA accepts each
 version once per Ubuntu series; for another series add an entry like
 `1.0.0~questing1` targeting it.

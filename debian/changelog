@@ -1,3 +1,14 @@
+notterizmus (1.1.0) resolute; urgency=medium
+
+  * Ctrl+Space: spelling fixes and word completion; item type cycling
+    moved to Ctrl+Shift+Space.
+  * Number hotkeys 1-9, 0 in the Alt+Insert, item and Ctrl+Space popups.
+  * The view follows the cursor, so Enter at the bottom of a full window
+    no longer hides it.
+  * Notes stay in the real Documents folder when running as a snap.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Thu, 05 Nov 2026 19:53:02 +0200
+
 notterizmus (1.0.0) resolute; urgency=medium
 
   * First release: outline editor for book chapter notes. See FEATURES.md.

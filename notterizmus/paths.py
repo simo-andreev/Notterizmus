@@ -36,3 +36,31 @@ def documents_dir(env=None, glib_documents=None):
 
 def notes_root(env=None, glib_documents=None):
     return documents_dir(env, glib_documents) / "Notterizmus"
+
+
+def metainfo_path(app_id, env=None):
+    """The AppStream metainfo file: the source checkout's, else the installed one
+    (found through XDG_DATA_DIRS, which also covers snaps)."""
+    env = os.environ if env is None else env
+    here = Path(__file__).resolve().parents[1] / "data" / f"{app_id}.metainfo.xml"
+    if here.is_file():
+        return here
+    for d in (env.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":"):
+        p = Path(d) / "metainfo" / f"{app_id}.metainfo.xml"
+        if d and p.is_file():
+            return p
+    return None
+
+
+def latest_release(app_id, env=None):
+    """(version, description markup) of the newest <release> in the metainfo."""
+    import xml.etree.ElementTree as ET
+    p = metainfo_path(app_id, env)
+    if p is None:
+        return None, ""
+    rel = ET.parse(p).getroot().find("releases/release")
+    if rel is None:
+        return None, ""
+    desc = rel.find("description")
+    markup = "" if desc is None else "".join(ET.tostring(c, encoding="unicode").strip() for c in desc)
+    return rel.get("version"), markup

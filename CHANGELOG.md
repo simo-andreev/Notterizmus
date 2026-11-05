@@ -1,12 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-11-05
 
 - Ctrl+Space: spelling fixes and word completion (chapter, book, dictionary). Item type cycling moved to Ctrl+Shift+Space.
 - Number hotkeys (1–9, 0) in the Alt+Insert, item and Ctrl+Space popups.
 - Fix: the view now follows the cursor; Enter at the bottom of a full window no longer hides it.
 - Notes stay in the real Documents folder when running as a snap.
-- Snap packaging (`snap/snapcraft.yaml`), not yet published.
+- Snap recipe added (`snap/snapcraft.yaml`); not yet published.
+- The About dialog takes its release notes from the AppStream metadata.
 
 ## 1.0.0 — 2026-11-04
 

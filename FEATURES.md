@@ -1,4 +1,4 @@
-# Notterizmus 1.0 — Features
+# Notterizmus 1.1 — Features
 
 A GNOME desktop outline editor for book chapter notes, made to paste cleanly into
 TopCoding (`app.topcoding.bg/assignments`).

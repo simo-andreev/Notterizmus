@@ -364,19 +364,17 @@ class Window(Adw.ApplicationWindow):
         Gtk.FileLauncher.new(Gio.File.new_for_path(str(root))).launch(self, None, None)
 
     def on_about(self, *_):
+        notes_version, notes = paths.latest_release(APP_ID)
         dlg = Adw.AboutDialog(
             application_name=APP_NAME,
             application_icon=APP_ID,
             version=VERSION,
             comments="Outline editor for book chapter notes, formatted for pasting into TopCoding.",
-            release_notes_version="1.0.0",
-            release_notes=(
-                "<p>First release.</p><ul>"
-                "<li>Outline editor with automatic numbering (Ⅰ, Ⅰ.1, Ⅰ.1.a) and tree connectors</li>"
-                "<li>Bold, italic and tables; Copy for TopCoding</li>"
-                "<li>Structure-aware paste, undo/redo, selection scopes, multiple cursors</li>"
-                "<li>Spell checking with per-chapter language</li></ul>"),
+            license_type=Gtk.License.GPL_3_0,
         )
+        if notes:  # written once, in data/dev.simo.Notterizmus.metainfo.xml
+            dlg.set_release_notes_version(notes_version or VERSION)
+            dlg.set_release_notes(notes)
         dlg.present(self)
 
     def on_shortcuts(self, *_):
