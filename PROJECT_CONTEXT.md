@@ -7,7 +7,7 @@
 
 ## Rules
 - Use the platform's native stack: Python 3.11+, PyGObject, GTK 4, libadwaita (≥1.8), Enchant via ctypes. No pip dependencies.
-- Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py` free of GTK so they stay unit-testable.
+- Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py`, `completion.py`, `paths.py` free of GTK so they stay unit-testable.
 - Every document mutation in the editor goes through `with self._op():` or `self._commit(group)` in `ui/outline.py`; otherwise it is neither undoable nor autosaved.
 - Never remove and re-append row widgets: `refresh()` reorders children in place (`reorder_child_after`) and reuses rows by node id and spacer labels. Re-adding rows makes the text jump (bug reported and fixed).
 - New text views: call `size_new_views()` (min height = one line) and let `_requeue_views()` re-measure after 20 ms; GtkTextView measures its height before it knows its width.
@@ -26,6 +26,7 @@
 - Undo: whole-document JSON snapshots; typing groups per word (`RichText.last_edit` → `_text_group`); GtkTextBuffer's own undo is disabled. History resets on load.
 - Enter on an empty bullet under a heading converts it to the heading's next sibling (Ⅰ.1.a + bullets → Ⅰ.1.b); Ctrl+Enter does the same from anywhere.
 - Multi-cursor: Ctrl tapped twice within 0.4 s and held, then ↑/↓; extra carets are GtkTextMarks drawn in `do_snapshot_layer`.
+- Ctrl+Space (`OutlineEditor.show_assist`): completions from `completion.py` (chapter words, then other `.notz` in the book folder via `BookWords`, then the Hunspell `.dic` stems for the word's alphabet), plus spelling fixes. Spelling fixes are hidden while the cursor is at the end of a word that has completions (an unfinished word always looks misspelled). Ctrl+Shift+Space cycles item type.
 - Clipboard MIME types: internal `application/x-notterizmus-nodes+json` and `-runs+json`, plus `text/html` and `text/plain`.
 - Paste: `importer.parse()` returns `None` for text without outline markers → it is joined into the current item (user wants long text in one item); Ctrl+Shift+V always joins.
 - Spelling: Enchant/Hunspell via ctypes because the `gir1.2-spelling-1` typelib isn't installed. Primary language comes from the chapter text, not the locale (the `bg_BG` locale once marked all English red). Words in the other alphabet use a matching dictionary.
@@ -38,9 +39,10 @@
 - Drawings (planned) would need Lexical's own clipboard JSON (`application/x-lexical-editor`); untested whether Chrome on Linux accepts that from a native app.
 
 ## Verifying changes
-- Unit tests: `python3 -m unittest tests.test_layout tests.test_importer` (also run during the Debian build). They cover only the non-GTK modules.
+- Unit tests: `python3 -m unittest discover -s tests -t .` (also run during the Debian build). They cover only the non-GTK modules.
 - UI: drive real widgets from a script. Construct `App()`, call `editor.on_key(row, row.view, Gdk.keyval_from_name(...), modifiers)`, type with `buffer.insert_interactive_at_cursor`, pump `GLib.MainContext` between steps.
-- Run scripts with `XDG_CONFIG_HOME=<scratch dir>` so the user's `state.json` and rules are untouched.
+- Run scripts with `XDG_CONFIG_HOME=<scratch dir>` so the user's `state.json` and rules are untouched, and add `Gio.ApplicationFlags.NON_UNIQUE` to the `App` flags: if the user's app is open, a unique second instance just activates theirs and exits silently.
+- Drive popovers by emitting `key-pressed` on their `Gtk.EventControllerKey` (from `observe_controllers()`) and `row-activated` on their ListBox.
 - `NOTTERIZMUS_SNAPSHOT=out.png` renders the window to a PNG and quits; popovers need their own `Gtk.WidgetPaintable` render.
 - Layout jumps: record child y-positions in a `add_tick_callback` for ~12 frames after an action; all frames must match the final layout.
 - Wayland: a window without keyboard focus can't own the clipboard, so system-clipboard tests from background windows fail; same-process clipboard reads work.

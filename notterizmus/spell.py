@@ -119,8 +119,12 @@ class Speller:
                 self._alt[script] = guess_language("а" if script == "cyrillic" else "a", langs)
         return self.dict is not None
 
+    def tag_for(self, word):
+        """Dictionary tag used for a word (by its alphabet), e.g. "en_US" or "bg_BG"."""
+        return self._alt.get(script_of_word(word)) or self.lang
+
     def _dict_for(self, word):
-        tag = self._alt.get(script_of_word(word)) or self.lang
+        tag = self.tag_for(word)
         return self._get(tag) if tag else None
 
     @staticmethod

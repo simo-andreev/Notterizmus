@@ -44,7 +44,8 @@ for 26.04 (`resolute`) only. Notes and settings are kept when the app is removed
 | Context menu (spelling, formatting, item type, add, selection, undo) | right-click |
 | Make it a sub-item / move it back out | Tab / Shift+Tab |
 | Move the item up or down | Alt+↑ / Alt+↓ |
-| Change item type | Ctrl+Space, or click its prefix |
+| Spelling fixes and word completion at the cursor (keep typing to filter, Enter or Tab picks) | Ctrl+Space |
+| Change item type | Ctrl+Shift+Space, or click its prefix |
 | Bold / italic | Ctrl+B / Ctrl+I |
 | Undo / redo (one word, deletion run, or structural change per step) | Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) |
 | Expand / shrink selection: word → item text → item → section → all | Ctrl+W / Ctrl+Shift+W |
@@ -73,7 +74,9 @@ the notification offers **One Item per Paragraph**.
 language or turns checking off. A new chapter picks its language from its text,
 and the choice is saved in the chapter file. Words in the other alphabet use a
 matching dictionary automatically (English for Latin, Bulgarian for Cyrillic).
-"Add to Dictionary" writes to your personal Enchant word list.
+"Add to Dictionary" writes to your personal Enchant word list. Ctrl+Space
+completes the word you're typing from this chapter, the book's other chapters,
+then the dictionary; on a misspelled word it lists fixes.
 
 **Known limits.**
 - TopCoding shows notes in a proportional font, so tree connectors drift a few
@@ -101,7 +104,7 @@ and blank lines, and your own bullet markers.
 ```
 
 ```bash
-python3 -m unittest tests.test_layout tests.test_importer
+python3 -m unittest discover -s tests -t .
 ```
 
 `./install.sh` adds this checkout to the app grid for your user (`--uninstall`

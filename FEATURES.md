@@ -7,7 +7,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Numbered items generated automatically: `Ⅰ)`, `Ⅰ.1)`, `Ⅰ.1.a)`, `Ⅰ.1.a.ⅰ)`, using single-character Unicode Roman numerals.
 - Tree connectors (`├ └ │`), with spacer lines drawn automatically.
 - Bullets: `•` note, `+` pro, `-` con. Bullets nest by indentation.
-- Typing triggers at the start of an item: `# ` numbered, `* ` bullet, `+ ` pro, `- ` con.
+- Typing triggers at the start of an item: `# ` numbered, `* ` bullet, `+ ` pro, `- ` con. Ctrl+Shift+Space cycles the type.
 - Bold and italic (Ctrl+B / Ctrl+I), on a selection or for text you are about to type.
 - Tables with row and column controls, an optional header row, and Tab to move between cells.
 - Configurable rules in `~/.config/notterizmus/rules.toml`:
@@ -44,7 +44,12 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Uses Enchant/Hunspell, the engine GNOME apps use.
 - A language button in the header bar. The language is remembered per chapter, and new chapters pick theirs from their text.
 - Mixed alphabets: Latin words are checked with an English dictionary and Cyrillic words with a Bulgarian one.
-- Suggestions, "Add to Dictionary" (your personal Enchant word list) and "Ignore".
+- Suggestions, "Add to Dictionary" (your personal Enchant word list) and "Ignore", from the right-click menu or Ctrl+Space.
+
+## Word completion
+- Ctrl+Space completes the word at the cursor: words from the open chapter first, then from the book's other chapters, then from the spelling dictionary (English or Bulgarian by alphabet).
+- Typing continues into the text and narrows the list; Enter or Tab picks, Space or Esc closes. Works in table cells too.
+- Completions keep your capitalisation and only appear when they add at least two letters.
 
 ## Files and desktop
 - One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).

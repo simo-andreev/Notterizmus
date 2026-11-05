@@ -388,7 +388,7 @@ class Window(Adw.ApplicationWindow):
                 ("Add component menu", "<Alt>Insert"),
                 ("Indent / outdent", "Tab <Shift>Tab"),
                 ("Move item up / down", "<Alt>Up <Alt>Down"),
-                ("Cycle item type", "<Ctrl>space"),
+                ("Cycle item type", "<Ctrl><Shift>space"),
                 ("Join with the item above", "BackSpace"),
             ]),
             ("Enter on an empty item", [
@@ -403,7 +403,8 @@ class Window(Adw.ApplicationWindow):
                 ("Add cursor above / below (tap Ctrl twice, hold, then arrow)", "<Ctrl>Up <Ctrl>Down"),
                 ("Back to one cursor", "Escape"),
             ]),
-            ("Text", [("Bold", "<Ctrl>b"), ("Italic", "<Ctrl>i"),
+            ("Text", [("Spelling fixes and word completion", "<Ctrl>space"),
+                      ("Bold", "<Ctrl>b"), ("Italic", "<Ctrl>i"),
                       ("Undo / redo", "<Ctrl>z <Ctrl><Shift>z"),
                       ("Paste (detects outline structure)", "<Ctrl>v"),
                       ("Paste as plain text", "<Ctrl><Shift>v")]),
