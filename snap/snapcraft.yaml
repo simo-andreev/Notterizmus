@@ -1,0 +1,51 @@
+name: notterizmus
+title: Notterizmus
+base: core26
+adopt-info: notterizmus        # summary, description, icon and license from the AppStream metainfo
+grade: stable
+confinement: strict
+license: GPL-3.0-or-later
+contact: simeon.zlatanov.andreev@pm.me
+website: https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library
+
+platforms:
+  amd64:
+
+apps:
+  notterizmus:
+    command: usr/bin/python3 -m notterizmus
+    extensions: [gnome]          # GTK 4 + libadwaita from the gnome-core26 runtime
+    desktop: usr/share/applications/dev.simo.Notterizmus.desktop
+    common-id: dev.simo.Notterizmus
+    plugs:
+      - home                     # chapter notes live in ~/<Documents>/Notterizmus
+    environment:
+      PYTHONPATH: $SNAP/usr/share/notterizmus
+
+parts:
+  notterizmus:
+    plugin: nil
+    source: .
+    stage-packages:
+      - python3
+      - python3-gi
+      - libenchant-2-2
+      - hunspell-en-us
+      - hunspell-en-gb
+      - hunspell-bg
+    override-pull: |
+      craftctl default
+      craftctl set version="$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' notterizmus/__init__.py)"
+    override-build: |
+      set -eu
+      D="$CRAFT_PART_INSTALL/usr/share"
+      mkdir -p "$D/notterizmus" "$D/applications" "$D/metainfo" "$D/icons"
+      cp -r notterizmus "$D/notterizmus/"
+      find "$D/notterizmus" -name __pycache__ -prune -exec rm -rf {} +
+      cp -r data/icons/hicolor "$D/icons/"
+      cp data/dev.simo.Notterizmus.metainfo.xml "$D/metainfo/"
+      # Snap desktop files need an icon path inside the snap.
+      sed 's|^Icon=.*|Icon=${SNAP}/usr/share/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png|' \
+          data/dev.simo.Notterizmus.desktop > "$D/applications/dev.simo.Notterizmus.desktop"
+    parse-info:
+      - usr/share/metainfo/dev.simo.Notterizmus.metainfo.xml

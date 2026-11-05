@@ -5,7 +5,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from .. import APP_ID, APP_NAME, VERSION
+from .. import APP_ID, APP_NAME, VERSION, paths
 from ..export import to_html, to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
@@ -17,8 +17,7 @@ RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
 
 
 def notes_root():
-    d = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS) or str(Path.home() / "Documents")
-    return Path(d) / "Notterizmus"
+    return paths.notes_root(glib_documents=GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS))
 
 
 def _state_path():
