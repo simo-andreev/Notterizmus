@@ -59,6 +59,8 @@ def build(rules=None):
              key("F1"), ", or from the menu) brings back a fresh copy.")),
           b(("Each item explains a control. Lines that start with ", Run("Try:", italic=True),
              " are exercises to do right there.")),
+          b(("Can't remember a key? ", key("Ctrl+Shift+P"), " searches every command by name, runs it, "
+             "and shows its key so you learn it on the way.")),
           b(("For real notes, press ", key("Ctrl+N"), " to create a chapter."))),
 
         h("Writing the outline",

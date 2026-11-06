@@ -11,6 +11,7 @@ from ..layout import layout
 from ..model import Document, chapter_filename
 from ..rules import Rules, config_dir, user_rules_path
 from ..spell import Speller, guess_language
+from . import command_search
 from .outline import OutlineEditor
 from .sidebar import ChapterSidebar
 
@@ -85,6 +86,7 @@ class Window(Adw.ApplicationWindow):
         self.spell_menu = spell
         s1.append_submenu("Spelling", spell)
         s3 = Gio.Menu()
+        s3.append("Search Commands…", "win.commands")
         s3.append("Getting Started", "win.guide")
         s3.append("Keyboard Shortcuts", "win.shortcuts")
         s3.append(f"About {APP_NAME}", "win.about")
@@ -167,7 +169,8 @@ class Window(Adw.ApplicationWindow):
                          ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about),
                          ("prev-chapter", lambda *_: self.on_chapter_step(-1)),
                          ("next-chapter", lambda *_: self.on_chapter_step(1)),
-                         ("rename", self.on_rename), ("versions", self.on_versions)):
+                         ("rename", self.on_rename), ("versions", self.on_versions),
+                         ("commands", self.on_commands)):
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", cb)
             self.add_action(a)
@@ -763,6 +766,13 @@ class Window(Adw.ApplicationWindow):
         self.set_doc(doc)
         self.toast("A practice copy: change anything. F1 brings back a fresh one.")
 
+    def on_commands(self, *_):
+        """Search Commands (Ctrl+Shift+P)."""
+        dlg = command_search.CommandSearch(command_search.build(self))
+        self._command_search = dlg
+        dlg.present(self)
+        GLib.idle_add(lambda: (dlg.entry.grab_focus(), False)[1])
+
     def on_versions(self, *_):
         """Earlier Versions: pick a kept copy of this chapter, preview it, restore it."""
         if not self.doc or self._is_guide() or not self.doc.path:
@@ -928,7 +938,8 @@ class Window(Adw.ApplicationWindow):
                               ("Move the chapter up / down", "<Alt>Up <Alt>Down"),
                               ("Move the chapter to Trash", "Delete"),
                               ("All chapter actions", "Menu")]),
-            ("Help", [("Getting Started (a practice chapter)", "F1"),
+            ("Help", [("Search commands (find any command and its key)", "<Ctrl><Shift>p"),
+                      ("Getting Started (a practice chapter)", "F1"),
                       ("Keyboard shortcuts", "<Ctrl>question")]),
         ]
         dlg = Adw.ShortcutsDialog()

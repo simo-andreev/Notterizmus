@@ -68,6 +68,7 @@ walks through the controls; each time you open it, it starts fresh.
 | In the chapter list: reorder, move to Trash, more | drag, or Alt+↑ / Alt+↓; Delete; right-click |
 | Resize the chapter list (double-click the edge for the default width) | drag the edge between the list and the text |
 | Getting Started: a practice chapter that shows the controls | F1 |
+| Search every command by name (each shows its key) | Ctrl+Shift+P |
 | All shortcuts | Ctrl+? |
 
 Enter on an empty sub-item moves it out one level; on an empty bullet under a
@@ -150,6 +151,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
 | `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
 | `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |
+| `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | Search Commands: matching, and the list of commands |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |

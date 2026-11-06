@@ -17,6 +17,7 @@ TopCoding (`app.topcoding.bg/assignments`).
   - your own bullet markers
 
 ## Learning the controls
+- **Search Commands** (Ctrl+Shift+P, or the menu): type a few letters of any command, in any order (“move up”, “rename”, “table”), and run it with Enter. Each result shows its key. Commands that are keys in the editor (indent, move item, Ctrl+Space…) do exactly what the key does.
 - **Getting Started** (F1, the menu, or the start page) opens a practice chapter that explains each control as an outline, with exercises to try in place. Each time you open it, it starts fresh; it's kept apart from your notes.
 
 ## Editing
