@@ -80,6 +80,10 @@ def build(win):
         key("Spelling Fixes and Word Completion", "<Control>space", section="Text",
             keywords="complete suggest autocomplete")
         act("Paste as Plain Text", "ed.paste-plain", section="Text", shown="<Control><Shift>v")
+        act("Find", "win.find", section="Find", keywords="search look")
+        act("Find and Replace", "win.replace", section="Find", keywords="search substitute change")
+        act("Find Next", "win.find-next", section="Find")
+        act("Find Previous", "win.find-prev", section="Find")
         key("Add Menu", "<Alt>Insert", section="Add", keywords="insert new item")
         act("Next Numbered Item", "ed.add", GLib.Variant.new_string("next"), section="Add",
             shown="<Control>Return", keywords="heading sibling")

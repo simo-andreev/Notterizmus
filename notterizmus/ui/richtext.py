@@ -25,6 +25,12 @@ class RichText(Gtk.TextView):
         red = Gdk.RGBA()
         red.parse("#e01b24")
         self.tag_spell = buf.create_tag("misspelled", underline=Pango.Underline.ERROR, underline_rgba=red)
+        # find bar highlights: every match, and the current one
+        found, current = Gdk.RGBA(), Gdk.RGBA()
+        found.parse("rgba(245, 194, 17, 0.35)")
+        current.parse("rgba(255, 120, 0, 0.75)")
+        self.tag_found = buf.create_tag("found", background_rgba=found)
+        self.tag_found_current = buf.create_tag("found-current", background_rgba=current)
         self._pending = None  # {"bold":..,"italic":..} after Ctrl+B/I with no selection
         self._loading = False
         self._inserting = False
@@ -69,6 +75,21 @@ class RichText(Gtk.TextView):
         buf.end_user_action()
         self._raw = False
         self.last_edit = ("paste", "", self.cursor_offset())
+        self._emit()
+
+    def replace_range(self, start, end, text):
+        """Replace characters start..end with text, keeping the first replaced character's
+        bold/italic. Reported as one content change."""
+        buf = self.get_buffer()
+        fmt = self._fmt_at(buf.get_iter_at_offset(start))
+        self._raw = True
+        buf.begin_user_action()
+        buf.delete(buf.get_iter_at_offset(start), buf.get_iter_at_offset(end))
+        if text:
+            buf.insert_with_tags(buf.get_iter_at_offset(start), text, *self._tags_for(fmt["bold"], fmt["italic"]))
+        buf.end_user_action()
+        self._raw = False
+        self.last_edit = ("paste", "", start + len(text))
         self._emit()
 
     def get_runs(self, start=None, end=None):

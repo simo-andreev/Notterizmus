@@ -27,6 +27,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - The Alt+Insert, item-prefix and Ctrl+Space popups number their first ten choices 1–9, 0; pressing the digit (top row or keypad) picks it.
 - Clicking an item's prefix opens a menu to change its type, add items next to it, or delete it.
 - Right-click menu: spelling suggestions, formatting, item type, add, selection, plain paste, undo/redo.
+- Find (Ctrl+F) and replace (Ctrl+H or Ctrl+R) across the chapter, table cells included: every match highlighted, “3 of 12”, Enter / Shift+Enter (or Ctrl+G / Ctrl+Shift+G) for the next and previous match, Match Case and Whole Words (Cyrillic too). Replacing keeps the bold or italic of the replaced text; Replace All is one undo step. Esc leaves the cursor on the match.
 - Undo/redo across the whole chapter, covering text and structure. Each step is one word, one run of deletions, or one structural change.
 - Ctrl+W / Ctrl+Shift+W expands and shrinks the selection: word → item text → item → section → everything.
 - Ctrl+A selects all items. Shift+↑/↓ at the first or last line, or Shift+click, extends an item selection.

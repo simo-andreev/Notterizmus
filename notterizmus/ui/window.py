@@ -12,12 +12,14 @@ from ..model import Document, chapter_filename
 from ..rules import Rules, config_dir, user_rules_path
 from ..spell import Speller, guess_language
 from . import command_search
+from .findbar import FindBar
 from .outline import OutlineEditor
 from .sidebar import ChapterSidebar
 
 RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
 SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX = 260, 180, 520  # chapter list width, px
 TEXT_ROOM = 20  # spare px beside the text column's minimum width
+DOC_ACTIONS = ("copy", "insert-table", "show-plain", "save", "find", "replace", "find-next", "find-prev")
 
 
 def notes_root():
@@ -106,9 +108,11 @@ class Window(Adw.ApplicationWindow):
 
         self.editor = OutlineEditor(self.rules)
         self.editor.spell_menu = spell
-        self.editor.connect("changed", lambda *_: self._schedule_save())
+        self.editor.connect("changed", lambda *_: (self._schedule_save(), self.findbar.schedule_refresh()))
         self.editor.connect("message", lambda _e, msg: self.toast(msg))
         self.editor.connect("toast", lambda _e, msg, button, cb: self.toast(msg, button, cb))
+        self.findbar = FindBar(self.editor, self.toast)
+        tv.add_top_bar(self.findbar)
 
         empty = Adw.StatusPage(icon_name=APP_ID, title="No Chapter Open",
                                description="Create a chapter for a book or open an existing one. "
@@ -170,7 +174,10 @@ class Window(Adw.ApplicationWindow):
                          ("prev-chapter", lambda *_: self.on_chapter_step(-1)),
                          ("next-chapter", lambda *_: self.on_chapter_step(1)),
                          ("rename", self.on_rename), ("versions", self.on_versions),
-                         ("commands", self.on_commands)):
+                         ("commands", self.on_commands),
+                         ("find", lambda *_: self.on_find()), ("replace", lambda *_: self.on_find(replace=True)),
+                         ("find-next", lambda *_: self.findbar.step(1)),
+                         ("find-prev", lambda *_: self.findbar.step(-1))):
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", cb)
             self.add_action(a)
@@ -181,7 +188,7 @@ class Window(Adw.ApplicationWindow):
             a = Gio.SimpleAction.new(name, GLib.VariantType.new("s"))
             a.connect("activate", lambda _a, p, f=cb: f(p.get_string()))
             self.add_action(a)
-        for act in ("copy", "insert-table", "show-plain", "save"):
+        for act in DOC_ACTIONS:
             self.lookup_action(act).set_enabled(False)
 
         show = bool(self.state.get("sidebar", True))
@@ -294,7 +301,8 @@ class Window(Adw.ApplicationWindow):
                 for v in self.editor.all_views():
                     v.recheck_spelling()
         self.stack.set_visible_child_name("editor")
-        for act in ("copy", "insert-table", "show-plain", "save"):
+        self.findbar.schedule_refresh()  # new chapter, new text views
+        for act in DOC_ACTIONS:
             self.lookup_action(act).set_enabled(True)
         self._update_title()
         self.state["last_file"] = str(doc.path)
@@ -364,12 +372,13 @@ class Window(Adw.ApplicationWindow):
             self.sidebar.focus_path(moved.get(Path(focus), focus))
 
     def _close_doc(self):
+        self.findbar.set_search_mode(False)
         if self._save_src:
             GLib.source_remove(self._save_src)
             self._save_src = None
         self.doc = None
         self.stack.set_visible_child_name("empty")
-        for act in ("copy", "insert-table", "show-plain", "save"):
+        for act in DOC_ACTIONS:
             self.lookup_action(act).set_enabled(False)
         self.wtitle.set_title(APP_NAME)
         self.wtitle.set_subtitle("")
@@ -766,6 +775,17 @@ class Window(Adw.ApplicationWindow):
         self.set_doc(doc)
         self.toast("A practice copy: change anything. F1 brings back a fresh one.")
 
+    def on_find(self, replace=False):
+        """Ctrl+F / Ctrl+H (or Ctrl+R): open the find bar, starting from the selected text if any."""
+        prefill = None
+        view = self.editor.cur_view
+        if view is not None and view.has_selection():
+            s, e = view.selection_offsets()
+            text = view.get_plain()[s:e]
+            if 0 < len(text) <= 100:
+                prefill = text
+        self.findbar.open(replace=replace, prefill=prefill)
+
     def on_commands(self, *_):
         """Search Commands (Ctrl+Shift+P)."""
         dlg = command_search.CommandSearch(command_search.build(self))
@@ -924,6 +944,8 @@ class Window(Adw.ApplicationWindow):
                 ("Add cursor above / below (tap Ctrl twice, hold, then arrow)", "<Ctrl>Up <Ctrl>Down"),
                 ("Back to one cursor", "Escape"),
             ]),
+            ("Find", [("Find in the chapter", "<Ctrl>f"), ("Find and replace", "<Ctrl>h <Ctrl>r"),
+                      ("Next / previous match", "<Ctrl>g <Ctrl><Shift>g")]),
             ("Text", [("Spelling fixes and word completion", "<Ctrl>space"),
                       ("Bold", "<Ctrl>b"), ("Italic", "<Ctrl>i"),
                       ("Undo / redo", "<Ctrl>z <Ctrl><Shift>z"),

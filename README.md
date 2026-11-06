@@ -54,6 +54,8 @@ walks through the controls; each time you open it, it starts fresh.
 | Undo / redo (one word, deletion run, or structural change per step) | Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) |
 | Expand / shrink selection: word → item text → item → section → all | Ctrl+W / Ctrl+Shift+W |
 | Select all items | Ctrl+A |
+| Find in the chapter, tables included (Enter / Shift+Enter or Ctrl+G / Ctrl+Shift+G: next / previous match) | Ctrl+F |
+| Find and replace (Replace, or Replace All as one undo step) | Ctrl+H or Ctrl+R |
 | Extend item selection | Shift+↑ / Shift+↓ at the first/last line, or Shift+click |
 | Selected items: copy, cut, delete, indent, bold | Ctrl+C, Ctrl+X, Delete, Tab, Ctrl+B |
 | Add cursors above/below | tap Ctrl twice, keep it held, then ↑ / ↓ (Esc to leave) |
@@ -152,6 +154,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
 | `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |
 | `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | Search Commands: matching, and the list of commands |
+| `notterizmus/find.py`, `notterizmus/ui/findbar.py` | Find and replace: matching, and the find bar |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |

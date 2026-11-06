@@ -103,6 +103,9 @@ def build(rules=None):
           b(("Selected items can be copied (", key("Ctrl+C"), "), cut (", key("Ctrl+X"), "), deleted (",
              key("Delete"), "), indented (", key("Tab"), ") or made bold (", key("Ctrl+B"), ") together.")),
           b((key("Alt+↑"), " and ", key("Alt+↓"), " move an item up or down.")),
+          b((key("Ctrl+F"), " finds text anywhere in the chapter, tables included. ", key("Enter"), " and ",
+             key("Shift+Enter"), " go to the next and previous match, ", key("Esc"), " leaves the cursor on it, "
+             "and ", key("Ctrl+H"), " (or ", key("Ctrl+R"), ") also replaces.")),
           b(_try("press ", key("Ctrl+W"), " four times in this line, then ", key("Ctrl+Shift+W"),
                  ". Then press ", key("Alt+↑"), " to move this line up."))),
 
