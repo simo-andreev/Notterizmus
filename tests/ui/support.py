@@ -94,14 +94,14 @@ def pump_until(cond, timeout=4.0):
 
 # -- chapters -----------------------------------------------------------------------------
 
-def open_chapter(nodes, title="Test"):
+def open_chapter(nodes, title="Test", book="Book"):
     """Save a chapter with these top-level nodes in the scratch notes folder and open it."""
     from notterizmus.model import Document, Node, chapter_filename
     from notterizmus.ui.window import notes_root
     win = app().win
     no = next(_chapter_no)
-    doc = Document(Node("root", children=nodes), "Book", no, title,
-                   notes_root() / "Book" / chapter_filename(no, title), lang="en_US")
+    doc = Document(Node("root", children=nodes), book, no, title,
+                   notes_root() / book / chapter_filename(no, title), lang="en_US")
     doc.save()
     win.open_path(doc.path)
     settle()

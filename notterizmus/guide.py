@@ -12,7 +12,8 @@ TITLE = "Getting Started"
 BOOK = "Notterizmus"
 # Words the English dictionary flags in the guide; ignored for the session while it's open.
 # "misspeled" stays flagged: it's an exercise.
-SPELL_IGNORE = ("Ctrl", "Esc", "Notterizmus", "Notterizmus's", "TopCoding", "TopCoding's", "compl")
+SPELL_IGNORE = ("Ctrl", "Esc", "PgUp", "PgDn", "Notterizmus", "Notterizmus's", "TopCoding",
+                "TopCoding's", "compl")
 
 
 def key(text):
@@ -156,6 +157,9 @@ def build(rules=None):
         h("More",
           b((key("Ctrl+N"), " creates a chapter and ", key("Ctrl+O"), " opens one. Each chapter of a book is "
              "its own file, saved automatically.")),
+          b(("The chapter list on the left shows each book's chapters in order; click one to open it, or click "
+             "a book to fold it. ", key("F9"), " shows or hides the list, and ", key("Ctrl+PgUp"), " or ",
+             key("Ctrl+PgDn"), " opens the previous or next chapter of the book.")),
           b((key("Ctrl+?"), " lists every keyboard shortcut, and ", key("F1"), " opens this guide again.")),
           b("Edit Formatting Rules in the menu changes the numbering, connectors, spacing and bullet markers."),
           b("Open Notes Folder in the menu shows your chapter files.")),

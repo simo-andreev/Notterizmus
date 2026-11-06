@@ -57,6 +57,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 
 ## Files and desktop
 - One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).
+- The chapter list on the left (F9) shows every book in the notes folder with its chapters in order; click a chapter to open it, click a book to fold it. Ctrl+PgUp / Ctrl+PgDn open the previous or next chapter of the book. In a narrow window the list slides over the text.
 - The last chapter you had open reopens on start.
 - Chapters saved by a newer version open safely: block types this version doesn't know are shown as a read-only note, kept unchanged in the file, and left out of Copy for TopCoding.
 - Native GTK 4 / libadwaita app: dark and light themes, keyboard shortcuts dialog (Ctrl+?), About dialog in the menu.

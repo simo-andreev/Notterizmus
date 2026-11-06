@@ -7,7 +7,7 @@
 
 ## Rules
 - Use the platform's native stack: Python 3.11+, PyGObject, GTK 4, libadwaita (≥1.8), Enchant via ctypes. No pip dependencies.
-- Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py`, `completion.py`, `paths.py`, `guide.py` free of GTK so they stay unit-testable.
+- Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py`, `completion.py`, `paths.py`, `guide.py`, `library.py` free of GTK so they stay unit-testable.
 - When a control or shortcut changes, update the Getting Started chapter (`guide.py`) as well as README.md, FEATURES.md and the shortcuts dialog. `tests/test_guide.py` fails if the guide teaches a key that README.md doesn't mention, or if the guide gains a word the English dictionary flags (add it to `guide.SPELL_IGNORE`).
 - To ask whether a node holds text, use `model.is_text(node)` (heading or bullet), never `kind != "table"`: kinds from a newer version are neither.
 - Never drop data the code doesn't understand: `Node.extra` carries unknown fields of known kinds, and unknown kinds keep their whole JSON; both are saved back unchanged.
@@ -26,10 +26,11 @@
 - `can_contain`: headings only under root or headings; bullets/tables under headings or bullets. Outdenting a bullet to root turns it into a heading.
 - Layout defaults reproduce the user's sample exactly for tree sections: bullet column = label column + 5; spacer `│` line before each numbered child unless the previous sibling is a bullet; blank line between top-level items.
 - File format: JSON `{"format": "notterizmus/1", book, chapter{number,title}, lang?, content[]}`, `.notz`, saved atomically, autosaved 800 ms after changes. Path: `<XDG Documents>/Notterizmus/<Book>/<NN> <Title>.notz` (localized folder, e.g. `~/Документи`).
-- `~/.config/notterizmus/state.json`: `last_file`, `last_book`, `spell`, `spell_lang`. `rules.toml` overrides `rules.DEFAULTS`.
+- `~/.config/notterizmus/state.json`: `last_file`, `last_book`, `spell`, `spell_lang`, `sidebar`. `rules.toml` overrides `rules.DEFAULTS`.
 - Undo: whole-document JSON snapshots; typing groups per word (`RichText.last_edit` → `_text_group`); GtkTextBuffer's own undo is disabled. History resets on load.
 - Enter on an empty bullet under a heading converts it to the heading's next sibling (Ⅰ.1.a + bullets → Ⅰ.1.b); Ctrl+Enter does the same from anywhere.
 - Multi-cursor: Ctrl tapped twice within 0.4 s and held, then ↑/↓; extra carets are GtkTextMarks drawn in `do_snapshot_layer`.
+- Chapter sidebar (R1): `Adw.OverlaySplitView` with `ui/sidebar.ChapterSidebar`; `library.scan(notes_root())` reads book folders and `<NN> <Title>.notz` names (not the JSON). It rescans when a chapter opens, when the sidebar is shown and when the window becomes active. Below 860sp it collapses into an overlay; that doesn't change the saved `sidebar` choice. `win.prev-chapter`/`win.next-chapter` (Ctrl+PgUp/PgDn) are app accels and also handled in `OutlineEditor.common_key`, so GtkTextView can't take them.
 - Getting Started (F1, `win.guide`): `guide.document()` writes a fresh copy to `paths.guide_path()` (`$XDG_DATA_HOME/notterizmus/`, outside the notes folder) each time it's opened; `Window._is_guide()` gives it its own title, keeps `last_book` unchanged and session-ignores `guide.SPELL_IGNORE`. F1 used to open About.
 - Unknown kinds (R6): `layout` emits a `Line("unknown")` and skips their children, the exporters drop those lines, spacer decisions ignore them, the editor shows `rows.UnknownRow` (read-only note with a delete button, no text view, skipped by the cursor).
 - Ctrl+Space (`OutlineEditor.show_assist`): completions from `completion.py` (chapter words, then other `.notz` in the book folder via `BookWords`, then the Hunspell `.dic` stems for the word's alphabet), plus spelling fixes. Spelling fixes are hidden while the cursor is at the end of a word that has completions (an unfinished word always looks misspelled). Ctrl+Shift+Space cycles item type.

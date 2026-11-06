@@ -62,6 +62,8 @@ walks through the controls; each time you open it, it starts fresh.
 | Insert table | Ctrl+T (in a cell: Tab moves to the next one and adds a row at the end) |
 | Delete an empty item / join with the line above | Backspace at the start |
 | New chapter / open a chapter | Ctrl+N / Ctrl+O |
+| Previous / next chapter of the book | Ctrl+PgUp / Ctrl+PgDn |
+| Show or hide the chapter list (books and their chapters, on the left) | F9 |
 | Getting Started: a practice chapter that shows the controls | F1 |
 | All shortcuts | Ctrl+? |
 
@@ -140,6 +142,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/completion.py` | Ctrl+Space word completion (chapter, book, dictionary) |
 | `notterizmus/guide.py` | The Getting Started chapter; update it when a control changes |
 | `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
+| `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |

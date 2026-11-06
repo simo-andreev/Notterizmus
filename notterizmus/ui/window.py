@@ -5,13 +5,14 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from .. import APP_ID, APP_NAME, VERSION, guide, paths
+from .. import APP_ID, APP_NAME, VERSION, guide, library, paths
 from ..export import to_html, to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
 from ..rules import Rules, config_dir, user_rules_path
 from ..spell import Speller, guess_language
 from .outline import OutlineEditor
+from .sidebar import ChapterSidebar
 
 RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
 
@@ -54,6 +55,8 @@ class Window(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         self.wtitle = Adw.WindowTitle(title=APP_NAME, subtitle="")
         header.set_title_widget(self.wtitle)
+        header.pack_start(Gtk.ToggleButton(icon_name="sidebar-show-symbolic", tooltip_text="Chapters (F9)",
+                                           action_name="win.sidebar"))
         header.pack_start(Gtk.Button(icon_name="document-new-symbolic", tooltip_text="New chapter (Ctrl+N)",
                                      action_name="win.new"))
         header.pack_start(Gtk.Button(icon_name="document-open-symbolic", tooltip_text="Open chapter (Ctrl+O)",
@@ -116,19 +119,41 @@ class Window(Adw.ApplicationWindow):
         self.stack.add_named(empty, "empty")
         self.stack.add_named(self.editor, "editor")
         tv.set_content(self.stack)
-        self.toasts.set_child(tv)
+
+        # Chapter list on the left; it becomes an overlay when the window is narrow.
+        self.sidebar = ChapterSidebar()
+        self.sidebar.connect("open-chapter", lambda _s, path: self._open_from_sidebar(path))
+        self.split = Adw.OverlaySplitView(sidebar=self.sidebar, content=tv,
+                                          min_sidebar_width=200, max_sidebar_width=300)
+        # The header needs about 620 px and the sidebar 200-300 px next to it.
+        bp = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 860sp"))
+        bp.add_setter(self.split, "collapsed", True)
+        self.add_breakpoint(bp)
+        self.set_size_request(640, 400)
+        self.toasts.set_child(self.split)
         self.set_content(self.toasts)
 
         for name, cb in (("new", self.on_new), ("open", self.on_open), ("save", lambda *_: self.save()),
                          ("copy", self.on_copy), ("insert-table", lambda *_: self.editor.insert_table()),
                          ("show-plain", self.on_show_plain), ("edit-rules", self.on_edit_rules),
                          ("reload-rules", self.on_reload_rules), ("open-folder", self.on_open_folder),
-                         ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about)):
+                         ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about),
+                         ("prev-chapter", lambda *_: self.on_chapter_step(-1)),
+                         ("next-chapter", lambda *_: self.on_chapter_step(1))):
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", cb)
             self.add_action(a)
         for act in ("copy", "insert-table", "show-plain", "save"):
             self.lookup_action(act).set_enabled(False)
+
+        show = bool(self.state.get("sidebar", True))
+        a = Gio.SimpleAction.new_stateful("sidebar", None, GLib.Variant.new_boolean(show))
+        a.connect("activate", lambda act, _p: self.split.set_show_sidebar(not act.get_state().get_boolean()))
+        self.add_action(a)
+        self.split.set_show_sidebar(show)
+        self.split.connect("notify::show-sidebar", self._on_sidebar_shown)
+        self.connect("notify::is-active", lambda *_: self.is_active() and self._reload_sidebar())
+        self._reload_sidebar()
 
         spell_on = bool(self.state.get("spell", True)) and self.speller.available
         a = Gio.SimpleAction.new_stateful("spell", None, GLib.Variant.new_boolean(spell_on))
@@ -238,12 +263,53 @@ class Window(Adw.ApplicationWindow):
         if not self._is_guide(doc):  # New Chapter keeps suggesting your own book
             self.state["last_book"] = doc.book
         save_state(self.state)
+        self._reload_sidebar()
 
     def open_path(self, path):
         try:
             self.set_doc(Document.load(path))
         except (OSError, ValueError, KeyError) as e:
             self.toast(f"Could not open {Path(path).name}: {e}")
+
+    # -- chapter sidebar -------------------------------------------------------------------
+
+    def _reload_sidebar(self):
+        if self.split.get_show_sidebar():
+            self.sidebar.reload(notes_root(), self.doc.path if self.doc else None)
+        return False
+
+    def _on_sidebar_shown(self, split, _pspec):
+        on = split.get_show_sidebar()
+        self.lookup_action("sidebar").set_state(GLib.Variant.new_boolean(on))
+        if not split.get_collapsed():  # an overlay closing by itself isn't a preference
+            self.state["sidebar"] = on
+            save_state(self.state)
+        if on:
+            self._reload_sidebar()
+
+    def _open_from_sidebar(self, path):
+        if not (self.doc and self.doc.path and Path(self.doc.path).resolve() == Path(path).resolve()):
+            self.save(quiet=True)
+            self.open_path(path)
+        if self.split.get_collapsed():
+            self.split.set_show_sidebar(False)
+
+    def on_chapter_step(self, delta):
+        """Open the previous (-1) or next (+1) chapter of the current book."""
+        if not self.doc or self._is_guide():
+            self.toast("Open a chapter of a book first")
+            return
+        books = library.scan(notes_root())
+        book, _i = library.find(books, self.doc.path)
+        if book is None:
+            self.toast("This chapter isn't in the notes folder")
+            return
+        ch = library.neighbor(books, self.doc.path, delta)
+        if ch is None:
+            self.toast(f"No {'next' if delta > 0 else 'previous'} chapter in “{book.name}”")
+            return
+        self.save(quiet=True)
+        self.open_path(ch.path)
 
     def _schedule_save(self):
         if self._save_src:
@@ -438,6 +504,8 @@ class Window(Adw.ApplicationWindow):
                       ("Paste as plain text", "<Ctrl><Shift>v")]),
             ("Tables", [("Insert table", "<Ctrl>t"), ("Next / previous cell", "Tab <Shift>Tab")]),
             ("File", [("New chapter", "<Ctrl>n"), ("Open chapter", "<Ctrl>o"), ("Save", "<Ctrl>s"),
+                      ("Previous / next chapter of the book", "<Ctrl>Page_Up <Ctrl>Page_Down"),
+                      ("Show or hide the chapter list", "F9"),
                       ("Copy for TopCoding", "<Ctrl><Shift>c")]),
             ("Help", [("Getting Started (a practice chapter)", "F1"),
                       ("Keyboard shortcuts", "<Ctrl>question")]),

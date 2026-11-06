@@ -526,6 +526,10 @@ class OutlineEditor(Gtk.ScrolledWindow):
 
     def common_key(self, view, name, ctrl, shift, alt):
         """Keys that work everywhere, table cells included."""
+        if ctrl and not alt and not shift and name in ("Page_Up", "Page_Down"):
+            # previous/next chapter (also an app shortcut; this keeps GtkTextView from taking it)
+            self.activate_action("win.prev-chapter" if name == "Page_Up" else "win.next-chapter", None)
+            return True
         if ctrl and not alt:
             if name == "z":
                 self.undo()
