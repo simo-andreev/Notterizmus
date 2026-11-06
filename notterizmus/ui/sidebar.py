@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gi.repository import Adw, GObject, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Graphene, Gtk, Pango
 
 from .. import library
 
@@ -18,6 +18,8 @@ class ChapterSidebar(Adw.Bin):
         self.current = None      # path of the open chapter
         self.expanded = set()    # book names shown open
         self._root = None
+        self.popup = None        # set by the window: popup(menu_model, widget) shows a menu
+        self.on_reorder = None   # set by the window: on_reorder(chapters in their new order)
 
         tv = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -31,6 +33,18 @@ class ChapterSidebar(Adw.Bin):
         empty.add_css_class("dim-label")
         self.list.set_placeholder(empty)
         self.list.connect("row-activated", self._activated)
+        keys = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        keys.connect("key-pressed", self._key)
+        self.list.add_controller(keys)
+        menu_click = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
+        menu_click.connect("pressed", self._right_click)
+        self.list.add_controller(menu_click)
+        drop = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.MOVE)
+        drop.connect("motion", self._drop_motion)
+        drop.connect("leave", lambda *_: self._mark_drop(None, False))
+        drop.connect("drop", self._drop)
+        self.list.add_controller(drop)
+        self._drop_row = None
         sw = Gtk.ScrolledWindow(child=self.list, vexpand=True, hscrollbar_policy=Gtk.PolicyType.NEVER)
         tv.set_content(sw)
         self.set_child(tv)
@@ -41,14 +55,24 @@ class ChapterSidebar(Adw.Bin):
         """Rescan the notes folder; current is the open chapter's path (or None)."""
         if root is not None:
             self._root = root
-        self.current = Path(current) if current else None
-        self.books = library.scan(self._root) if self._root else []
-        book, _i = library.find(self.books, self.current)
+        current = Path(current) if current else None
+        books = library.scan(self._root) if self._root else []
+        book, _i = library.find(books, current)
+        unchanged = self._shape(books) == self._shape(self.books) and current == self.current \
+            and (book is None or book.name in self.expanded)
+        self.current, self.books = current, books
         if book is not None:
             self.expanded.add(book.name)
-        self._rebuild()
+        if not unchanged:  # rebuilding on every window activation would drop keyboard focus
+            self._rebuild()
+
+    @staticmethod
+    def _shape(books):
+        return [(b.name, [c.path for c in b.chapters]) for b in books]
 
     def _rebuild(self):
+        had = self.focused_row()
+        had_key = (had._book, str(had._path)) if had is not None else None
         while (row := self.list.get_row_at_index(0)) is not None:
             self.list.remove(row)
         selected = None
@@ -67,6 +91,10 @@ class ChapterSidebar(Adw.Bin):
             self.list.select_row(selected)
         else:
             self.list.unselect_all()
+        if had_key is not None:
+            again = next((r for r in self.rows() if (r._book, str(r._path)) == had_key), None)
+            if again is not None:
+                again.grab_focus()
 
     def _book_row(self, book, is_open):
         box = Gtk.Box(spacing=6)
@@ -80,6 +108,7 @@ class ChapterSidebar(Adw.Bin):
         box.append(count)
         row = Gtk.ListBoxRow(child=box, selectable=False, tooltip_text=book.name)
         row._book = book.name
+        row._folder = book.path
         row._path = None
         return row
 
@@ -90,9 +119,14 @@ class ChapterSidebar(Adw.Bin):
         num.add_css_class("numeric")
         box.append(num)
         box.append(Gtk.Label(label=ch.label, xalign=0, hexpand=True, ellipsize=Pango.EllipsizeMode.END))
-        row = Gtk.ListBoxRow(child=box, tooltip_text=ch.path.name)
+        row = Gtk.ListBoxRow(child=box, tooltip_text=f"{ch.path.name}\nDrag to reorder · right-click for more")
         row._book = None
+        row._folder = ch.path.parent
         row._path = ch.path
+        drag = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
+        drag.connect("prepare", lambda *_: Gdk.ContentProvider.new_for_value(str(ch.path)))
+        drag.connect("drag-begin", lambda src, _d: src.set_icon(Gtk.WidgetPaintable.new(row), 20, 10))
+        row.add_controller(drag)
         return row
 
     # -- input ------------------------------------------------------------------------------
@@ -107,6 +141,112 @@ class ChapterSidebar(Adw.Bin):
                 book_row.grab_focus()  # keep keyboard focus on the book that was toggled
             return
         self.emit("open-chapter", str(row._path))
+
+    def focus_path(self, path):
+        """Put keyboard focus on the chapter row for path (after the list was rebuilt)."""
+        row = next((r for r in self.rows() if r._path and library.same_file(r._path, path)), None)
+        if row is not None:
+            row.grab_focus()
+
+    def focused_row(self):
+        row = self.list.get_focus_child()
+        return row if isinstance(row, Gtk.ListBoxRow) else None
+
+    # -- menus and keys -----------------------------------------------------------------------
+
+    def menu_for(self, row):
+        m = Gio.Menu()
+        if row._path is None:
+            item = Gio.MenuItem.new("Rename Book…", None)
+            item.set_action_and_target_value("win.book-rename", GLib.Variant.new_string(str(row._folder)))
+            m.append_item(item)
+            return m
+        target = GLib.Variant.new_string(str(row._path))
+        s1, s2, s3 = Gio.Menu(), Gio.Menu(), Gio.Menu()
+        for menu, label, action in ((s1, "Chapter Properties…", "win.chapter-props"),
+                                    (s2, "Move Up", "win.chapter-up"), (s2, "Move Down", "win.chapter-down"),
+                                    (s3, "Move to Trash", "win.chapter-trash")):
+            item = Gio.MenuItem.new(label, None)
+            item.set_action_and_target_value(action, target)
+            menu.append_item(item)
+        for s in (s1, s2, s3):
+            m.append_section(None, s)
+        return m
+
+    def show_menu(self, row):
+        if self.popup is not None and row is not None:
+            self.popup(self.menu_for(row), row)
+
+    def _right_click(self, gesture, _n, _x, y):
+        row = self.list.get_row_at_y(int(y))
+        if row is not None:
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+            row.grab_focus()
+            self.show_menu(row)
+
+    def _key(self, _ctl, keyval, _code, state):
+        name = Gdk.keyval_name(keyval)
+        alt = bool(state & Gdk.ModifierType.ALT_MASK)
+        shift = bool(state & Gdk.ModifierType.SHIFT_MASK)
+        row = self.focused_row()
+        if row is None:
+            return False
+        if name == "Menu" or (shift and name == "F10"):
+            self.show_menu(row)
+            return True
+        if row._path is None:
+            return False
+        target = GLib.Variant.new_string(str(row._path))
+        if alt and name in ("Up", "Down"):
+            self.activate_action("win.chapter-up" if name == "Up" else "win.chapter-down", target)
+            return True
+        if name == "Delete" and not alt:
+            self.activate_action("win.chapter-trash", target)
+            return True
+        return False
+
+    # -- drag to reorder ------------------------------------------------------------------------
+
+    def _drop_place(self, y):
+        """(row, after) for a drop at y: before or after a chapter row."""
+        row = self.list.get_row_at_y(int(y))
+        if row is None or row._path is None:
+            return None, False
+        ok, top = row.compute_point(self.list, Graphene.Point().init(0, 0))
+        after = ok and y > top.y + row.get_height() / 2
+        return row, after
+
+    def _mark_drop(self, row, after):
+        if self._drop_row is not None:
+            self._drop_row.remove_css_class("drop-before")
+            self._drop_row.remove_css_class("drop-after")
+        self._drop_row = row
+        if row is not None:
+            row.add_css_class("drop-after" if after else "drop-before")
+
+    def _drop_motion(self, _target, _x, y):
+        row, after = self._drop_place(y)
+        self._mark_drop(row, after)
+        return Gdk.DragAction.MOVE if row is not None else 0
+
+    def _drop(self, _target, value, _x, y):
+        row, after = self._drop_place(y)
+        self._mark_drop(None, False)
+        return row is not None and self.drop_chapter(value, row._path, after)
+
+    def drop_chapter(self, src, target, after=False):
+        """Move chapter src next to chapter target in the same book (reorders it)."""
+        book, i = library.find(self.books, src)
+        tbook, _j = library.find(self.books, target)
+        if book is None or tbook is not book or library.same_file(src, target):
+            return False  # only within one book; moving to another book is in Chapter Properties
+        moving = book.chapters[i]
+        order = [c for c in book.chapters if c is not moving]
+        j = next(k for k, c in enumerate(order) if library.same_file(c.path, target))
+        order.insert(j + 1 if after else j, moving)
+        if self.on_reorder is not None:
+            self.on_reorder(order, moving.path)
+        return True
 
     def rows(self):
         i = 0

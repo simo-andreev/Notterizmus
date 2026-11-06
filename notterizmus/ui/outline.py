@@ -1255,6 +1255,10 @@ class OutlineEditor(Gtk.ScrolledWindow):
         m.append_section(None, s3)
         return m
 
+    def popup_menu(self, model, parent, rect=None):
+        """Show a Gio.Menu as the app's numbered popup list (also used by the sidebar)."""
+        self._popup(model, parent, rect)
+
     def _popup(self, model, parent, rect=None, node=None):
         """Show a Gio.Menu as a plain list popover. (GtkPopoverMenu mis-measures its
         height here and adds a scrollbar; a ListBox never scrolls.)"""

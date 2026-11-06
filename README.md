@@ -64,6 +64,8 @@ walks through the controls; each time you open it, it starts fresh.
 | New chapter / open a chapter | Ctrl+N / Ctrl+O |
 | Previous / next chapter of the book | Ctrl+PgUp / Ctrl+PgDn |
 | Show or hide the chapter list (books and their chapters, on the left) | F9 |
+| Chapter properties: rename, change the number, move to another book (on a book in the list: rename the book) | F2 |
+| In the chapter list: reorder, move to Trash, more | drag, or Alt+↑ / Alt+↓; Delete; right-click |
 | Getting Started: a practice chapter that shows the controls | F1 |
 | All shortcuts | Ctrl+? |
 

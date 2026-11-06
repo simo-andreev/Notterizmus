@@ -105,3 +105,19 @@ class SidebarTest(ui.UITestCase):
         ui.settle()
         self.assertFalse(any(sel for _l, _p, sel in self.win.sidebar.chapter_rows()))
         self.assertFalse(any("Getting Started" in str(p) for _l, p, _s in self.win.sidebar.chapter_rows()))
+
+    def test_switching_back_to_the_window_keeps_focus_in_the_list(self):
+        paths = self.make_book("Sidebar focus", ["Kept"])
+        row = next(r for r in self.win.sidebar.rows() if r._path and Path(r._path).resolve() == paths[0].resolve())
+        row.grab_focus()
+        ui.pump(0.1)
+        self.win._reload_sidebar()  # what happens when the window becomes active again
+        ui.pump(0.1)
+        focused = self.win.sidebar.focused_row()
+        self.assertIsNotNone(focused)
+        self.assertEqual(Path(focused._path).resolve(), paths[0].resolve())
+        (paths[0].parent / "99 Added outside.notz").write_text(paths[0].read_text(encoding="utf-8"), encoding="utf-8")
+        self.win._reload_sidebar()  # the folder changed: rebuilt, focus stays on the same chapter
+        ui.pump(0.1)
+        self.assertIn("Added outside", [label for label, _p, _s in self.win.sidebar.chapter_rows()])
+        self.assertEqual(Path(self.win.sidebar.focused_row()._path).resolve(), paths[0].resolve())

@@ -71,6 +71,14 @@ popover.ntz-menu .menu-num {
   font-feature-settings: "tnum";
 }
 
+/* chapter sidebar: where a dragged chapter will land */
+.navigation-sidebar row.drop-before {
+  box-shadow: inset 0 2px @accent_bg_color;
+}
+.navigation-sidebar row.drop-after {
+  box-shadow: inset 0 -2px @accent_bg_color;
+}
+
 /* a block type from a newer version: read-only note */
 .ntz-unknown {
   border: 1px dashed alpha(currentColor, 0.35);

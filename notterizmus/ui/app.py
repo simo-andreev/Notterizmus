@@ -34,7 +34,7 @@ class App(Adw.Application):
         Gtk.Window.set_default_icon_name(APP_ID)
         for action, accels in (("win.new", ["<Ctrl>n"]), ("win.open", ["<Ctrl>o"]), ("win.save", ["<Ctrl>s"]),
                                ("win.copy", ["<Ctrl><Shift>c"]), ("win.shortcuts", ["<Ctrl>question"]),
-                               ("win.guide", ["F1"]), ("win.sidebar", ["F9"]),
+                               ("win.guide", ["F1"]), ("win.sidebar", ["F9"]), ("win.rename", ["F2"]),
                                ("win.prev-chapter", ["<Ctrl>Page_Up"]), ("win.next-chapter", ["<Ctrl>Page_Down"]),
                                ):
             self.set_accels_for_action(action, accels)

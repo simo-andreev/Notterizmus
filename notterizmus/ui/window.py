@@ -69,6 +69,8 @@ class Window(Adw.ApplicationWindow):
         s2.append("Edit Formatting Rules", "win.edit-rules")
         s2.append("Reload Formatting Rules", "win.reload-rules")
         s2.append("Open Notes Folder", "win.open-folder")
+        s0 = Gio.Menu()
+        s0.append("Chapter Properties…", "win.rename")
         spell = Gio.Menu()
         spell.append("Check Spelling", "win.spell")
         langs = Gio.Menu()
@@ -83,7 +85,7 @@ class Window(Adw.ApplicationWindow):
         s3.append("Getting Started", "win.guide")
         s3.append("Keyboard Shortcuts", "win.shortcuts")
         s3.append(f"About {APP_NAME}", "win.about")
-        for s in (s1, s2, s3):
+        for s in (s0, s1, s2, s3):
             menu.append_section(None, s)
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu, tooltip_text="Menu"))
         copy = Gtk.Button(tooltip_text="Copy formatted notes, then paste into TopCoding (Ctrl+Shift+C)",
@@ -123,6 +125,8 @@ class Window(Adw.ApplicationWindow):
         # Chapter list on the left; it becomes an overlay when the window is narrow.
         self.sidebar = ChapterSidebar()
         self.sidebar.connect("open-chapter", lambda _s, path: self._open_from_sidebar(path))
+        self.sidebar.on_reorder = self._reorder_chapters
+        self.sidebar.popup = self.editor.popup_menu
         self.split = Adw.OverlaySplitView(sidebar=self.sidebar, content=tv,
                                           min_sidebar_width=200, max_sidebar_width=300)
         # The header needs about 620 px and the sidebar 200-300 px next to it.
@@ -139,9 +143,17 @@ class Window(Adw.ApplicationWindow):
                          ("reload-rules", self.on_reload_rules), ("open-folder", self.on_open_folder),
                          ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about),
                          ("prev-chapter", lambda *_: self.on_chapter_step(-1)),
-                         ("next-chapter", lambda *_: self.on_chapter_step(1))):
+                         ("next-chapter", lambda *_: self.on_chapter_step(1)),
+                         ("rename", self.on_rename)):
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", cb)
+            self.add_action(a)
+        for name, cb in (("chapter-props", self.on_chapter_props), ("book-rename", self.on_book_rename),
+                         ("chapter-up", lambda path: self.on_chapter_move(path, -1)),
+                         ("chapter-down", lambda path: self.on_chapter_move(path, 1)),
+                         ("chapter-trash", self.on_chapter_trash)):
+            a = Gio.SimpleAction.new(name, GLib.VariantType.new("s"))
+            a.connect("activate", lambda _a, p, f=cb: f(p.get_string()))
             self.add_action(a)
         for act in ("copy", "insert-table", "show-plain", "save"):
             self.lookup_action(act).set_enabled(False)
@@ -278,6 +290,230 @@ class Window(Adw.ApplicationWindow):
             self.sidebar.reload(notes_root(), self.doc.path if self.doc else None)
         return False
 
+    # -- renaming, reordering and trashing chapters and books ------------------------------------
+
+    def _flush_save(self):
+        """Write the open chapter now: file operations read chapters from disk."""
+        if self._save_src:
+            GLib.source_remove(self._save_src)
+            self._save_src = None
+        self.save(quiet=True)
+
+    def _after_move(self, moved, focus=None):
+        """Point the open chapter at its new file and refresh the list."""
+        if self.doc and self.doc.path:
+            new = next((n for o, n in moved.items() if library.same_file(o, self.doc.path)), None)
+            if new is not None:
+                fresh = Document.load(new)
+                self.doc.path = Path(new)
+                self.doc.book, self.doc.chapter_no, self.doc.chapter_title = \
+                    fresh.book, fresh.chapter_no, fresh.chapter_title
+                self.state["last_file"] = str(new)
+                self.state["last_book"] = fresh.book
+                save_state(self.state)
+                self._update_title()
+        self._reload_sidebar()
+        if focus is not None:
+            self.sidebar.focus_path(moved.get(Path(focus), focus))
+
+    def _close_doc(self):
+        if self._save_src:
+            GLib.source_remove(self._save_src)
+            self._save_src = None
+        self.doc = None
+        self.stack.set_visible_child_name("empty")
+        for act in ("copy", "insert-table", "show-plain", "save"):
+            self.lookup_action(act).set_enabled(False)
+        self.wtitle.set_title(APP_NAME)
+        self.wtitle.set_subtitle("")
+        self.set_title(APP_NAME)
+        self.state.pop("last_file", None)
+        save_state(self.state)
+
+    def on_rename(self, *_):
+        """F2: the focused sidebar row (chapter or book), else the open chapter."""
+        focus = self.get_focus()
+        if focus is not None and focus.is_ancestor(self.sidebar):
+            row = self.sidebar.focused_row()
+            if row is not None and row._path is None:
+                return self.on_book_rename(str(row._folder))
+            if row is not None:
+                return self.on_chapter_props(str(row._path))
+        if not self.doc or self._is_guide() or not self.doc.path:
+            self.toast("Open a chapter of a book first")
+            return
+        self.on_chapter_props(str(self.doc.path))
+
+    def _dialog(self, heading, rows, apply_label):
+        dlg = Adw.AlertDialog(heading=heading)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, css_classes=["boxed-list"])
+        for r in rows:
+            lb.append(r)
+        hint = Gtk.Label(xalign=0, wrap=True, css_classes=["dim-label"], visible=False)
+        box.append(lb)
+        box.append(hint)
+        dlg.set_extra_child(box)
+        dlg.add_response("cancel", "Cancel")
+        dlg.add_response("apply", apply_label)
+        dlg.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("apply")
+        dlg.set_close_response("cancel")
+        return dlg, hint
+
+    def on_chapter_props(self, path):
+        """Rename a chapter, change its number, or move it to another book."""
+        if self.doc and library.same_file(self.doc.path, path):
+            self._flush_save()
+        path = Path(path)
+        try:
+            doc = Document.load(path)
+        except (OSError, ValueError, KeyError) as e:
+            self.toast(f"Could not read {path.name}: {e}")
+            return
+        books = [b.path for b in library.scan(notes_root())]
+        if not any(library.same_file(b, path.parent) for b in books):
+            books.append(path.parent)
+        names = Gtk.StringList.new([b.name for b in books])
+        book = Adw.ComboRow(title="Book", model=names)
+        book.set_selected(next(i for i, b in enumerate(books) if library.same_file(b, path.parent)))
+        num = Adw.SpinRow.new_with_range(1, 999, 1)
+        num.set_title("Chapter number")
+        num.set_value(doc.chapter_no or 1)
+        title = Adw.EntryRow(title="Chapter title (optional)")
+        title.set_text(doc.chapter_title)
+        dlg, hint = self._dialog("Chapter Properties", [book, num, title], "Apply")
+
+        def target():
+            return books[book.get_selected()], int(num.get_value())
+
+        def validate(*_):
+            folder, n = target()
+            other = library.chapter_numbered(folder, n, exclude=path)
+            ok, msg = True, ""
+            if other is not None and not library.same_file(folder, path.parent):
+                ok, msg = False, f"“{folder.name}” already has chapter {n}, “{other.label}”."
+            elif other is not None:
+                msg = f"Chapter {n}, “{other.label}”, gets number {doc.chapter_no} (they swap)."
+            hint.set_text(msg)
+            hint.set_visible(bool(msg))
+            dlg.set_response_enabled("apply", ok)
+
+        book.connect("notify::selected", validate)
+        num.connect("notify::value", validate)
+        validate()
+
+        def on_resp(_d, resp):
+            if resp == "apply":
+                folder, n = target()
+                self.apply_chapter_props(path, folder, n, title.get_text().strip())
+
+        dlg.connect("response", on_resp)
+        dlg.present(self)
+        GLib.idle_add(lambda: (title.grab_focus(), False)[1])
+
+    def apply_chapter_props(self, path, folder, number, title):
+        self._flush_save()
+        same_book = library.same_file(folder, Path(path).parent)
+        try:
+            moved = library.set_chapter(path, number, title, None if same_book else folder)
+        except FileExistsError:
+            self.toast(f"“{Path(folder).name}” already has a chapter {number}")
+            return
+        except OSError as e:
+            self.toast(f"Could not change the chapter: {e}")
+            return
+        if not same_book:
+            self.sidebar.expanded.add(Path(folder).name)
+        self._after_move(moved)
+
+    def on_book_rename(self, folder):
+        folder = Path(folder)
+        old = library.book_name(folder)
+        entry = Adw.EntryRow(title="Book name")
+        entry.set_text(old)
+        dlg, hint = self._dialog("Rename Book", [entry], "Rename")
+        others = {d.name.casefold() for d in notes_root().iterdir()
+                  if d.is_dir() and not library.same_file(d, folder)} if notes_root().exists() else set()
+
+        def validate(*_):
+            name = entry.get_text().strip()
+            taken = library.safe_name(name).casefold() in others
+            hint.set_text("Another book already has that name." if taken else "")
+            hint.set_visible(taken)
+            dlg.set_response_enabled("apply", bool(name) and not taken and name != old)
+
+        entry.connect("changed", validate)
+        validate()
+        dlg.connect("response", lambda _d, resp: resp == "apply" and self.apply_book_rename(
+            folder, entry.get_text().strip()))
+        dlg.present(self)
+        GLib.idle_add(lambda: (entry.grab_focus(), False)[1])
+
+    def apply_book_rename(self, folder, name):
+        self._flush_save()
+        old_folder = Path(folder)
+        try:
+            moved = library.rename_book(old_folder, name)
+        except FileExistsError:
+            self.toast("Another book already has that name")
+            return
+        except OSError as e:
+            self.toast(f"Could not rename the book: {e}")
+            return
+        if old_folder.name in self.sidebar.expanded:
+            self.sidebar.expanded.discard(old_folder.name)
+            self.sidebar.expanded.add(library.safe_name(name))
+        self._after_move(moved)
+
+    def _reorder_chapters(self, order, moving):
+        self._flush_save()
+        try:
+            moved = library.reorder(order)
+        except (FileExistsError, OSError) as e:
+            self.toast(f"Could not reorder the chapters: {e}")
+            self._reload_sidebar()
+            return
+        self._after_move(moved, focus=moving)
+
+    def on_chapter_move(self, path, delta):
+        """Alt+↑/↓ in the sidebar: swap places (and numbers) with the neighbour."""
+        books = library.scan(notes_root())
+        book, i = library.find(books, path)
+        if book is None or not 0 <= i + delta < len(book.chapters):
+            return
+        order = list(book.chapters)
+        order[i], order[i + delta] = order[i + delta], order[i]
+        self._reorder_chapters(order, book.chapters[i].path)
+
+    def on_chapter_trash(self, path):
+        path = Path(path)
+        is_open = bool(self.doc and library.same_file(self.doc.path, path))
+        if is_open:
+            self._flush_save()
+        label = library.Chapter(*library.parse_name(path.stem), path).label
+        try:
+            data = path.read_bytes()
+            _trash_file(path)
+        except (OSError, GLib.Error) as e:
+            self.toast(f"Could not move “{label}” to Trash: {getattr(e, 'message', e)}")
+            return
+        if is_open:
+            self._close_doc()
+        self._reload_sidebar()
+        self.toast(f"“{label}” moved to Trash", "Undo", lambda: self._untrash(path, data, is_open))
+
+    def _untrash(self, path, data, reopen):
+        if path.exists():
+            self.toast(f"{path.name} exists again, so it was left in the Trash")
+            return
+        if not _restore_from_trash(path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)  # no trash access (e.g. inside a sandbox): write it back
+        if reopen:
+            self.open_path(path)
+        self._reload_sidebar()
+
     def _on_sidebar_shown(self, split, _pspec):
         on = split.get_show_sidebar()
         self.lookup_action("sidebar").set_state(GLib.Variant.new_boolean(on))
@@ -379,7 +615,7 @@ class Window(Adw.ApplicationWindow):
             b = book.get_text().strip() or "Unsorted"
             n = int(num.get_value())
             t = title.get_text().strip()
-            folder = notes_root() / "".join("_" if c in "/\\\0" else c for c in b)
+            folder = notes_root() / library.safe_name(b)
             existing = sorted(folder.glob(f"{n:02d}*.notz")) if folder.exists() else []
             if existing:
                 self.open_path(existing[0])
@@ -505,8 +741,12 @@ class Window(Adw.ApplicationWindow):
             ("Tables", [("Insert table", "<Ctrl>t"), ("Next / previous cell", "Tab <Shift>Tab")]),
             ("File", [("New chapter", "<Ctrl>n"), ("Open chapter", "<Ctrl>o"), ("Save", "<Ctrl>s"),
                       ("Previous / next chapter of the book", "<Ctrl>Page_Up <Ctrl>Page_Down"),
-                      ("Show or hide the chapter list", "F9"),
+                      ("Chapter properties: rename, number, book (on a book: rename it)", "F2"),
                       ("Copy for TopCoding", "<Ctrl><Shift>c")]),
+            ("Chapter list", [("Show or hide", "F9"),
+                              ("Move the chapter up / down", "<Alt>Up <Alt>Down"),
+                              ("Move the chapter to Trash", "Delete"),
+                              ("All chapter actions", "Menu")]),
             ("Help", [("Getting Started (a practice chapter)", "F1"),
                       ("Keyboard shortcuts", "<Ctrl>question")]),
         ]
@@ -522,3 +762,28 @@ class Window(Adw.ApplicationWindow):
             types.add(Adw.ShortcutsItem(title=f"{label} {sym} — “{t}”", accelerator=""))
         dlg.add(types)
         dlg.present(self)
+
+
+def _trash_file(path):
+    Gio.File.new_for_path(str(path)).trash(None)
+
+
+def _restore_from_trash(path):
+    """Move the most recently trashed copy of path back. False if it can't be found."""
+    try:
+        trash = Gio.File.new_for_uri("trash:///")
+        found = None
+        it = trash.enumerate_children("standard::name,trash::orig-path,trash::deletion-date",
+                                      Gio.FileQueryInfoFlags.NONE, None)
+        for info in it:
+            if info.get_attribute_byte_string("trash::orig-path") == str(path):
+                date = info.get_attribute_string("trash::deletion-date") or ""
+                if found is None or date > found[0]:
+                    found = (date, it.get_child(info))
+        if found is None:
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        found[1].move(Gio.File.new_for_path(str(path)), Gio.FileCopyFlags.NONE, None, None, None)
+        return True
+    except GLib.Error:
+        return False

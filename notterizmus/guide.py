@@ -160,6 +160,10 @@ def build(rules=None):
           b(("The chapter list on the left shows each book's chapters in order; click one to open it, or click "
              "a book to fold it. ", key("F9"), " shows or hides the list, and ", key("Ctrl+PgUp"), " or ",
              key("Ctrl+PgDn"), " opens the previous or next chapter of the book.")),
+          b((key("F2"), " (or Chapter Properties in the menu) renames the chapter, changes its number or moves "
+             "it to another book; on a book in the list, it renames the book. In the list, drag a chapter or "
+             "press ", key("Alt+↑"), " or ", key("Alt+↓"), " to reorder, and ", key("Delete"),
+             " moves it to the Trash (Undo brings it back). Right-click shows all of these.")),
           b((key("Ctrl+?"), " lists every keyboard shortcut, and ", key("F1"), " opens this guide again.")),
           b("Edit Formatting Rules in the menu changes the numbering, connectors, spacing and bullet markers."),
           b("Open Notes Folder in the menu shows your chapter files.")),
