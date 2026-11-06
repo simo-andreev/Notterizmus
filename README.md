@@ -114,6 +114,15 @@ and blank lines, and your own bullet markers.
 python3 -m unittest discover -s tests -t .
 ```
 
+The UI tests in `tests/ui` drive the real editor on a private display, so no
+window appears and your own settings and notes aren't touched. They need Weston
+for the frame-by-frame checks (`sudo apt install weston`); without it they run on
+GTK's Broadway server and skip those checks.
+
+```bash
+scripts/ui-tests.sh
+```
+
 `./install.sh` adds this checkout to the app grid for your user (`--uninstall`
 removes it); don't keep it alongside the packaged app or it appears twice.
 `NOTTERIZMUS_SNAPSHOT=/path/out.png ./notterizmus.sh <file.notz>` renders the
@@ -131,6 +140,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/completion.py` | Ctrl+Space word completion (chapter, book, dictionary) |
 | `notterizmus/guide.py` | The Getting Started chapter; update it when a control changes |
 | `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
+| `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |
 | `notterizmus/ui/window.py`, `app.py` | Window, header bar, dialogs, file handling, spelling menu |
@@ -161,8 +171,9 @@ Each release:
    `DEBFULLNAME="Simo Andreev" DEBEMAIL="simeon.zlatanov.andreev@pm.me" dch -v 1.2.0 "What changed"`,
    then the same with `dch -r -D resolute ""`. Update `FEATURES.md` if features
    changed. `tests/test_release.py` fails the build if these disagree.
-2. Commit, then `scripts/release.sh deb`, install `dist/notterizmus_<version>_all.deb`
-   and try it; `lintian dist/*.deb` should show nothing above pedantic.
+2. Commit, run `scripts/ui-tests.sh`, then `scripts/release.sh deb`, install
+   `dist/notterizmus_<version>_all.deb` and try it; `lintian dist/*.deb` should show
+   nothing above pedantic.
 3. `scripts/release.sh ppa` signs and uploads (a passphrase prompt appears).
    Launchpad emails on acceptance and build result; tag the commit `v<version>`.
 

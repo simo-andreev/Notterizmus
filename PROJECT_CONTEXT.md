@@ -45,12 +45,12 @@
 - Drawings (planned) would need Lexical's own clipboard JSON (`application/x-lexical-editor`); untested whether Chrome on Linux accepts that from a native app.
 
 ## Verifying changes
-- Unit tests: `python3 -m unittest discover -s tests -t .` (also run during the Debian build). They cover only the non-GTK modules.
-- UI: drive real widgets from a script. Construct `App()`, call `editor.on_key(row, row.view, Gdk.keyval_from_name(...), modifiers)`, type with `buffer.insert_interactive_at_cursor`, pump `GLib.MainContext` between steps.
-- Run scripts with `XDG_CONFIG_HOME=<scratch dir>` so the user's `state.json` and rules are untouched, and add `Gio.ApplicationFlags.NON_UNIQUE` to the `App` flags: if the user's app is open, a unique second instance just activates theirs and exits silently.
-- Drive popovers by emitting `key-pressed` on their `Gtk.EventControllerKey` (from `observe_controllers()`) and `row-activated` on their ListBox.
+- Unit tests: `python3 -m unittest discover -s tests -t .` (also run during the Debian build). They cover the non-GTK modules; the UI suites skip themselves there.
+- UI tests: `scripts/ui-tests.sh` runs `tests/ui` on a private display (headless Weston if installed, else Broadway), with config, data and Documents in a scratch folder, and fails if GTK prints a warning. Add a UI test for every UI bug fixed. Helpers are in `tests/ui/support.py`: `open_chapter`, `focus`, `press` (emits `key-pressed` on the widget's own controller with GTK's key names, e.g. Shift+z → `Z`), `type_text`, `record_frames`, `menu_choices`, `clipboard`.
+- Broadway without a browser draws about one frame per second, so frame-by-frame checks (`record_frames`) only run on Weston (`NOTTERIZMUS_UI_FRAMES=1`).
+- Never read the app's own clipboard synchronously from the main thread: the app supplies the data from the main loop, so it deadlocks (use `support.clipboard`).
+- Ad-hoc scripts outside the runner: set `XDG_CONFIG_HOME`/`XDG_DATA_HOME` to a scratch dir and add `Gio.ApplicationFlags.NON_UNIQUE`; otherwise a running copy of the app just gets activated and the script exits silently.
 - `NOTTERIZMUS_SNAPSHOT=out.png` renders the window to a PNG and quits; popovers need their own `Gtk.WidgetPaintable` render.
-- Layout jumps: record child y-positions in a `add_tick_callback` for ~12 frames after an action; all frames must match the final layout.
 - Wayland: a window without keyboard focus can't own the clipboard, so system-clipboard tests from background windows fail; same-process clipboard reads work.
 
 ## Packaging and release
