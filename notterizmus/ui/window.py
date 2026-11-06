@@ -5,7 +5,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from .. import APP_ID, APP_NAME, VERSION, paths
+from .. import APP_ID, APP_NAME, VERSION, guide, paths
 from ..export import to_html, to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
@@ -77,6 +77,7 @@ class Window(Adw.ApplicationWindow):
         self.spell_menu = spell
         s1.append_submenu("Spelling", spell)
         s3 = Gio.Menu()
+        s3.append("Getting Started", "win.guide")
         s3.append("Keyboard Shortcuts", "win.shortcuts")
         s3.append(f"About {APP_NAME}", "win.about")
         for s in (s1, s2, s3):
@@ -100,12 +101,15 @@ class Window(Adw.ApplicationWindow):
         self.editor.connect("toast", lambda _e, msg, button, cb: self.toast(msg, button, cb))
 
         empty = Adw.StatusPage(icon_name=APP_ID, title="No Chapter Open",
-                               description="Create a chapter for a book, or open an existing one.")
+                               description="Create a chapter for a book or open an existing one. "
+                                           "New here? Getting Started shows the controls.")
         bb = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
         nb = Gtk.Button(label="New Chapter", action_name="win.new", css_classes=["pill", "suggested-action"])
         ob = Gtk.Button(label="Open…", action_name="win.open", css_classes=["pill"])
+        gb = Gtk.Button(label="Getting Started", action_name="win.guide", css_classes=["pill"])
         bb.append(nb)
         bb.append(ob)
+        bb.append(gb)
         empty.set_child(bb)
 
         self.stack = Gtk.Stack()
@@ -119,7 +123,7 @@ class Window(Adw.ApplicationWindow):
                          ("copy", self.on_copy), ("insert-table", lambda *_: self.editor.insert_table()),
                          ("show-plain", self.on_show_plain), ("edit-rules", self.on_edit_rules),
                          ("reload-rules", self.on_reload_rules), ("open-folder", self.on_open_folder),
-                         ("shortcuts", self.on_shortcuts), ("about", self.on_about)):
+                         ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about)):
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", cb)
             self.add_action(a)
@@ -200,11 +204,19 @@ class Window(Adw.ApplicationWindow):
         self._apply_spelling(tag)
         self.toast(f"Spelling: {Speller.language_name(tag)}")
 
+    def _is_guide(self, doc=None):
+        doc = doc or self.doc
+        return bool(doc and doc.path) and Path(doc.path) == paths.guide_path()
+
     def _update_title(self):
         d = self.doc
-        title = f"Chapter {d.chapter_no}" + (f" — {d.chapter_title}" if d.chapter_title else "")
+        if self._is_guide(d):
+            title, subtitle = guide.TITLE, "Practice copy"
+        else:
+            title = f"Chapter {d.chapter_no}" + (f" — {d.chapter_title}" if d.chapter_title else "")
+            subtitle = d.book
         self.wtitle.set_title(title)
-        self.wtitle.set_subtitle(d.book)
+        self.wtitle.set_subtitle(subtitle)
         self.set_title(f"{title} · {APP_NAME}")
 
     def set_doc(self, doc):
@@ -213,12 +225,18 @@ class Window(Adw.ApplicationWindow):
         if self.speller.available:
             text = " ".join(n.text for n in doc.root.walk())
             self._apply_spelling(self._pick_lang(doc.lang, text))
+            if self._is_guide(doc) and self.speller.dict:
+                for word in guide.SPELL_IGNORE:
+                    self.speller.ignore(word)
+                for v in self.editor.all_views():
+                    v.recheck_spelling()
         self.stack.set_visible_child_name("editor")
         for act in ("copy", "insert-table", "show-plain", "save"):
             self.lookup_action(act).set_enabled(True)
         self._update_title()
         self.state["last_file"] = str(doc.path)
-        self.state["last_book"] = doc.book
+        if not self._is_guide(doc):  # New Chapter keeps suggesting your own book
+            self.state["last_book"] = doc.book
         save_state(self.state)
 
     def open_path(self, path):
@@ -313,7 +331,7 @@ class Window(Adw.ApplicationWindow):
         fd = Gtk.FileDialog(title="Open Chapter")
         root = notes_root()
         root.mkdir(parents=True, exist_ok=True)
-        start = Path(self.doc.path).parent if self.doc and self.doc.path else root
+        start = Path(self.doc.path).parent if self.doc and self.doc.path and not self._is_guide() else root
         fd.set_initial_folder(Gio.File.new_for_path(str(start)))
         f = Gtk.FileFilter(name="Chapter notes (*.notz)")
         f.add_pattern("*.notz")
@@ -331,6 +349,18 @@ class Window(Adw.ApplicationWindow):
                 self.open_path(gf.get_path())
 
         fd.open(self, None, done)
+
+    def on_guide(self, *_):
+        """Open a fresh practice copy of the Getting Started chapter."""
+        self.save(quiet=True)
+        doc = guide.document(paths.guide_path(), self.rules)
+        try:
+            doc.save()
+        except OSError as e:
+            self.toast(f"Could not create the guide: {e}")
+            return
+        self.set_doc(doc)
+        self.toast("A practice copy: change anything. F1 brings back a fresh one.")
 
     def on_show_plain(self, *_):
         text = to_plain(layout(self.doc.root, self.rules))
@@ -409,6 +439,8 @@ class Window(Adw.ApplicationWindow):
             ("Tables", [("Insert table", "<Ctrl>t"), ("Next / previous cell", "Tab <Shift>Tab")]),
             ("File", [("New chapter", "<Ctrl>n"), ("Open chapter", "<Ctrl>o"), ("Save", "<Ctrl>s"),
                       ("Copy for TopCoding", "<Ctrl><Shift>c")]),
+            ("Help", [("Getting Started (a practice chapter)", "F1"),
+                      ("Keyboard shortcuts", "<Ctrl>question")]),
         ]
         dlg = Adw.ShortcutsDialog()
         for title, items in groups:

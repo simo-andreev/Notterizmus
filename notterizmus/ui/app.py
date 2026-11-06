@@ -34,7 +34,7 @@ class App(Adw.Application):
         Gtk.Window.set_default_icon_name(APP_ID)
         for action, accels in (("win.new", ["<Ctrl>n"]), ("win.open", ["<Ctrl>o"]), ("win.save", ["<Ctrl>s"]),
                                ("win.copy", ["<Ctrl><Shift>c"]), ("win.shortcuts", ["<Ctrl>question"]),
-                               ("win.about", ["F1"]),
+                               ("win.guide", ["F1"]),
                                ):
             self.set_accels_for_action(action, accels)
         q = Gio.SimpleAction.new("quit", None)

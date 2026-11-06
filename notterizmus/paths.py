@@ -38,6 +38,14 @@ def notes_root(env=None, glib_documents=None):
     return documents_dir(env, glib_documents) / "Notterizmus"
 
 
+def guide_path(env=None):
+    """The Getting Started practice copy, kept in the app's data folder rather than
+    among the user's notes (inside a snap, XDG_DATA_HOME is the snap's own)."""
+    env = os.environ if env is None else env
+    base = env.get("XDG_DATA_HOME") or os.path.join(env.get("HOME") or str(Path.home()), ".local", "share")
+    return Path(base) / "notterizmus" / "Getting Started.notz"
+
+
 def metainfo_path(app_id, env=None):
     """The AppStream metainfo file: the source checkout's, else the installed one
     (found through XDG_DATA_DIRS, which also covers snaps)."""

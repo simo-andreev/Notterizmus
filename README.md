@@ -30,6 +30,9 @@ for 26.04 (`resolute`) only. Notes and settings are kept when the app is removed
 
 ## Using it
 
+New here? Press F1 (or menu → **Getting Started**) for a practice chapter that
+walks through the controls; each time you open it, it starts fresh.
+
 1. **New Chapter** (Ctrl+N): enter book, chapter number and optional title.
 2. Type the outline. Start an item with `# ` for a numbered item, `* ` `+ ` `- `
    for a note, pro or con bullet. Tab / Shift+Tab change the level.
@@ -58,6 +61,8 @@ for 26.04 (`resolute`) only. Notes and settings are kept when the app is removed
 | Paste as plain text, joined into the current item | Ctrl+Shift+V |
 | Insert table | Ctrl+T (in a cell: Tab moves to the next one and adds a row at the end) |
 | Delete an empty item / join with the line above | Backspace at the start |
+| New chapter / open a chapter | Ctrl+N / Ctrl+O |
+| Getting Started: a practice chapter that shows the controls | F1 |
 | All shortcuts | Ctrl+? |
 
 Enter on an empty sub-item moves it out one level; on an empty bullet under a
@@ -94,6 +99,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Chapter notes, one autosaved JSON file per book + chapter | `<Documents>/Notterizmus/<Book>/<NN> <Title>.notz` — `<Documents>` is the localized XDG folder, e.g. `~/Документи` |
 | Formatting rules (optional) | `~/.config/notterizmus/rules.toml`, created from [`rules.example.toml`](notterizmus/rules.example.toml) by menu → **Edit Formatting Rules**; apply with **Reload Formatting Rules** |
 | Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
+| Getting Started practice copy, rewritten each time it's opened | `~/.local/share/notterizmus/Getting Started.notz` |
 
 Rules cover numbering format per level, connector characters, spacing, spacer
 and blank lines, and your own bullet markers.
@@ -122,6 +128,9 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/export.py` | Lines → HTML for TopCoding, and plain text |
 | `notterizmus/importer.py` | Pasted HTML/text → outline nodes |
 | `notterizmus/spell.py` | Enchant spell checker (ctypes) |
+| `notterizmus/completion.py` | Ctrl+Space word completion (chapter, book, dictionary) |
+| `notterizmus/guide.py` | The Getting Started chapter; update it when a control changes |
+| `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
 | `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |
 | `notterizmus/ui/window.py`, `app.py` | Window, header bar, dialogs, file handling, spelling menu |

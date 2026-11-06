@@ -7,7 +7,8 @@
 
 ## Rules
 - Use the platform's native stack: Python 3.11+, PyGObject, GTK 4, libadwaita (≥1.8), Enchant via ctypes. No pip dependencies.
-- Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py`, `completion.py`, `paths.py` free of GTK so they stay unit-testable.
+- Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py`, `completion.py`, `paths.py`, `guide.py` free of GTK so they stay unit-testable.
+- When a control or shortcut changes, update the Getting Started chapter (`guide.py`) as well as README.md, FEATURES.md and the shortcuts dialog. `tests/test_guide.py` fails if the guide teaches a key that README.md doesn't mention, or if the guide gains a word the English dictionary flags (add it to `guide.SPELL_IGNORE`).
 - Every document mutation in the editor goes through `with self._op():` or `self._commit(group)` in `ui/outline.py`; otherwise it is neither undoable nor autosaved.
 - Never remove and re-append row widgets: `refresh()` reorders children in place (`reorder_child_after`) and reuses rows by node id and spacer labels. Re-adding rows makes the text jump (bug reported and fixed).
 - Scrolling follows the cursor via `ensure_visible()` (tick callback, retried until new rows are laid out); the viewport's own `scroll_to_focus` is off. Every new text view must be registered with `track_cursor()`.
@@ -27,6 +28,7 @@
 - Undo: whole-document JSON snapshots; typing groups per word (`RichText.last_edit` → `_text_group`); GtkTextBuffer's own undo is disabled. History resets on load.
 - Enter on an empty bullet under a heading converts it to the heading's next sibling (Ⅰ.1.a + bullets → Ⅰ.1.b); Ctrl+Enter does the same from anywhere.
 - Multi-cursor: Ctrl tapped twice within 0.4 s and held, then ↑/↓; extra carets are GtkTextMarks drawn in `do_snapshot_layer`.
+- Getting Started (F1, `win.guide`): `guide.document()` writes a fresh copy to `paths.guide_path()` (`$XDG_DATA_HOME/notterizmus/`, outside the notes folder) each time it's opened; `Window._is_guide()` gives it its own title, keeps `last_book` unchanged and session-ignores `guide.SPELL_IGNORE`. F1 used to open About.
 - Ctrl+Space (`OutlineEditor.show_assist`): completions from `completion.py` (chapter words, then other `.notz` in the book folder via `BookWords`, then the Hunspell `.dic` stems for the word's alphabet), plus spelling fixes. Spelling fixes are hidden while the cursor is at the end of a word that has completions (an unfinished word always looks misspelled). Ctrl+Shift+Space cycles item type.
 - Clipboard MIME types: internal `application/x-notterizmus-nodes+json` and `-runs+json`, plus `text/html` and `text/plain`.
 - Paste: `importer.parse()` returns `None` for text without outline markers → it is joined into the current item (user wants long text in one item); Ctrl+Shift+V always joins.

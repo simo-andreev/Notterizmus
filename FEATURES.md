@@ -16,6 +16,9 @@ TopCoding (`app.topcoding.bg/assignments`).
   - spacer and blank lines
   - your own bullet markers
 
+## Learning the controls
+- **Getting Started** (F1, the menu, or the start page) opens a practice chapter that explains each control as an outline, with exercises to try in place. Each time you open it, it starts fresh; it's kept apart from your notes.
+
 ## Editing
 - Enter adds an item. Tab / Shift+Tab indent and outdent. Alt+↑/↓ moves an item.
 - Enter on an empty bullet under `Ⅰ.1.a)` turns it into `Ⅰ.1.b)`. Ctrl+Enter adds the next numbered item at the current level.
@@ -55,7 +58,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 ## Files and desktop
 - One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).
 - The last chapter you had open reopens on start.
-- Native GTK 4 / libadwaita app: dark and light themes, keyboard shortcuts dialog (Ctrl+?), About dialog (F1).
+- Native GTK 4 / libadwaita app: dark and light themes, keyboard shortcuts dialog (Ctrl+?), About dialog in the menu.
 - `install.sh` adds the app and its icon to the GNOME app grid. No root needed.
 
 ## Planned

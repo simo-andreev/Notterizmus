@@ -55,7 +55,7 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R23 | **Getting Started chapter**: Help → Getting Started opens a bundled sample chapter that explains each control as an outline you can edit, with the keys in bold | You're still learning the controls. The shortcuts dialog lists the keys but doesn't show them in use | S |
+| R23 | **Getting Started chapter**: F1, the menu or the start page opens a practice chapter that explains each control as an outline you can edit, with the keys in bold | You're still learning the controls. The shortcuts dialog lists the keys but doesn't show them in use | S. **Done**, not yet released |
 | R24 | **Command search**: one shortcut opens a search over every command; type a few letters to find and run one, with its shortcut shown next to it | You can use a feature before you remember its key, and you see the key each time you use it | M |
 | R1 | **Chapter sidebar**: books and chapters in a collapsible side panel; click to open; Ctrl+PgUp / Ctrl+PgDn for the previous or next chapter | The file dialog is the only way to switch, and it gets slower with every chapter | M |
 | R2 | **Chapter properties**: rename, renumber, move to another book, move to Trash | The number and title are fixed at creation and are part of the filename | S |
