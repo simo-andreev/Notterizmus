@@ -95,7 +95,9 @@ then the dictionary; on a misspelled word it lists fixes.
   TopCoding then draws a code background behind them.
 - An item is one paragraph; line breaks inside an item are not supported.
 - No drawings yet (TopCoding supports Excalidraw; see "Adding a block type").
-- Undo history lasts until the chapter is closed.
+- Undo history lasts until the chapter is closed. For older states, **Earlier
+  Versions** in the menu has copies kept when the chapter was opened and every
+  10 minutes while it was edited (the newest 20).
 
 ## Files
 
@@ -105,6 +107,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Formatting rules (optional) | `~/.config/notterizmus/rules.toml`, created from [`rules.example.toml`](notterizmus/rules.example.toml) by menu → **Edit Formatting Rules**; apply with **Reload Formatting Rules** |
 | Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
 | Getting Started practice copy, rewritten each time it's opened | `~/.local/share/notterizmus/Getting Started.notz` |
+| Earlier versions of each chapter (newest 20) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
 
 Rules cover numbering format per level, connector characters, spacing, spacer
 and blank lines, and your own bullet markers.
@@ -146,6 +149,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/guide.py` | The Getting Started chapter; update it when a control changes |
 | `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
 | `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
+| `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |

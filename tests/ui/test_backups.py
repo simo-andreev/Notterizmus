@@ -1,0 +1,98 @@
+"""Earlier versions (R4): copies kept on open and while editing, restored from a dialog."""
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from notterizmus import backups, paths
+from notterizmus.export import to_plain
+from notterizmus.guide import b, h
+from notterizmus.layout import layout
+from notterizmus.model import Document
+
+from . import support as ui
+
+
+class BackupsTest(ui.UITestCase):
+    def setUp(self):
+        super().setUp()
+        self.every = backups.BACKUP_EVERY
+
+    def tearDown(self):
+        backups.BACKUP_EVERY = self.every
+        while self.win.get_visible_dialog() is not None:
+            self.win.get_visible_dialog().force_close()
+            ui.pump(0.3)
+
+    def folder(self):
+        return backups.folder_for(self.win.doc.path, self.win.notes_root_path(), paths.backups_dir())
+
+    def texts(self):
+        return [Document.load(c.path).root.children[0].text for c in backups.list_backups(self.folder())]
+
+    def test_opening_a_chapter_keeps_a_copy(self):
+        ui.open_chapter([h("As opened")], book="Backups open")
+        self.assertEqual(self.texts(), ["As opened"])
+
+    def test_getting_started_has_no_copies(self):
+        self.win.lookup_action("guide").activate(None)
+        ui.settle()
+        root = paths.backups_dir()
+        self.assertFalse(any("Getting Started" in str(p) for p in root.rglob("*")) if root.exists() else False)
+
+    def test_saving_keeps_the_version_it_overwrites_at_most_every_interval(self):
+        doc = ui.open_chapter([h("v1")], book="Backups interval")
+        view = ui.row(doc.root.children[0]).view
+        ui.type_text(view, " v2")
+        self.win.save(quiet=True)
+        self.assertEqual(self.texts(), ["v1"], "within the interval: no new copy")
+        backups.BACKUP_EVERY = 0
+        time.sleep(1.1)  # copies are named by the second
+        ui.type_text(view, " v3")
+        self.win.save(quiet=True)
+        self.assertEqual(self.texts(), ["v1 v2", "v1"])
+
+    def test_restoring_an_earlier_version_and_undoing_it(self):
+        doc = ui.open_chapter([h("now")], book="Backups restore")
+        folder = self.folder()
+        for i, text in enumerate(["older", "old"]):
+            earlier = Document.load(doc.path)
+            earlier.root.children[0].runs = [ui_run(text)]
+            tmp = folder / "tmp.notz"
+            earlier.save(tmp)
+            target = folder / f"{(datetime.now() - timedelta(hours=2 - i)).strftime('%Y-%m-%dT%H-%M-%S')}.notz"
+            tmp.rename(target)
+        self.win.lookup_action("versions").activate(None)
+        ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
+        dlg = self.win.get_visible_dialog()
+        rows = [w for w in ui.walk(dlg) if isinstance(w, ui.Adw.ActionRow)]
+        self.assertEqual([r.get_subtitle() for r in rows], ["1 item · same as now", "1 item", "1 item"])
+        self.assertTrue(rows[0].get_title().startswith("Today"))
+        listbox = rows[0].get_parent()
+        listbox.select_row(rows[2])  # the oldest
+        ui.pump(0.1)
+        buf = self.win._versions_preview.get_buffer()
+        self.assertEqual(buf.get_text(*buf.get_bounds(), True),
+                         to_plain(layout(Document.load(rows[2]._backup.path).root, self.win.rules)))
+        restore = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.Button) and w.get_label() == "Restore")
+        restore.emit("clicked")
+        ui.pump_until(lambda: self.win.get_visible_dialog() is None)
+        ui.settle()
+        self.assertEqual(self.win.doc.root.children[0].text, "older")
+        self.assertEqual(self.win.doc.chapter_title, doc.chapter_title, "only the content changes")
+        ui.press(ui.row(self.win.doc.root.children[0]).view, "z", ctrl=True)
+        self.assertEqual(self.win.doc.root.children[0].text, "now")
+
+    def test_copies_follow_a_renamed_chapter(self):
+        doc = ui.open_chapter([h("kept")], title="Before", book="Backups rename")
+        before = self.folder()
+        self.assertTrue(before.is_dir())
+        self.win.apply_chapter_props(doc.path, doc.path.parent, doc.chapter_no, "After")
+        ui.pump(0.2)
+        self.assertFalse(before.exists())
+        self.assertEqual(self.texts(), ["kept"])
+        self.assertTrue(self.folder().name.endswith("After"))
+
+
+def ui_run(text):
+    from notterizmus.model import Run
+    return Run(text)

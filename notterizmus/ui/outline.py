@@ -370,6 +370,14 @@ class OutlineEditor(Gtk.ScrolledWindow):
             if self._suspend == 0:
                 self._commit(group)
 
+    def replace_content(self, root):
+        """Replace the whole chapter (e.g. with an earlier version) as one undoable step."""
+        self._undo.append(self._cur)
+        self._redo.clear()
+        content = json.dumps([c.to_json() for c in root.children], ensure_ascii=False)
+        first = next((n for n in display_order(root) if is_text(n)), None)
+        self._restore((content, first.id if first else None, -1))
+
     def undo(self):
         if not self._undo:
             self.emit("message", "Nothing to undo")

@@ -167,7 +167,9 @@ def build(rules=None):
              " moves it to the Trash (Undo brings it back). Right-click shows all of these.")),
           b((key("Ctrl+?"), " lists every keyboard shortcut, and ", key("F1"), " opens this guide again.")),
           b("Edit Formatting Rules in the menu changes the numbering, connectors, spacing and bullet markers."),
-          b("Open Notes Folder in the menu shows your chapter files.")),
+          b("Open Notes Folder in the menu shows your chapter files."),
+          b("Earlier Versions in the menu lists copies of the chapter kept when you opened it and every 10 "
+            "minutes while you edited it. Pick one to see it, and Restore puts it back; Ctrl+Z undoes that.")),
     ])
 
 

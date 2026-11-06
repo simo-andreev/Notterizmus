@@ -5,7 +5,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from .. import APP_ID, APP_NAME, VERSION, guide, library, paths
+from .. import APP_ID, APP_NAME, VERSION, backups, guide, library, paths
 from ..export import to_html, to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
@@ -73,6 +73,7 @@ class Window(Adw.ApplicationWindow):
         s2.append("Open Notes Folder", "win.open-folder")
         s0 = Gio.Menu()
         s0.append("Chapter Properties…", "win.rename")
+        s0.append("Earlier Versions…", "win.versions")
         spell = Gio.Menu()
         spell.append("Check Spelling", "win.spell")
         langs = Gio.Menu()
@@ -166,7 +167,7 @@ class Window(Adw.ApplicationWindow):
                          ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about),
                          ("prev-chapter", lambda *_: self.on_chapter_step(-1)),
                          ("next-chapter", lambda *_: self.on_chapter_step(1)),
-                         ("rename", self.on_rename)):
+                         ("rename", self.on_rename), ("versions", self.on_versions)):
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", cb)
             self.add_action(a)
@@ -298,6 +299,23 @@ class Window(Adw.ApplicationWindow):
             self.state["last_book"] = doc.book
         save_state(self.state)
         self._reload_sidebar()
+        self._backup(force=True)  # the chapter as it was when you opened it
+
+    @staticmethod
+    def notes_root_path():
+        return notes_root()
+
+    def _backup_folder(self):
+        return backups.folder_for(self.doc.path, notes_root(), paths.backups_dir())
+
+    def _backup(self, force=False):
+        """Keep a copy of the chapter as it is on disk (never in the way of saving)."""
+        if not self.doc or not self.doc.path or self._is_guide():
+            return
+        try:
+            backups.backup(self.doc.path, self._backup_folder(), force=force)
+        except OSError:
+            pass
 
     def open_path(self, path):
         try:
@@ -323,6 +341,10 @@ class Window(Adw.ApplicationWindow):
 
     def _after_move(self, moved, focus=None):
         """Point the open chapter at its new file and refresh the list."""
+        try:
+            backups.move(moved, notes_root(), paths.backups_dir())  # earlier versions follow
+        except OSError:
+            pass
         if self.doc and self.doc.path:
             new = next((n for o, n in moved.items() if library.same_file(o, self.doc.path)), None)
             if new is not None:
@@ -636,6 +658,7 @@ class Window(Adw.ApplicationWindow):
     def save(self, quiet=False):
         if not self.doc:
             return
+        self._backup()  # at most every few minutes: the version about to be overwritten
         try:
             self.doc.save()
             if not quiet:
@@ -739,6 +762,88 @@ class Window(Adw.ApplicationWindow):
             return
         self.set_doc(doc)
         self.toast("A practice copy: change anything. F1 brings back a fresh one.")
+
+    def on_versions(self, *_):
+        """Earlier Versions: pick a kept copy of this chapter, preview it, restore it."""
+        if not self.doc or self._is_guide() or not self.doc.path:
+            self.toast("Open a chapter of a book first")
+            return
+        self._flush_save()
+        found = backups.list_backups(self._backup_folder())
+        dlg = Adw.Dialog(title="Earlier Versions", content_width=860, content_height=600)
+        tv = Adw.ToolbarView()
+        header = Adw.HeaderBar(show_start_title_buttons=False, show_end_title_buttons=False)
+        cancel = Gtk.Button(label="Cancel")
+        cancel.connect("clicked", lambda *_: dlg.close())
+        restore = Gtk.Button(label="Restore", sensitive=False, css_classes=["suggested-action"])
+        header.pack_start(cancel)
+        header.pack_end(restore)
+        tv.add_top_bar(header)
+        if not found:
+            tv.set_content(Adw.StatusPage(
+                icon_name="document-open-recent-symbolic", title="No Earlier Versions Yet",
+                description="A copy is kept when you open a chapter, and every 10 minutes while you edit it."))
+        else:
+            lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE, css_classes=["navigation-sidebar"])
+            try:
+                now = Path(self.doc.path).read_bytes()
+            except OSError:
+                now = None
+            for b in found:
+                try:
+                    items = sum(1 for n in Document.load(b.path).root.walk() if n.kind != "root")
+                    subtitle = f"{items} item{'s' if items != 1 else ''}"
+                    if now is not None and b.path.read_bytes() == now:
+                        subtitle += " · same as now"
+                except (OSError, ValueError, KeyError):
+                    subtitle = "can't be read"
+                row = Adw.ActionRow(title=_when(b.when), subtitle=subtitle)
+                row._backup = b
+                lb.append(row)
+            preview = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
+                                   left_margin=16, right_margin=16, top_margin=12, bottom_margin=12)
+            self._versions_preview = preview
+
+            def selected(_lb, row):
+                restore.set_sensitive(row is not None)
+                if row is None:
+                    return
+                try:
+                    text = to_plain(layout(Document.load(row._backup.path).root, self.rules))
+                except (OSError, ValueError, KeyError) as e:
+                    text = f"This copy can't be read: {e}"
+                    restore.set_sensitive(False)
+                preview.get_buffer().set_text(text)
+
+            lb.connect("row-selected", selected)
+            paned = Gtk.Paned(position=250, shrink_start_child=False, resize_start_child=False,
+                              start_child=Gtk.ScrolledWindow(child=lb, hscrollbar_policy=Gtk.PolicyType.NEVER),
+                              end_child=Gtk.ScrolledWindow(child=preview, hexpand=True))
+            tv.set_content(paned)
+            lb.select_row(lb.get_row_at_index(0))
+
+            def do_restore(*_):
+                row = lb.get_selected_row()
+                dlg.close()
+                if row is not None:
+                    self.restore_version(row._backup.path)
+
+            restore.connect("clicked", do_restore)
+            lb.connect("row-activated", lambda *_: do_restore())
+        dlg.set_child(tv)
+        dlg.present(self)
+
+    def restore_version(self, path):
+        """Put an earlier version's content in the editor; Ctrl+Z takes it back."""
+        try:
+            earlier = Document.load(path)
+        except (OSError, ValueError, KeyError) as e:
+            self.toast(f"Could not read that version: {e}")
+            return
+        self._flush_save()
+        self._backup(force=True)  # what you had a moment ago is kept too
+        self.editor.replace_content(earlier.root)
+        self.toast("Earlier version restored. Ctrl+Z takes it back.")
 
     def on_show_plain(self, *_):
         text = to_plain(layout(self.doc.root, self.rules))
@@ -863,3 +968,14 @@ def _restore_from_trash(path):
         return True
     except GLib.Error:
         return False
+
+
+def _when(dt):
+    """'Today 14:05', 'Yesterday 09:30' or '2026-11-02 18:40'."""
+    from datetime import date, timedelta
+    day = dt.date()
+    if day == date.today():
+        return f"Today {dt:%H:%M}"
+    if day == date.today() - timedelta(days=1):
+        return f"Yesterday {dt:%H:%M}"
+    return f"{dt:%Y-%m-%d %H:%M}"
