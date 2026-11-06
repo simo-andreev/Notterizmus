@@ -159,7 +159,8 @@ def build(rules=None):
              "its own file, saved automatically.")),
           b(("The chapter list on the left shows each book's chapters in order; click one to open it, or click "
              "a book to fold it. ", key("F9"), " shows or hides the list, and ", key("Ctrl+PgUp"), " or ",
-             key("Ctrl+PgDn"), " opens the previous or next chapter of the book.")),
+             key("Ctrl+PgDn"), " opens the previous or next chapter of the book. Drag the edge between the "
+             "list and the text to make the list wider; double-click the edge for the default width.")),
           b((key("F2"), " (or Chapter Properties in the menu) renames the chapter, changes its number or moves "
              "it to another book; on a book in the list, it renames the book. In the list, drag a chapter or "
              "press ", key("Alt+↑"), " or ", key("Alt+↓"), " to reorder, and ", key("Delete"),

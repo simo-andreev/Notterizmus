@@ -121,3 +121,99 @@ class SidebarTest(ui.UITestCase):
         ui.pump(0.1)
         self.assertIn("Added outside", [label for label, _p, _s in self.win.sidebar.chapter_rows()])
         self.assertEqual(Path(self.win.sidebar.focused_row()._path).resolve(), paths[0].resolve())
+
+
+class SidebarWidthTest(ui.UITestCase):
+    def setUp(self):
+        super().setUp()
+        if not self.win.split.get_show_sidebar():
+            self.win.lookup_action("sidebar").activate(None)
+        self.win.set_sidebar_width(260, save=True)
+        ui.pump(0.3)
+
+    def tearDown(self):
+        self.win.set_sidebar_width(260, save=True)
+        ui.pump(0.2)
+
+    def drag(self, dx):
+        """Drag the handle by dx, as the overlay's drag gesture reports it."""
+        gesture = next(c for c in self.ctrls(self.win._overlay) if isinstance(c, ui.Gtk.GestureDrag))
+        ok, box = self.win.handle.compute_bounds(self.win._overlay)
+        self.win._handle_drag_begin(gesture, box.origin.x + 3, 200)
+        self.win._handle_drag_update(gesture, dx, 0)
+        ui.pump(0.2)
+        self.win._handle_drag_end(gesture, dx, 0)
+        ui.pump(0.3)
+
+    @staticmethod
+    def ctrls(widget):
+        lst = widget.observe_controllers()
+        return [lst.get_item(i) for i in range(lst.get_n_items())]
+
+    def saved(self):
+        return json.loads((config_dir() / "state.json").read_text()).get("sidebar_width")
+
+    def test_the_handle_sits_on_the_edge(self):
+        self.assertEqual(self.win.sidebar.get_width(), 260)
+        self.assertTrue(self.win.handle.get_visible())
+        ok, box = self.win.handle.compute_bounds(self.win._overlay)
+        self.assertLessEqual(abs(box.origin.x + box.size.width / 2 - 260), 1)
+
+    def test_dragging_the_edge_resizes_the_list_and_is_remembered(self):
+        self.drag(80)
+        self.assertEqual(self.win.sidebar.get_width(), 340)
+        self.assertEqual(self.saved(), 340)
+        self.assertFalse(self.win.split.get_collapsed())
+        again = type(self.win)(self.app)  # a new window starts at the saved width
+        try:
+            self.assertEqual(again._sidebar_w, 340)
+        finally:
+            again.destroy()
+
+    def test_dragging_stops_at_the_limits(self):
+        self.drag(-500)
+        self.assertEqual(self.win.sidebar.get_width(), 180)
+        self.drag(3000)
+        room = self.win.get_width() - self.win._text_min_width() - 21
+        self.assertEqual(self.win.sidebar.get_width(), min(520, room))
+        self.assertFalse(self.win.split.get_collapsed(), "dragging never pushes the text out")
+
+    def test_a_drag_that_starts_elsewhere_does_nothing(self):
+        gesture = next(c for c in self.ctrls(self.win._overlay) if isinstance(c, ui.Gtk.GestureDrag))
+        self.win._handle_drag_begin(gesture, 700, 200)  # in the text, not on the handle
+        self.win._handle_drag_update(gesture, 100, 0)
+        self.win._handle_drag_end(gesture, 100, 0)
+        ui.pump(0.2)
+        self.assertEqual(self.win.sidebar.get_width(), 260)
+
+    def test_double_click_on_the_handle_restores_the_default(self):
+        self.drag(100)
+        click = next(c for c in self.ctrls(self.win.handle) if isinstance(c, ui.Gtk.GestureClick))
+        click.emit("pressed", 2, 3, 100)
+        ui.pump(0.3)
+        self.assertEqual(self.win.sidebar.get_width(), 260)
+        self.assertEqual(self.saved(), 260)
+
+    def test_a_wide_list_turns_into_an_overlay_sooner(self):
+        if not ui.FRAMES:
+            self.skipTest("window resizing is checked on Weston")
+        self.win.set_sidebar_width(400, save=True)
+        try:
+            self.win.set_default_size(1000, 800)  # 400 + the text column don't fit in 1000
+            self.assertTrue(ui.pump_until(lambda: self.win.split.get_collapsed()))
+            self.assertFalse(self.win.handle.get_visible())
+        finally:
+            self.win.set_default_size(1100, 800)
+            ui.pump_until(lambda: not self.win.split.get_collapsed())
+            ui.pump(0.3)
+        self.assertTrue(self.win.handle.get_visible())
+
+    def test_a_click_without_moving_changes_nothing(self):
+        gesture = next(c for c in self.ctrls(self.win._overlay) if isinstance(c, ui.Gtk.GestureDrag))
+        ok, box = self.win.handle.compute_bounds(self.win._overlay)
+        self.win._handle_drag_begin(gesture, box.origin.x + 3, 200)
+        self.win._handle_drag_update(gesture, 1, 0)  # a wobble, not a drag
+        self.win._handle_drag_end(gesture, 1, 0)
+        ui.pump(0.2)
+        self.assertEqual(self.win.sidebar.get_width(), 260)
+        self.assertFalse(self.win.handle.has_css_class("dragging"))

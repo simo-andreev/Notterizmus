@@ -59,7 +59,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).
 - Chapter Properties (F2): rename a chapter, change its number (a number another chapter has is swapped with it) or move it to another book. On a book in the list, F2 renames the book: its folder and the name stored in its chapters.
 - Reorder chapters by dragging them in the list or with Alt+↑ / Alt+↓. Chapter numbers are the book's own, so reordering hands out the existing numbers in the new order (1, 2, 5 stay 1, 2, 5). Delete moves a chapter to the Trash, with Undo.
-- The chapter list on the left (F9) shows every book in the notes folder with its chapters in order; click a chapter to open it, click a book to fold it. Ctrl+PgUp / Ctrl+PgDn open the previous or next chapter of the book. In a narrow window the list slides over the text.
+- The chapter list on the left (F9) shows every book in the notes folder with its chapters in order; click a chapter to open it, click a book to fold it. Ctrl+PgUp / Ctrl+PgDn open the previous or next chapter of the book. Drag the edge between the list and the text to resize it (the width is remembered; double-click the edge for the default). In a window too narrow for the list and the text side by side, the list slides over the text.
 - The last chapter you had open reopens on start.
 - Chapters saved by a newer version open safely: block types this version doesn't know are shown as a read-only note, kept unchanged in the file, and left out of Copy for TopCoding.
 - Native GTK 4 / libadwaita app: dark and light themes, keyboard shortcuts dialog (Ctrl+?), About dialog in the menu.

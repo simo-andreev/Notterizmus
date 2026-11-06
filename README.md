@@ -66,6 +66,7 @@ walks through the controls; each time you open it, it starts fresh.
 | Show or hide the chapter list (books and their chapters, on the left) | F9 |
 | Chapter properties: rename, change the number, move to another book (on a book in the list: rename the book) | F2 |
 | In the chapter list: reorder, move to Trash, more | drag, or Alt+↑ / Alt+↓; Delete; right-click |
+| Resize the chapter list (double-click the edge for the default width) | drag the edge between the list and the text |
 | Getting Started: a practice chapter that shows the controls | F1 |
 | All shortcuts | Ctrl+? |
 

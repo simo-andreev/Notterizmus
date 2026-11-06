@@ -15,6 +15,8 @@ from .outline import OutlineEditor
 from .sidebar import ChapterSidebar
 
 RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
+SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX = 260, 180, 520  # chapter list width, px
+TEXT_ROOM = 20  # spare px beside the text column's minimum width
 
 
 def notes_root():
@@ -127,15 +129,35 @@ class Window(Adw.ApplicationWindow):
         self.sidebar.connect("open-chapter", lambda _s, path: self._open_from_sidebar(path))
         self.sidebar.on_reorder = self._reorder_chapters
         self.sidebar.popup = self.editor.popup_menu
-        self.split = Adw.OverlaySplitView(sidebar=self.sidebar, content=tv,
-                                          min_sidebar_width=200, max_sidebar_width=300)
-        # The header needs about 620 px and the sidebar 200-300 px next to it.
-        bp = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 860sp"))
-        bp.add_setter(self.split, "collapsed", True)
-        self.add_breakpoint(bp)
+        self.split = Adw.OverlaySplitView(sidebar=self.sidebar, content=tv)
+        # Collapse when the text column doesn't fit beside the list; set_sidebar_width
+        # keeps this condition in step with the list's width.
+        self._collapse = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 900px"))
+        self._collapse.add_setter(self.split, "collapsed", True)
+        self.add_breakpoint(self._collapse)
         self.set_size_request(640, 400)
-        self.toasts.set_child(self.split)
+        # The split view has no resize handle: a thin strip over the edge does it. The
+        # drag is tracked on the overlay, which doesn't move while the handle does.
+        self.handle = Gtk.Box(css_classes=["sidebar-handle"],
+                              tooltip_text="Drag to resize the chapter list · double-click for the default width")
+        self.handle.set_cursor_from_name("col-resize")
+        reset = Gtk.GestureClick()
+        reset.connect("pressed", lambda _g, n, *_: n == 2 and self.set_sidebar_width(SIDEBAR_DEFAULT, save=True))
+        self.handle.add_controller(reset)
+        overlay = Gtk.Overlay(child=self.split)
+        overlay.add_overlay(self.handle)
+        drag = Gtk.GestureDrag()
+        drag.connect("drag-begin", self._handle_drag_begin)
+        drag.connect("drag-update", self._handle_drag_update)
+        drag.connect("drag-end", self._handle_drag_end)
+        overlay.add_controller(drag)
+        self._overlay = overlay
+        self.toasts.set_child(overlay)
         self.set_content(self.toasts)
+        self._sidebar_w = SIDEBAR_DEFAULT
+        self._drag_from = None
+        self.set_sidebar_width(self.state.get("sidebar_width", SIDEBAR_DEFAULT))
+        self.split.connect("notify::collapsed", lambda *_: self._update_handle())
 
         for name, cb in (("new", self.on_new), ("open", self.on_open), ("save", lambda *_: self.save()),
                          ("copy", self.on_copy), ("insert-table", lambda *_: self.editor.insert_table()),
@@ -514,7 +536,61 @@ class Window(Adw.ApplicationWindow):
             self.open_path(path)
         self._reload_sidebar()
 
+    def _text_min_width(self):
+        return self.split.get_content().measure(Gtk.Orientation.HORIZONTAL, -1)[0]
+
+    def set_sidebar_width(self, width, save=False):
+        w = int(max(SIDEBAR_MIN, min(SIDEBAR_MAX, width)))
+        self._sidebar_w = w
+        self.split.set_min_sidebar_width(w)
+        self.split.set_max_sidebar_width(w)
+        self._collapse.set_condition(
+            Adw.BreakpointCondition.parse(f"max-width: {w + self._text_min_width() + TEXT_ROOM}px"))
+        self._update_handle()
+        if save:
+            self.state["sidebar_width"] = w
+            save_state(self.state)
+
+    def _update_handle(self):
+        self.handle.set_visible(self.split.get_show_sidebar() and not self.split.get_collapsed())
+        rtl = self.get_direction() == Gtk.TextDirection.RTL
+        edge = max(0, self._sidebar_w - 3)  # 6 px wide, centred on the edge
+        self.handle.set_halign(Gtk.Align.END if rtl else Gtk.Align.START)
+        self.handle.set_margin_start(0 if rtl else edge)
+        self.handle.set_margin_end(edge if rtl else 0)
+
+    def _handle_drag_begin(self, gesture, x, y):
+        ok, box = self.handle.compute_bounds(self._overlay)
+        if not (self.handle.get_visible() and ok and box.origin.x - 2 <= x <= box.origin.x + box.size.width + 2):
+            gesture.set_state(Gtk.EventSequenceState.DENIED)  # not on the handle
+            return
+        # Claim only once the pointer moves (in _handle_drag_update): claiming on press
+        # would cancel the handle's own click gesture, so double-click couldn't reset.
+        self._drag_from = self._sidebar_w
+
+    def _handle_drag_update(self, gesture, dx, _dy):
+        if self._drag_from is None:
+            return
+        if not self.handle.has_css_class("dragging"):
+            if abs(dx) < 3:
+                return
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+            self.handle.add_css_class("dragging")
+        if self.get_direction() == Gtk.TextDirection.RTL:
+            dx = -dx
+        # never collapse while dragging ("max-width: N" includes N, hence the extra pixel)
+        room = self.get_width() - self._text_min_width() - TEXT_ROOM - 1
+        self.set_sidebar_width(min(self._drag_from + dx, room))
+
+    def _handle_drag_end(self, *_):
+        dragged = self.handle.has_css_class("dragging")
+        self._drag_from = None
+        self.handle.remove_css_class("dragging")
+        if dragged:
+            self.set_sidebar_width(self._sidebar_w, save=True)
+
     def _on_sidebar_shown(self, split, _pspec):
+        self._update_handle()
         on = split.get_show_sidebar()
         self.lookup_action("sidebar").set_state(GLib.Variant.new_boolean(on))
         if not split.get_collapsed():  # an overlay closing by itself isn't a preference
