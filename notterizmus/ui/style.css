@@ -70,3 +70,13 @@ popover.ntz-menu .menu-num {
   opacity: 0.55;
   font-feature-settings: "tnum";
 }
+
+/* a block type from a newer version: read-only note */
+.ntz-unknown {
+  border: 1px dashed alpha(currentColor, 0.35);
+  border-radius: 6px;
+  padding: 4px 4px 4px 10px;
+}
+.ntz-unknown > image {
+  margin-top: 4px;
+}

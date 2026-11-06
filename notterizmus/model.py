@@ -7,6 +7,9 @@ Node kinds:
   table    - table block; rows live in node.data["rows"]
 Future kinds (e.g. "drawing") only need a data codec here, a layout rule
 in layout.py, an exporter in export.py and a row widget in ui/rows.py.
+
+Kinds and fields this version doesn't know (written by a newer one) are kept
+unchanged when the file is saved; the editor shows such blocks read-only.
 """
 from __future__ import annotations
 
@@ -81,6 +84,14 @@ def _table_dec(d):
 
 DATA_CODECS = {"table": (_table_enc, _table_dec)}
 
+TEXT_KINDS = ("heading", "bullet")
+BLOCK_KINDS = ("heading", "bullet", "table")  # any other kind comes from a newer version
+_KNOWN_FIELDS = ("kind", "id", "runs", "marker", "data", "children")
+
+
+def is_text(node):
+    return node.kind in TEXT_KINDS
+
 
 def new_table_data(rows=2, cols=2):
     return {"header": False, "rows": [[[] for _ in range(cols)] for _ in range(rows)]}
@@ -97,6 +108,7 @@ class Node:
         self.id = id or uuid.uuid4().hex[:12]
         self.parent = None
         self.children = []
+        self.extra = {}  # fields from a newer version, saved back unchanged
         for c in children or []:
             self.insert(len(self.children), c)
 
@@ -133,6 +145,11 @@ class Node:
 
     def to_json(self):
         d = {"kind": self.kind, "id": self.id}
+        if self.kind not in BLOCK_KINDS and self.kind != "root":
+            d.update(self.extra)  # a block from a newer version: exactly as it was read
+            if self.children:
+                d["children"] = [c.to_json() for c in self.children]
+            return d
         if self.kind in ("heading", "bullet"):
             d["runs"] = runs_to_json(self.runs)
         if self.kind == "bullet":
@@ -143,22 +160,31 @@ class Node:
             d["data"] = self.data
         if self.children:
             d["children"] = [c.to_json() for c in self.children]
+        for k, v in self.extra.items():
+            d.setdefault(k, v)
         return d
 
     @staticmethod
     def from_json(d):
         kind = d["kind"]
+        children = [Node.from_json(c) for c in d.get("children", [])]
+        if kind not in BLOCK_KINDS:
+            node = Node(kind, id=d.get("id"), children=children)
+            node.extra = {k: v for k, v in d.items() if k not in ("kind", "id", "children")}
+            return node
         data = d.get("data") or {}
         if kind in DATA_CODECS:
             data = DATA_CODECS[kind][1](data)
-        return Node(
+        node = Node(
             kind,
             runs=runs_from_json(d.get("runs")),
             marker=d.get("marker", "dot"),
             data=data,
             id=d.get("id"),
-            children=[Node.from_json(c) for c in d.get("children", [])],
+            children=children,
         )
+        node.extra = {k: v for k, v in d.items() if k not in _KNOWN_FIELDS}
+        return node
 
 
 def can_contain(parent, child):

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .model import Run
+from .model import BLOCK_KINDS, Run
 
 
 @dataclass
@@ -30,7 +30,7 @@ class Seg:
 
 @dataclass
 class Line:
-    kind: str  # item | spacer | blank | table
+    kind: str  # item | spacer | blank | table | unknown (a block from a newer version)
     prefix: list = field(default_factory=list)  # list[Seg]
     node: object = None
 
@@ -89,7 +89,8 @@ class _Layout:
             if c.kind == "heading":
                 n += 1
                 is_last = i == last_head
-                prev = kids[i - 1] if i > 0 else None
+                # blocks from a newer version aren't exported, so they don't count here
+                prev = next((k for k in reversed(kids[:i]) if k.kind in BLOCK_KINDS), None)
                 if self.t["spacer_lines"] and (
                         prev is None or prev.kind == "heading" or self.t["spacer_after_leaf"]):
                     self.out.append(Line("spacer", [self.conn(inner + self.t["trunk"])]))
@@ -109,6 +110,9 @@ class _Layout:
         prefix = [self.conn(base)] if base else []
         if c.kind == "table":
             self.out.append(Line("table", prefix, c))
+            return
+        if c.kind not in BLOCK_KINDS:  # shown in the editor, left out of exports
+            self.out.append(Line("unknown", prefix, c))
             return
         if c.kind == "bullet":
             prefix.append(Seg(self.r.marker_symbol(c.marker) + " ", "marker"))

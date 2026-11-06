@@ -13,12 +13,12 @@ from ..export import runs_html, to_html, to_plain
 from ..importer import html_items, join_lines, parse, text_items
 from ..layout import layout
 from ..model import (Node, Run, can_contain, display_order, enclosing_heading, fresh_ids,
-                     heading_numbers, indent, leaf_insert_index, move, new_table_data,
+                     heading_numbers, indent, is_text, leaf_insert_index, move, new_table_data,
                      normalize_runs, outdent, remove_promote, runs_from_json, runs_text,
                      runs_to_json, set_kind)
 from ..spell import should_check
 from .richtext import SPELL
-from .rows import ROW_TYPES, TableRow, TextRow, _mods, _prefix_markup
+from .rows import TableRow, TextRow, _mods, _prefix_markup, row_type
 
 NODES_MIME = "application/x-notterizmus-nodes+json"
 RUNS_MIME = "application/x-notterizmus-runs+json"
@@ -191,7 +191,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
         self.current = self.cur_view = None
         self.sel, self.mc_views = [], []
         self._ensure_nonempty()
-        first = next((n for n in display_order(doc.root) if n.kind != "table"), None)
+        first = next((n for n in display_order(doc.root) if is_text(n)), None)
         self.refresh(focus=first, offset=-1)
         self._undo, self._redo = [], []
         self._cur = self._snapshot()
@@ -207,7 +207,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
             self.doc.root.append(Node("heading"))
 
     def _row(self, node):
-        cls = ROW_TYPES.get(node.kind, TextRow)
+        cls = row_type(node.kind)
         row = self.rows.get(node.id)
         if row is None or type(row) is not cls:
             row = cls(self, node)
@@ -244,7 +244,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
         wanted = []
         nlabels = 0
         for ln in layout(self.doc.root, self.rules):
-            if ln.kind in ("item", "table"):
+            if ln.kind in ("item", "table", "unknown"):
                 row = self._row(ln.node)
                 row.set_prefix(ln.prefix)
                 for k in ("heading", "bullet"):
@@ -396,14 +396,14 @@ class OutlineEditor(Gtk.ScrolledWindow):
         old_rows, self.rows = self.rows, {}
         for n in self.doc.root.walk():
             r = old_rows.get(n.id)
-            if r is None or type(r) is not ROW_TYPES.get(n.kind, TextRow):
+            if r is None or type(r) is not row_type(n.kind):
                 continue
             same = (r.node.runs == n.runs) if isinstance(r, TextRow) else (r.node.data == n.data)
             r.node = n
             if not same:
                 if isinstance(r, TextRow):
                     r.reload()
-                else:
+                elif isinstance(r, TableRow):
                     r.header_btn.set_active(bool(n.data.get("header")))
                     r.build()
             self.rows[n.id] = r
@@ -648,7 +648,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
             if isinstance(row, TableRow):
                 row.focus_cell(0 if delta > 0 else len(row.rows) - 1, 0)
                 return True
-            if row:
+            if row and row.views():  # blocks from a newer version can't take the cursor
                 row.focus(0 if delta > 0 else -1)
                 return True
             i += delta
@@ -701,7 +701,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
     def _prev_text_node(self, node):
         order = self._order()
         for n in reversed(order[:order.index(node)]):
-            if n.kind != "table":
+            if is_text(n):
                 return n
         return None
 
@@ -719,7 +719,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
                 self._ensure_nonempty()
                 self.refresh(focus=target or self._order()[0], offset=-1)
             return True
-        if node.children or prev is None or prev.kind == "table":
+        if node.children or prev is None or not is_text(prev):
             return True
         with self._op():
             join = len(prev.text)
@@ -734,7 +734,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
         order = self._order()
         idx = order.index(node)
         nxt = order[idx + 1] if idx + 1 < len(order) else None
-        if nxt is None or nxt.kind == "table" or nxt.children:
+        if nxt is None or not is_text(nxt) or nxt.children:
             return True
         with self._op():
             join = len(node.text)
@@ -772,7 +772,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
 
     def _set_kind_cmd(self, target):
         node = self._menu_node or self.current
-        if node is None or node.kind == "table":
+        if node is None or not is_text(node):
             return
         kind, _, marker = target.partition(":")
         self.change_kind(node, kind, marker or None)
@@ -845,8 +845,8 @@ class OutlineEditor(Gtk.ScrolledWindow):
             self._ensure_nonempty()
             self.sel = []
             order = self._order()
-            target = next((n for n in reversed(order[:max(first, 1)]) if n.kind != "table"), None) \
-                or next((n for n in order if n.kind != "table"), order[0])
+            target = next((n for n in reversed(order[:max(first, 1)]) if is_text(n)), None) \
+                or next((n for n in order if is_text(n)), order[0])
             self.refresh(focus=target, offset=-1)
 
     # -- item selection (Ctrl+A, Ctrl+W, Shift+Up/Down) -------------------------------------
@@ -1372,7 +1372,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
         self.clear_carets()
         node = row.node
         m = Gio.Menu()
-        if node.kind != "table":
+        if is_text(node):
             m.append_section("Item Type", self._kind_section(node))
             m.append_section("Add", self.add_menu_model(node))
             d = Gio.Menu()
@@ -1380,7 +1380,7 @@ class OutlineEditor(Gtk.ScrolledWindow):
             m.append_section(None, d)
         else:
             d = Gio.Menu()
-            d.append_item(_mi("Delete Table", "ed.delete-item"))
+            d.append_item(_mi("Delete Table" if node.kind == "table" else "Delete Block", "ed.delete-item"))
             m.append_section(None, d)
         self._popup(m, row.prefix, node=node)
 

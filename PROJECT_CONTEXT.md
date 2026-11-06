@@ -9,6 +9,8 @@
 - Use the platform's native stack: Python 3.11+, PyGObject, GTK 4, libadwaita (≥1.8), Enchant via ctypes. No pip dependencies.
 - Keep `model.py`, `rules.py`, `layout.py`, `export.py`, `importer.py`, `spell.py`, `completion.py`, `paths.py`, `guide.py` free of GTK so they stay unit-testable.
 - When a control or shortcut changes, update the Getting Started chapter (`guide.py`) as well as README.md, FEATURES.md and the shortcuts dialog. `tests/test_guide.py` fails if the guide teaches a key that README.md doesn't mention, or if the guide gains a word the English dictionary flags (add it to `guide.SPELL_IGNORE`).
+- To ask whether a node holds text, use `model.is_text(node)` (heading or bullet), never `kind != "table"`: kinds from a newer version are neither.
+- Never drop data the code doesn't understand: `Node.extra` carries unknown fields of known kinds, and unknown kinds keep their whole JSON; both are saved back unchanged.
 - Every document mutation in the editor goes through `with self._op():` or `self._commit(group)` in `ui/outline.py`; otherwise it is neither undoable nor autosaved.
 - Never remove and re-append row widgets: `refresh()` reorders children in place (`reorder_child_after`) and reuses rows by node id and spacer labels. Re-adding rows makes the text jump (bug reported and fixed).
 - Scrolling follows the cursor via `ensure_visible()` (tick callback, retried until new rows are laid out); the viewport's own `scroll_to_focus` is off. Every new text view must be registered with `track_cursor()`.
@@ -29,6 +31,7 @@
 - Enter on an empty bullet under a heading converts it to the heading's next sibling (Ⅰ.1.a + bullets → Ⅰ.1.b); Ctrl+Enter does the same from anywhere.
 - Multi-cursor: Ctrl tapped twice within 0.4 s and held, then ↑/↓; extra carets are GtkTextMarks drawn in `do_snapshot_layer`.
 - Getting Started (F1, `win.guide`): `guide.document()` writes a fresh copy to `paths.guide_path()` (`$XDG_DATA_HOME/notterizmus/`, outside the notes folder) each time it's opened; `Window._is_guide()` gives it its own title, keeps `last_book` unchanged and session-ignores `guide.SPELL_IGNORE`. F1 used to open About.
+- Unknown kinds (R6): `layout` emits a `Line("unknown")` and skips their children, the exporters drop those lines, spacer decisions ignore them, the editor shows `rows.UnknownRow` (read-only note with a delete button, no text view, skipped by the cursor).
 - Ctrl+Space (`OutlineEditor.show_assist`): completions from `completion.py` (chapter words, then other `.notz` in the book folder via `BookWords`, then the Hunspell `.dic` stems for the word's alphabet), plus spelling fixes. Spelling fixes are hidden while the cursor is at the end of a word that has completions (an unfinished word always looks misspelled). Ctrl+Shift+Space cycles item type.
 - Clipboard MIME types: internal `application/x-notterizmus-nodes+json` and `-runs+json`, plus `text/html` and `text/plain`.
 - Paste: `importer.parse()` returns `None` for text without outline markers → it is joined into the current item (user wants long text in one item); Ctrl+Shift+V always joins.

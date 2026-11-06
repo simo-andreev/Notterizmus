@@ -33,7 +33,7 @@ def _json_texts(items):
         for key in ("runs",):
             if it.get(key):
                 yield "".join(r.get("t", "") for r in it[key])
-        for row in (it.get("data") or {}).get("rows", []):
+        for row in (it.get("data") or {}).get("rows", []) if it.get("kind") == "table" else []:
             for cell in row:
                 yield "".join(r.get("t", "") for r in cell)
         yield from _json_texts(it.get("children", []))

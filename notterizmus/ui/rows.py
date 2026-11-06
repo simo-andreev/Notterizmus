@@ -283,4 +283,40 @@ class TableRow(_PrefixRow):
         self._changed_struct(None)
 
 
+class UnknownRow(_PrefixRow):
+    """A block type this version doesn't know, written by a newer Notterizmus. Its data is
+    saved back unchanged; here it's a read-only note, left out of Copy for TopCoding."""
+
+    def __init__(self, editor, node):
+        super().__init__(editor, node)
+        box = Gtk.Box(spacing=8, hexpand=True)
+        box.add_css_class("ntz-unknown")
+        box.append(Gtk.Image(icon_name="dialog-information-symbolic", valign=Gtk.Align.START))
+        self.label = Gtk.Label(xalign=0, wrap=True, hexpand=True)
+        self.label.add_css_class("dim-label")
+        box.append(self.label)
+        rm = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete this block",
+                        valign=Gtk.Align.START)
+        rm.add_css_class("flat")
+        rm.connect("clicked", lambda _b: editor.delete_items([self.node]))
+        box.append(rm)
+        self.append(box)
+        self.reload()
+
+    def reload(self):
+        self.label.set_text(f"A “{self.node.kind}” block made with a newer version of Notterizmus. "
+                            "It's kept in the file unchanged, but it can't be shown or edited here, "
+                            "and Copy for TopCoding leaves it out.")
+
+    def focus(self, offset=0):
+        pass
+
+    def cursor_offset(self):
+        return None
+
+
 ROW_TYPES = {"heading": TextRow, "bullet": TextRow, "table": TableRow}
+
+
+def row_type(kind):
+    return ROW_TYPES.get(kind, UnknownRow)

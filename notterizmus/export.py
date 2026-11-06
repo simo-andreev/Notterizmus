@@ -61,6 +61,8 @@ def to_html(lines, code_prefix=False):
             para.clear()
 
     for ln in lines:
+        if ln.kind == "unknown":
+            continue
         if ln.kind == "table":
             flush()
             parts.append(_table_html(ln.node))
@@ -90,6 +92,8 @@ def _table_plain(prefix, node):
 def to_plain(lines):
     out = []
     for ln in lines:
+        if ln.kind == "unknown":
+            continue
         if ln.kind == "table":
             out += _table_plain(ln.prefix_text(), ln.node)
         else:
