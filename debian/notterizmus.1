@@ -1,4 +1,4 @@
-.TH NOTTERIZMUS 1 "2026-11-05" "notterizmus 1.1.0" "User Commands"
+.TH NOTTERIZMUS 1 "2026-11-06" "notterizmus 1.2.0" "User Commands"
 .SH NAME
 notterizmus \- outline editor for book chapter notes
 .SH SYNOPSIS
@@ -24,8 +24,13 @@ Without a
 argument the last opened chapter is reopened.
 .PP
 Press
+.B F1
+in the application for Getting Started, a practice chapter that shows each
+control, and
 .B Ctrl+?
-in the application for the list of keyboard shortcuts.
+for the list of keyboard shortcuts.
+.B F9
+shows or hides the chapter list.
 .SH FILES
 .TP
 .I ~/.config/notterizmus/rules.toml
@@ -33,7 +38,11 @@ Optional formatting rules: numbering formats, connector characters, spacing and
 bullet markers.
 .TP
 .I ~/.config/notterizmus/state.json
-Last opened chapter and spell-checking preferences.
+Last opened chapter, spell-checking preferences and the chapter list's
+visibility and width.
+.TP
+.I ~/.local/share/notterizmus/Getting Started.notz
+The Getting Started practice copy, rewritten each time it is opened.
 .SH SEE ALSO
 .I /usr/share/doc/notterizmus/FEATURES.md
 .SH AUTHOR

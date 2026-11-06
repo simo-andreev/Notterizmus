@@ -1,3 +1,19 @@
+notterizmus (1.2.0) resolute; urgency=medium
+
+  * Chapter list on the left (F9) with Ctrl+PgUp/PgDn for the previous
+    or next chapter; drag its edge to resize it.
+  * Chapter Properties (F2): rename, renumber or move a chapter to
+    another book; F2 on a book renames it.
+  * Reorder chapters by dragging them or with Alt+Up/Down; Delete moves
+    one to the Trash, with Undo.
+  * Getting Started (F1): a practice chapter that shows each control;
+    About is in the menu only.
+  * Chapters saved by a newer version keep unknown parts unchanged and
+    show them read-only.
+  * Fix GTK size warnings for table cells.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Fri, 06 Nov 2026 19:12:06 +0200
+
 notterizmus (1.1.0) resolute; urgency=medium
 
   * Ctrl+Space: spelling fixes and word completion; item type cycling

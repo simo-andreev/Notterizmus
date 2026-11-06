@@ -35,6 +35,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.2.0" date="2026-11-06">
+      <description>
+        <p>Moving around your books, and learning the controls.</p>
+        <ul>
+          <li>A chapter list on the left shows every book with its chapters (F9). Ctrl+PgUp and Ctrl+PgDn open the previous or next chapter, and the list's edge can be dragged to resize it.</li>
+          <li>Chapter Properties (F2) renames a chapter, changes its number or moves it to another book; F2 on a book renames the book. Drag chapters or press Alt+Up and Alt+Down in the list to reorder them; Delete moves one to the Trash, with Undo.</li>
+          <li>Getting Started (F1) opens a practice chapter that shows each control. About is now only in the menu.</li>
+          <li>Chapters saved by a newer version open safely: parts this version doesn't know are kept unchanged and shown read-only.</li>
+          <li>Fixed warnings printed for chapters with tables.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-11-05">
       <description>
         <p>Typing aids and a scrolling fix.</p>

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 — 2026-11-06
+
+- Chapter list on the left (F9): books from the notes folder with their chapters in order; click to open, click a book to fold it. Ctrl+PgUp / Ctrl+PgDn open the previous or next chapter. Drag its edge to resize it (remembered; double-click for the default). In a narrow window it slides over the text.
+- Chapter Properties (F2): rename a chapter, change its number (a number another chapter has is swapped) or move it to another book. F2 on a book renames it, folder and stored name.
+- Reorder chapters by dragging them in the list or with Alt+↑ / Alt+↓; the book's existing numbers are handed out in the new order. Delete moves a chapter to the Trash, with Undo.
+- Getting Started (F1): a fresh practice chapter that explains each control. F1 used to open About, which is now in the menu only.
+- Chapters saved by a newer version open safely: unknown block types are shown read-only and left out of Copy for TopCoding, and unknown blocks and fields are saved back unchanged.
+- Fix: no more GTK size warnings for table cells; the Hunspell `.aff` file is closed after reading.
+- Development: UI tests that run off-screen (`scripts/ui-tests.sh`, on Weston or Broadway).
+
 ## 1.1.0 — 2026-11-05
 
 - Ctrl+Space: spelling fixes and word completion (chapter, book, dictionary). Item type cycling moved to Ctrl+Shift+Space.
