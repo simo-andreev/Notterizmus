@@ -102,10 +102,11 @@ def dictionary_words(tag):
             continue
         enc = "utf-8"
         try:
-            for line in open(d / f"{tag}.aff", encoding="latin-1"):
-                if line.startswith("SET "):
-                    enc = line.split()[1].replace("microsoft-", "")
-                    break
+            with open(d / f"{tag}.aff", encoding="latin-1") as aff:
+                for line in aff:
+                    if line.startswith("SET "):
+                        enc = line.split()[1].replace("microsoft-", "")
+                        break
         except OSError:
             pass
         seen = set()
