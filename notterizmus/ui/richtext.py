@@ -275,6 +275,12 @@ class RichText(Gtk.TextView):
         # line laid out before the view had a width keeps that (very tall) height. When
         # the height it's given is off from what its text needs, re-measure, once per
         # distinct situation so a parent that legitimately differs can't cause a loop.
+        # width/height here exclude the CSS border (table cells have one), but measure()
+        # works on the border box and warns when asked for less than the minimum width.
+        ok, box = self.compute_bounds(self)
+        fw, fh = (round(box.size.width) - self.get_width(), round(box.size.height) - self.get_height()) \
+            if ok else (0, 0)
+        width, height = width + max(fw, 0), height + max(fh, 0)
         need = self.measure(Gtk.Orientation.VERTICAL, width)[1]
         key = (width, height, need)
         if abs(need - height) > 4 and key != self._size_fix:
