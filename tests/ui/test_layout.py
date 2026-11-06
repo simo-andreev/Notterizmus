@@ -15,14 +15,16 @@ class LayoutTest(ui.UITestCase):
             moved = {w: (y, final[w]) for w, y in frame.items() if w in final and y != final[w]}
             self.assertFalse(moved, f"frame {i} drew rows away from where they end up: {list(moved.values())[:3]}")
 
+    # With wrapping text, since a text view measures its height before it knows its
+    # width. Disabling OutlineEditor.size_new_views makes the Enter test fail.
     def test_enter_does_not_make_rows_jump(self):
-        doc = ui.open_chapter([h("Intro", h("One", b("x"), b("y")), h("Two", b("z")))])
+        doc = ui.open_chapter([h("Intro", h("One", b("x"), b(LONG)), h("Two", b(LONG)))])
         bullet = doc.root.children[0].children[0].children[0]
         r = ui.focus(bullet)
         self.assert_no_jumps(ui.record_frames(lambda: ui.press(r.view, "Return", wait=0)))
 
     def test_indent_does_not_make_rows_jump(self):
-        doc = ui.open_chapter([h("Intro", b("x"), b("y"), h("One", b("z")))])
+        doc = ui.open_chapter([h("Intro", b("x"), b(LONG), h("One", b(LONG)))])
         r = ui.focus(doc.root.children[0].children[1])
         self.assert_no_jumps(ui.record_frames(lambda: ui.press(r.view, "Tab", wait=0)))
 

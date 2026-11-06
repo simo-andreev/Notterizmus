@@ -33,7 +33,8 @@ if [ "${NOTTERIZMUS_UI_BACKEND:-}" != broadway ] && command -v weston >/dev/null
         >"$tmp/server.log" 2>&1 &
     spid=$!
     wait_for "$rundir/$sock"
-    display="GDK_BACKEND=wayland WAYLAND_DISPLAY=$sock NOTTERIZMUS_UI_FRAMES=1"
+    # No GPU on a headless display: skip GTK's GL/Vulkan probing (and its libEGL noise)
+    display="GDK_BACKEND=wayland WAYLAND_DISPLAY=$sock GDK_DISABLE=gl,vulkan NOTTERIZMUS_UI_FRAMES=1"
     echo "UI tests on a headless Weston"
 elif command -v gtk4-broadwayd >/dev/null; then
     n=60  # a free Broadway display; its socket is broadway<n+1>.socket
