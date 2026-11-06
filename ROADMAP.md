@@ -22,6 +22,8 @@ Sizes: **S** one focused change · **M** several changes across modules ·
   a dash when it verifies the domain. The ID passes the AppStream, desktop-file
   and GLib checks without warnings; the current ID gets a pedantic AppStream
   hint for its capital letter.
+- **Sidebar follow-ups** (after R1): resizing the sidebar (R27), renaming a book
+  (R28), and renaming and reordering chapters (added to R2).
 - **Ubuntu releases**: 20.04 onwards, using options A + D from
   [Ubuntu support](#ubuntu-support). The PPA covers 26.04 and newer, and the
   snap covers 20.04–24.04.
@@ -58,7 +60,9 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 | R23 | **Getting Started chapter**: F1, the menu or the start page opens a practice chapter that explains each control as an outline you can edit, with the keys in bold | You're still learning the controls. The shortcuts dialog lists the keys but doesn't show them in use | S. **Done**, not yet released |
 | R24 | **Command search**: one shortcut opens a search over every command; type a few letters to find and run one, with its shortcut shown next to it | You can use a feature before you remember its key, and you see the key each time you use it | M |
 | R1 | **Chapter sidebar**: books and chapters in a collapsible side panel; click to open; Ctrl+PgUp / Ctrl+PgDn for the previous or next chapter | The file dialog is the only way to switch, and it gets slower with every chapter | M. **Done**, not yet released; F9 shows or hides it |
-| R2 | **Chapter properties**: rename, renumber, move to another book, move to Trash | The number and title are fixed at creation and are part of the filename | S |
+| R2 | **Chapter rename and order**: rename a chapter or change its number; reorder chapters by dragging them in the sidebar (or Alt+↑/↓ there); move one to another book or to Trash. Reordering renumbers the files (`<NN> <Title>.notz`) and the number stored in each chapter | The number and title are fixed at creation and are part of the filename, so chapters can't be renamed or put in a different order | M |
+| R28 | **Rename a book** from the sidebar: renames its folder and the book name stored in each of its chapters; refuses a name another book already has | A book's name is fixed when its first chapter is created | S |
+| R27 | **Resizable sidebar**: drag the edge between the chapter list and the text; the width is remembered. The split view used now has no drag handle, so this needs one of our own (or a `Gtk.Paned` in the wide layout, keeping the overlay for narrow windows) | Long book or chapter titles get cut off at the fixed width | S |
 | R3 | **Find and replace** in the chapter (Ctrl+F, Ctrl+H): matches highlighted across items, with case and whole-word options | There is no find at all | M |
 | R4 | **Rolling backups**: keep the last few saved versions of each chapter and restore one from the menu | Autosave overwrites the only copy. A bad paste followed by closing the app can't be undone | S |
 | R5 | **Zoom**: Ctrl+= / Ctrl+- / Ctrl+0, remembered | Text size is fixed in CSS | S |
@@ -153,7 +157,7 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 1. R23, then R13 and R6. R23 helps you right away. Tests come before the big
    changes, and R6 should be on users' machines well before any file contains a
    drawing.
-2. R1, R2, R4, R24, then R3 and R5.
+2. R2 and R28 (renaming and reordering), R27, R4, R24, then R3 and R5.
 3. R14, the split, once the tests cover the keys and clipboard.
 4. Before sharing with the course: R25 (the new ID), R19, R22 with R26, R17
    and R18, and later R21 and R20.
