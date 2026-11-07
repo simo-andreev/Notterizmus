@@ -35,6 +35,17 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.3.0" date="2026-11-07">
+      <description>
+        <p>Finding things, earlier versions, and a bigger or smaller text.</p>
+        <ul>
+          <li>Find (Ctrl+F) and replace (Ctrl+H or Ctrl+R) across the chapter, table cells included, with Match Case and Whole Words. Replace All is one undo step.</li>
+          <li>Earlier Versions in the menu: a copy of each chapter is kept when you open it and every 10 minutes while you edit. Preview one and restore it; Ctrl+Z takes it back.</li>
+          <li>Search Commands (Ctrl+Shift+P) finds any command by name, runs it and shows its key.</li>
+          <li>Text size: Ctrl+=, Ctrl+- and Ctrl+0, Ctrl with the scroll wheel, or the row at the top of the menu. Only the chapter's text changes.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-11-06">
       <description>
         <p>Moving around your books, and learning the controls.</p>

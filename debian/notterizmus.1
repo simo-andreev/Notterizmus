@@ -1,4 +1,4 @@
-.TH NOTTERIZMUS 1 "2026-11-06" "notterizmus 1.2.0" "User Commands"
+.TH NOTTERIZMUS 1 "2026-11-07" "notterizmus 1.3.0" "User Commands"
 .SH NAME
 notterizmus \- outline editor for book chapter notes
 .SH SYNOPSIS
@@ -30,7 +30,9 @@ control, and
 .B Ctrl+?
 for the list of keyboard shortcuts.
 .B F9
-shows or hides the chapter list.
+shows or hides the chapter list, and
+.B Ctrl+Shift+P
+searches all commands by name.
 .SH FILES
 .TP
 .I ~/.config/notterizmus/rules.toml
@@ -38,11 +40,15 @@ Optional formatting rules: numbering formats, connector characters, spacing and
 bullet markers.
 .TP
 .I ~/.config/notterizmus/state.json
-Last opened chapter, spell-checking preferences and the chapter list's
-visibility and width.
+Last opened chapter, spell-checking preferences, the chapter list's
+visibility and width, and the text size.
 .TP
 .I ~/.local/share/notterizmus/Getting Started.notz
 The Getting Started practice copy, rewritten each time it is opened.
+.TP
+.I ~/.local/share/notterizmus/backups/
+Earlier versions of each chapter (the newest 20), shown by Earlier Versions
+in the menu.
 .SH SEE ALSO
 .I /usr/share/doc/notterizmus/FEATURES.md
 .SH AUTHOR

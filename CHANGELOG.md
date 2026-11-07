@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 — 2026-11-07
+
+- Find (Ctrl+F) and replace (Ctrl+H or Ctrl+R) across the chapter, table cells included: every match highlighted, “3 of 12”, Enter / Shift+Enter or Ctrl+G / Ctrl+Shift+G, Match Case and Whole Words (Cyrillic too). Replacing keeps bold/italic; Replace All is one undo step.
+- Earlier Versions (menu): a copy of each chapter is kept when it's opened and every 10 minutes while editing (newest 20, in `~/.local/share/notterizmus/backups`); preview and restore, undoable. Copies follow renamed chapters.
+- Search Commands (Ctrl+Shift+P): find any command by name or keyword, run it with Enter; each shows its key. Key-only editor actions run by replaying their key.
+- Text size: Ctrl+= / Ctrl+- / Ctrl+0, Ctrl + scroll wheel, or the “− 100% +” row in the menu (60–250%, remembered); only the chapter text changes.
+
 ## 1.2.0 — 2026-11-06
 
 - Chapter list on the left (F9): books from the notes folder with their chapters in order; click to open, click a book to fold it. Ctrl+PgUp / Ctrl+PgDn open the previous or next chapter. Drag its edge to resize it (remembered; double-click for the default). In a narrow window it slides over the text.

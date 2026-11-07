@@ -1,3 +1,16 @@
+notterizmus (1.3.0) resolute; urgency=medium
+
+  * Find (Ctrl+F) and replace (Ctrl+H or Ctrl+R) across the chapter,
+    tables included.
+  * Earlier Versions: copies kept on open and every 10 minutes; preview
+    and restore, undoable.
+  * Search Commands (Ctrl+Shift+P): find and run any command; each shows
+    its key.
+  * Text size: Ctrl+=, Ctrl+-, Ctrl+0 and Ctrl + scroll wheel,
+    remembered.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Sat, 07 Nov 2026 10:26:46 +0200
+
 notterizmus (1.2.0) resolute; urgency=medium
 
   * Chapter list on the left (F9) with Ctrl+PgUp/PgDn for the previous
