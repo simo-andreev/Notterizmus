@@ -72,6 +72,9 @@ def build(win):
     act("Show Plain Text", "win.show-plain", section="Chapter", keywords="export preview")
     act("Save", "win.save", section="Chapter")
     act("Show or Hide the Chapter List", "win.sidebar", section="List", keywords="sidebar books panel")
+    act("Larger Text", "win.zoom-in", section="Text size", keywords="zoom in bigger font")
+    act("Smaller Text", "win.zoom-out", section="Text size", keywords="zoom out font")
+    act("Normal Text Size", "win.zoom-reset", section="Text size", keywords="zoom reset 100 font")
     if has_doc:
         act("Undo", "ed.undo", section="Text", shown="<Control>z")
         act("Redo", "ed.redo", section="Text", shown="<Control><Shift>z")

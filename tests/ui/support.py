@@ -25,7 +25,7 @@ if ENABLED:
     gi.require_version("Gdk", "4.0")
     gi.require_version("Adw", "1")
     gi.require_version("Graphene", "1.0")
-    from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk  # noqa: F401
+    from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk, Pango  # noqa: F401
 
 _app = None
 _chapter_no = itertools.count(1)

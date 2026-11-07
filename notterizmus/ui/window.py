@@ -19,6 +19,7 @@ from .sidebar import ChapterSidebar
 RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
 SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX = 260, 180, 520  # chapter list width, px
 TEXT_ROOM = 20  # spare px beside the text column's minimum width
+ZOOM_MIN, ZOOM_MAX, ZOOM_STEP, TEXT_PT = 60, 250, 10, 11  # chapter text zoom, % and base size
 DOC_ACTIONS = ("copy", "insert-table", "show-plain", "save", "find", "replace", "find-next", "find-prev")
 
 
@@ -92,9 +93,25 @@ class Window(Adw.ApplicationWindow):
         s3.append("Getting Started", "win.guide")
         s3.append("Keyboard Shortcuts", "win.shortcuts")
         s3.append(f"About {APP_NAME}", "win.about")
-        for s in (s0, s1, s2, s3):
+        zoom_item = Gio.MenuItem.new(None, None)
+        zoom_item.set_attribute_value("custom", GLib.Variant.new_string("zoom"))
+        sz = Gio.Menu()
+        sz.append_item(zoom_item)
+        for s in (sz, s0, s1, s2, s3):
             menu.append_section(None, s)
-        header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu, tooltip_text="Menu"))
+        menu_btn = Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu, tooltip_text="Menu")
+        # "−  100%  +" row at the top of the menu, as in other GNOME apps
+        zoom_row = Gtk.Box(spacing=0, homogeneous=True, margin_start=12, margin_end=12)
+        zoom_row.add_css_class("linked")
+        zoom_row.append(Gtk.Button(icon_name="zoom-out-symbolic", tooltip_text="Smaller text (Ctrl+-)",
+                                   action_name="win.zoom-out", css_classes=["flat"]))
+        self.zoom_label = Gtk.Button(label="100%", tooltip_text="Normal size (Ctrl+0)",
+                                     action_name="win.zoom-reset", css_classes=["flat", "numeric"])
+        zoom_row.append(self.zoom_label)
+        zoom_row.append(Gtk.Button(icon_name="zoom-in-symbolic", tooltip_text="Larger text (Ctrl+=)",
+                                   action_name="win.zoom-in", css_classes=["flat"]))
+        menu_btn.get_popover().add_child(zoom_row, "zoom")
+        header.pack_end(menu_btn)
         copy = Gtk.Button(tooltip_text="Copy formatted notes, then paste into TopCoding (Ctrl+Shift+C)",
                           action_name="win.copy")
         copy.set_child(Adw.ButtonContent(icon_name="edit-copy-symbolic", label="Copy for TopCoding"))
@@ -113,6 +130,15 @@ class Window(Adw.ApplicationWindow):
         self.editor.connect("toast", lambda _e, msg, button, cb: self.toast(msg, button, cb))
         self.findbar = FindBar(self.editor, self.toast)
         tv.add_top_bar(self.findbar)
+        # Zoom changes only the chapter text, through one app-wide provider above style.css
+        # (one per window would pile up on the display, and a closed window's would win).
+        self._zoom_css = _zoom_provider(self.get_display())
+        self._zoom, self._zoom_toast, self._scroll_zoom = 100, None, 0.0
+        scroll = Gtk.EventControllerScroll(flags=Gtk.EventControllerScrollFlags.VERTICAL,
+                                           propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        scroll.connect("scroll", lambda c, _dx, dy: self.scroll_zoom(
+            bool(c.get_current_event_state() & Gdk.ModifierType.CONTROL_MASK), dy))
+        self.editor.add_controller(scroll)
 
         empty = Adw.StatusPage(icon_name=APP_ID, title="No Chapter Open",
                                description="Create a chapter for a book or open an existing one. "
@@ -176,6 +202,9 @@ class Window(Adw.ApplicationWindow):
                          ("rename", self.on_rename), ("versions", self.on_versions),
                          ("commands", self.on_commands),
                          ("find", lambda *_: self.on_find()), ("replace", lambda *_: self.on_find(replace=True)),
+                         ("zoom-in", lambda *_: self.set_zoom(self._zoom + ZOOM_STEP)),
+                         ("zoom-out", lambda *_: self.set_zoom(self._zoom - ZOOM_STEP)),
+                         ("zoom-reset", lambda *_: self.set_zoom(100)),
                          ("find-next", lambda *_: self.findbar.step(1)),
                          ("find-prev", lambda *_: self.findbar.step(-1))):
             a = Gio.SimpleAction.new(name, None)
@@ -213,6 +242,7 @@ class Window(Adw.ApplicationWindow):
         self.add_action(a)
         self._apply_spelling(default_lang)
 
+        self.set_zoom(self.state.get("zoom", 100), save=False, announce=False)
         self.connect("close-request", self._on_close)
         if self.rules.error:
             GLib.idle_add(lambda: (self.toast("Rules file error — using defaults"), False)[1])
@@ -775,6 +805,41 @@ class Window(Adw.ApplicationWindow):
         self.set_doc(doc)
         self.toast("A practice copy: change anything. F1 brings back a fresh one.")
 
+    # -- zoom ----------------------------------------------------------------------------------
+
+    def set_zoom(self, percent, save=True, announce=True):
+        """Size of the chapter text, in % of normal (11 pt); the rest of the window keeps its size."""
+        pct = int(max(ZOOM_MIN, min(ZOOM_MAX, round(percent / ZOOM_STEP) * ZOOM_STEP)))
+        changed = pct != self._zoom
+        self._zoom = pct
+        size = TEXT_PT * pct / 100
+        self._zoom_css.load_from_string(
+            f".outline .prefix, .outline textview.rt, .outline textview.rt text {{ font-size: {size:.2f}pt; }}")
+        self.zoom_label.set_label(f"{pct}%")
+        self.lookup_action("zoom-in").set_enabled(pct < ZOOM_MAX)
+        self.lookup_action("zoom-out").set_enabled(pct > ZOOM_MIN)
+        if changed:
+            self.editor.text_size_changed()
+        if save:
+            self.state["zoom"] = pct
+            save_state(self.state)
+        if announce:
+            if self._zoom_toast is not None:
+                self._zoom_toast.dismiss()
+            self._zoom_toast = Adw.Toast(title=f"Text size {pct}%", timeout=1)
+            self.toasts.add_toast(self._zoom_toast)
+
+    def scroll_zoom(self, ctrl, dy):
+        """Ctrl + scroll wheel zooms (up: larger). Returns True when it used the scroll."""
+        if not ctrl:
+            return False
+        self._scroll_zoom -= dy
+        steps = int(self._scroll_zoom)
+        if steps:
+            self._scroll_zoom -= steps
+            self.set_zoom(self._zoom + steps * ZOOM_STEP)
+        return True
+
     def on_find(self, replace=False):
         """Ctrl+F / Ctrl+H (or Ctrl+R): open the find bar, starting from the selected text if any."""
         prefill = None
@@ -944,6 +1009,8 @@ class Window(Adw.ApplicationWindow):
                 ("Add cursor above / below (tap Ctrl twice, hold, then arrow)", "<Ctrl>Up <Ctrl>Down"),
                 ("Back to one cursor", "Escape"),
             ]),
+            ("Text size", [("Larger / smaller text (also Ctrl + scroll wheel)", "<Ctrl>equal <Ctrl>minus"),
+                           ("Normal text size", "<Ctrl>0")]),
             ("Find", [("Find in the chapter", "<Ctrl>f"), ("Find and replace", "<Ctrl>h <Ctrl>r"),
                       ("Next / previous match", "<Ctrl>g <Ctrl><Shift>g")]),
             ("Text", [("Spelling fixes and word completion", "<Ctrl>space"),
@@ -976,6 +1043,17 @@ class Window(Adw.ApplicationWindow):
             types.add(Adw.ShortcutsItem(title=f"{label} {sym} — “{t}”", accelerator=""))
         dlg.add(types)
         dlg.present(self)
+
+
+_ZOOM_PROVIDER = None
+
+
+def _zoom_provider(display):
+    global _ZOOM_PROVIDER
+    if _ZOOM_PROVIDER is None:
+        _ZOOM_PROVIDER = Gtk.CssProvider()
+        Gtk.StyleContext.add_provider_for_display(display, _ZOOM_PROVIDER, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
+    return _ZOOM_PROVIDER
 
 
 def _trash_file(path):

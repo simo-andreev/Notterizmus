@@ -51,6 +51,7 @@ walks through the controls; each time you open it, it starts fresh.
 | Change item type | Ctrl+Shift+Space, or click its prefix |
 | Pick a choice in the Alt+Insert, item or Ctrl+Space popup | its number, 1–9 then 0 (keypad too) |
 | Bold / italic | Ctrl+B / Ctrl+I |
+| Larger / smaller / normal text (chapter text only; also Ctrl + scroll wheel) | Ctrl+= / Ctrl+- / Ctrl+0 |
 | Undo / redo (one word, deletion run, or structural change per step) | Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) |
 | Expand / shrink selection: word → item text → item → section → all | Ctrl+W / Ctrl+Shift+W |
 | Select all items | Ctrl+A |

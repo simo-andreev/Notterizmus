@@ -114,6 +114,9 @@ def build(rules=None):
              "selected, they apply to what you type next.")),
           b((key("Ctrl+Z"), " undoes one word, one run of deletions or one change to the structure at a "
              "time. ", key("Ctrl+Shift+Z"), " or ", key("Ctrl+Y"), " redoes.")),
+          b((key("Ctrl+="), " and ", key("Ctrl+-"), " make the chapter's text larger or smaller (so does ",
+             key("Ctrl"), " with the scroll wheel), and ", key("Ctrl+0"), " brings it back to normal. The menu "
+             "has the same at its top.")),
           b(_try("double-click a word in this line, press ", key("Ctrl+I"), ", then ", key("Ctrl+Z"), "."))),
 
         h("Tables",

@@ -65,7 +65,7 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 | R27 | **Resizable sidebar**: drag the edge between the chapter list and the text; the width is remembered. The split view used now has no drag handle, so this needs one of our own (or a `Gtk.Paned` in the wide layout, keeping the overlay for narrow windows) | Long book or chapter titles get cut off at the fixed width | S. **Done** in 1.2.0: a handle over the edge; double-click resets |
 | R3 | **Find and replace** in the chapter (Ctrl+F, Ctrl+H): matches highlighted across items, with case and whole-word options | There is no find at all | M. **Done**, not yet released |
 | R4 | **Rolling backups**: keep the last few saved versions of each chapter and restore one from the menu | Autosave overwrites the only copy. A bad paste followed by closing the app can't be undone | S. **Done**, not yet released: Earlier Versions in the menu |
-| R5 | **Zoom**: Ctrl+= / Ctrl+- / Ctrl+0, remembered | Text size is fixed in CSS | S |
+| R5 | **Zoom**: Ctrl+= / Ctrl+- / Ctrl+0, remembered | Text size is fixed in CSS | S. **Done**, not yet released; also Ctrl + scroll and a menu row |
 | R6 | **Unknown block types**: show them as a read-only "made with a newer version" row and leave them out of Copy for TopCoding | A file with a drawing (R12) opened in an older version would otherwise show an empty item; text typed there isn't saved | S. **Done** in 1.2.0. Also keeps unknown fields of known items (1.1 dropped them) |
 
 ### 1.3 — Richer notes

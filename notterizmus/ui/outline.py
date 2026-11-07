@@ -231,6 +231,16 @@ class OutlineEditor(Gtk.ScrolledWindow):
         for row in self.rows.values():
             yield from row.views()
 
+    def text_size_changed(self):
+        """After zooming: forget the one-line height measured for the old size, and drop it
+        as the rows' minimum height (they're laid out already; rows added later measure
+        it again). Not re-measured here: the new font only takes effect in the frame's
+        layout phase, so measuring now would give the old size."""
+        self._line_h = 0
+        for v in self.all_views():
+            v.set_size_request(v.get_size_request()[0], -1)
+        self._requeue_views()
+
     def refresh(self, focus=None, offset=None):
         if focus is None and self.current is not None and self.current.id in self.rows:
             row = self.rows[self.current.id]

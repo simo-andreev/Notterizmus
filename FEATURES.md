@@ -65,6 +65,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Earlier Versions (menu): a copy of each chapter is kept when you open it and every 10 minutes while you edit (the newest 20, outside your notes folder). The dialog previews each one; Restore puts it in the editor, and Ctrl+Z takes it back. Copies follow a chapter when it's renamed or moved.
 - The last chapter you had open reopens on start.
 - Chapters saved by a newer version open safely: block types this version doesn't know are shown as a read-only note, kept unchanged in the file, and left out of Copy for TopCoding.
+- Text size: Ctrl+= / Ctrl+- / Ctrl+0, Ctrl + scroll wheel, or the “− 100% +” row at the top of the menu (60–250%, remembered). Only the chapter's text changes size; the rest of the window doesn't.
 - Native GTK 4 / libadwaita app: dark and light themes, keyboard shortcuts dialog (Ctrl+?), About dialog in the menu.
 - `install.sh` adds the app and its icon to the GNOME app grid. No root needed.
 
