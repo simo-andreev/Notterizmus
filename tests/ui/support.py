@@ -4,6 +4,13 @@ Run the tests with scripts/ui-tests.sh. It starts a private Broadway display (no
 appears on your screen), points the config, data and Documents folders at a scratch
 directory and fails if GTK printed any warnings. A plain
 `python3 -m unittest discover -s tests -t .` skips these tests.
+
+Two ways to press keys:
+- real_key() / real_type(): real key events through Broadway (tests/ui/broadway_input.py),
+  so GTK's whole dispatch runs: app shortcuts, capture/bubble, the focused widget. Use
+  these for anything about which widget gets a key (Escape, shortcuts, typing).
+- press(): emits "key-pressed" on one widget's own controller; quicker for driving the
+  editor's key handling directly.
 """
 from __future__ import annotations
 
@@ -14,9 +21,10 @@ import unittest
 from pathlib import Path
 
 ENABLED = os.environ.get("NOTTERIZMUS_UI_TESTS") == "1"
-# Frame-by-frame checks need a display that draws at a normal rate (Weston). Broadway
-# without a browser attached draws about once a second, so they're skipped there.
+# Frame-by-frame checks need a display that draws at a normal rate: Broadway with our
+# input client connected (it answers the frame roundtrips) or Weston.
 FRAMES = os.environ.get("NOTTERIZMUS_UI_FRAMES") == "1"
+BROADWAY_PORT = os.environ.get("NOTTERIZMUS_UI_BROADWAY_PORT")
 
 if ENABLED:
     import gi
@@ -28,6 +36,7 @@ if ENABLED:
     from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk, Pango  # noqa: F401
 
 _app = None
+_keyboard = None
 _chapter_no = itertools.count(1)
 
 
@@ -46,6 +55,10 @@ def app():
     if _app is None:
         _check_scratch()
         from notterizmus.ui.app import App
+        global _keyboard
+        if BROADWAY_PORT and _keyboard is None:  # before the window: it answers frame roundtrips
+            from .broadway_input import BroadwayInput
+            _keyboard = BroadwayInput(int(BROADWAY_PORT))
         a = App()
         a.set_flags(a.get_flags() | Gio.ApplicationFlags.NON_UNIQUE)
         a.register(None)
@@ -154,6 +167,32 @@ def press(widget, name, ctrl=False, shift=False, alt=False, wait=0.12):
     handled = key_controller(widget).emit("key-pressed", Gdk.keyval_from_name(name), 0, state)
     pump(wait)
     return handled
+
+
+def real_key(name, ctrl=False, shift=False, alt=False, wait=0.15):
+    """Press a key for real (Broadway): it goes to whatever has keyboard focus, through
+    GTK's full event dispatch. Key names as in Gdk.keyval_from_name ("Escape", "f", "Tab")."""
+    if _keyboard is None:
+        raise unittest.SkipTest("real key presses need the Broadway display (the default runner)")
+    if shift and len(name) == 1 and name.isalpha():
+        name = name.upper()  # what the keymap gives for Shift+letter
+    elif shift and name == "Tab":
+        name = "ISO_Left_Tab"
+    keyval = Gdk.keyval_from_name(name)
+    if keyval in (0, 0xFFFFFF):
+        raise ValueError(f"unknown key name {name!r}")
+    _keyboard.key(keyval, ctrl=ctrl, shift=shift, alt=alt)
+    pump(wait)
+
+
+def real_type(text, wait=0.05):
+    """Type text for real, one key per character."""
+    if _keyboard is None:
+        raise unittest.SkipTest("real key presses need the Broadway display (the default runner)")
+    for ch in text:
+        _keyboard.key(Gdk.unicode_to_keyval(ord(ch)), shift=ch.isupper())
+        pump(wait)
+    pump(0.1)
 
 
 def type_text(view, text, wait=0.12):

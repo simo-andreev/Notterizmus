@@ -127,10 +127,12 @@ and blank lines, and your own bullet markers.
 python3 -m unittest discover -s tests -t .
 ```
 
-The UI tests in `tests/ui` drive the real editor on a private display, so no
-window appears and your own settings and notes aren't touched. They need Weston
-for the frame-by-frame checks (`sudo apt install weston`); without it they run on
-GTK's Broadway server and skip those checks.
+The UI tests in `tests/ui` drive the real editor on a private GTK Broadway display
+(package `libgtk-4-bin`), so no window appears and your own settings and notes aren't
+touched. A small client presses real keys through it, so shortcuts, Escape and focus
+are tested as you'd use them, and paces frames like a 60 Hz screen for the
+frame-by-frame checks. `NOTTERIZMUS_UI_BACKEND=weston` runs them on a headless
+Weston instead (`sudo apt install weston`), without the real key presses.
 
 ```bash
 scripts/ui-tests.sh

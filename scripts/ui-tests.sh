@@ -3,9 +3,10 @@
 # screen, and your own settings and notes are never touched. Fails if any test fails
 # or GTK prints a warning. Extra arguments go to unittest, e.g. -v or -k cursor.
 #
-# Uses a headless Weston if it's installed (sudo apt install weston): it draws at a
-# normal frame rate, so the frame-by-frame checks run too. Otherwise it uses GTK's
-# Broadway server (package libgtk-4-bin) and skips those checks.
+# Uses GTK's Broadway server (package libgtk-4-bin). The tests connect a small client to
+# it (tests/ui/broadway_input.py) that presses real keys and answers frame roundtrips, so
+# frames run at full speed. NOTTERIZMUS_UI_BACKEND=weston runs on a headless Weston
+# instead (no real key presses there; those tests are skipped).
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -27,7 +28,8 @@ wait_for() {  # wait up to 5 s for a socket
     [ -S "$1" ] || { echo "display server didn't start; its log:" >&2; cat "$tmp/server.log" >&2; exit 2; }
 }
 
-if [ "${NOTTERIZMUS_UI_BACKEND:-}" != broadway ] && command -v weston >/dev/null; then
+if [ "${NOTTERIZMUS_UI_BACKEND:-}" = weston ]; then
+    command -v weston >/dev/null || { echo "weston not found (sudo apt install weston)" >&2; exit 2; }
     sock="notterizmus-ui-$$"
     weston --backend=headless --socket="$sock" --width=1280 --height=900 --idle-time=0 \
         >"$tmp/server.log" 2>&1 &
@@ -42,10 +44,10 @@ elif command -v gtk4-broadwayd >/dev/null; then
     gtk4-broadwayd --address 127.0.0.1 --port $((18000 + n)) ":$n" >"$tmp/server.log" 2>&1 &
     spid=$!
     wait_for "$rundir/broadway$((n + 1)).socket"
-    display="GDK_BACKEND=broadway BROADWAY_DISPLAY=:$n NOTTERIZMUS_UI_FRAMES=0"
-    echo "UI tests on Broadway; frame-by-frame checks are skipped (install weston to run them)"
+    display="GDK_BACKEND=broadway BROADWAY_DISPLAY=:$n NOTTERIZMUS_UI_BROADWAY_PORT=$((18000 + n)) NOTTERIZMUS_UI_FRAMES=1"
+    echo "UI tests on Broadway, with real key presses"
 else
-    echo "Needs weston or gtk4-broadwayd: sudo apt install weston" >&2
+    echo "Needs gtk4-broadwayd: sudo apt install libgtk-4-bin" >&2
     exit 2
 fi
 
