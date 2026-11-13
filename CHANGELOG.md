@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 — 2026-11-14
+
+- Text is drawn hinted (GTK's manual font rendering when the desktop is on automatic), so thin strokes stay visible: the top bar of "=" faded until it looked like "-".
+- Escape closes the find bar from anywhere in it (the replace field and buttons too) and from the text, after extra cursors and item selection.
+- Ctrl+F on a selected word starts at that word; Search Commands keeps the text selection for Bold and Italic; Enter right after typing in either search acts on what was typed.
+- Earlier Versions keeps a long history: all of the last day, then one copy per hour for a week, per day for three months and per week after that, grouped by day in the dialog.
+- Indenting or outdenting an item whose text wraps no longer makes the rows below jump for a frame.
+- Development: the editor is split into themed modules (`ui/outline_*.py`); UI tests press real keys through GTK's Broadway server (100 tests).
+
 ## 1.3.0 — 2026-11-07
 
 - Find (Ctrl+F) and replace (Ctrl+H or Ctrl+R) across the chapter, table cells included: every match highlighted, “3 of 12”, Enter / Shift+Enter or Ctrl+G / Ctrl+Shift+G, Match Case and Whole Words (Cyrillic too). Replacing keeps bold/italic; Replace All is one undo step.

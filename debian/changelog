@@ -1,3 +1,15 @@
+notterizmus (1.3.1) resolute; urgency=medium
+
+  * Draw text hinted so thin strokes stay visible (the top bar of '='
+    faded away).
+  * Escape closes the find bar from anywhere in it and from the text.
+  * Ctrl+F starts at the selected word; Search Commands keeps the
+    selection; Enter right after typing acts on the typed text.
+  * Earlier Versions keeps a long, thinned history, grouped by day.
+  * Indenting or outdenting a wrapped item no longer makes rows jump.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Sat, 14 Nov 2026 00:45:04 +0200
+
 notterizmus (1.3.0) resolute; urgency=medium
 
   * Find (Ctrl+F) and replace (Ctrl+H or Ctrl+R) across the chapter,

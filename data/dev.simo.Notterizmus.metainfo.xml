@@ -35,6 +35,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.3.1" date="2026-11-14">
+      <description>
+        <p>Fixes for text, find and earlier versions.</p>
+        <ul>
+          <li>Thin strokes stay visible: the top bar of "=" no longer fades so that it looks like "-".</li>
+          <li>Escape closes the find bar from anywhere in it and from the text.</li>
+          <li>Ctrl+F on a selected word starts at that word, Search Commands keeps the selection for Bold and Italic, and Enter right after typing acts on what was typed.</li>
+          <li>Earlier Versions keeps a long history: all of the last day, then one copy per hour, per day and per week as they get older, grouped by day.</li>
+          <li>Indenting or outdenting an item whose text wraps no longer makes the rows below jump.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.0" date="2026-11-07">
       <description>
         <p>Finding things, earlier versions, and a bigger or smaller text.</p>

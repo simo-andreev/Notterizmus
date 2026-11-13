@@ -8,7 +8,7 @@ the outline on the clipboard as HTML that pastes cleanly into the chapter notes
 editor at `app.topcoding.bg/assignments`. Made for personal book notes in
 English and Bulgarian; it is not a general word processor or Markdown editor.
 
-Updated 2026-11-07 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
+Updated 2026-11-14 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
 [FEATURES.md](FEATURES.md) · [CHANGELOG.md](CHANGELOG.md) ·
 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (briefing for coding agents)
 
