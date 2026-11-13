@@ -54,3 +54,10 @@ class LayoutTest(ui.UITestCase):
             need = v.measure(ui.Gtk.Orientation.VERTICAL, round(box.size.width))[1]
             self.assertLessEqual(abs(round(box.size.height) - need), 2,
                                  f"a row is {round(box.size.height)} px tall but its text needs {need}")
+
+    def test_text_is_drawn_hinted(self):
+        # GTK's "automatic" rendering drew the top bar of "=" between two pixel rows, so
+        # faint that "1 + 1 = 2" read as "1 + 1 - 2". The app switches to "manual".
+        settings = ui.Gtk.Settings.get_default()
+        self.assertEqual(settings.get_property("gtk-font-rendering"), ui.Gtk.FontRendering.MANUAL)
+        self.assertTrue(settings.get_property("gtk-hint-font-metrics"))

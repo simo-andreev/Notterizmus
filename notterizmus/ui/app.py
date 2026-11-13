@@ -17,6 +17,17 @@ CSS = Path(__file__).with_name("style.css")
 ICONS = Path(__file__).resolve().parents[2] / "data" / "icons"
 
 
+def use_hinted_text(settings):
+    """GTK's "automatic" font rendering draws text unhinted, so a thin horizontal stroke
+    that falls between two pixel rows is drawn half-bright on each and almost vanishes:
+    the top bar of "=" looked like "-". With "manual", GTK follows the desktop's own
+    hinting setting (Ubuntu's default is slight) and rounds glyph metrics to whole pixels.
+    A desktop already on "manual" is left as it is."""
+    if settings.get_property("gtk-font-rendering") == Gtk.FontRendering.AUTOMATIC:
+        settings.set_property("gtk-font-rendering", Gtk.FontRendering.MANUAL)
+        settings.set_property("gtk-hint-font-metrics", True)
+
+
 class App(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
@@ -29,6 +40,7 @@ class App(Adw.Application):
         prov.load_from_path(str(CSS))
         display = Gdk.Display.get_default()
         Gtk.StyleContext.add_provider_for_display(display, prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        use_hinted_text(Gtk.Settings.get_default())
         # icon works straight from the checkout; install.sh also puts it in the user icon theme
         Gtk.IconTheme.get_for_display(display).add_search_path(str(ICONS))
         Gtk.Window.set_default_icon_name(APP_ID)
