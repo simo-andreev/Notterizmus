@@ -60,6 +60,8 @@ class KeysMixin:
             handled = self._sel_key(name, ctrl, shift, alt)
             if handled is not None:
                 return handled
+        if name == "Escape" and self.on_escape is not None and self.on_escape():
+            return True  # nothing of the editor's to cancel: e.g. close the find bar
         if not (ctrl and name in ("w", "W")):
             self._wstack = []
 

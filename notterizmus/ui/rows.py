@@ -200,6 +200,8 @@ class TableRow(_PrefixRow):
         nrows, ncols = len(self.rows), len(self.rows[0]) if self.rows else 0
         if self.editor.common_key(rt, name, ctrl, shift, alt):
             return True
+        if name == "Escape" and self.editor.on_escape is not None and self.editor.on_escape():
+            return True
         if ctrl and not shift and name == "space":
             self.editor.show_assist(rt)
             return True

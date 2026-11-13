@@ -130,6 +130,8 @@ class Window(Adw.ApplicationWindow):
         self.editor.connect("toast", lambda _e, msg, button, cb: self.toast(msg, button, cb))
         self.findbar = FindBar(self.editor, self.toast)
         tv.add_top_bar(self.findbar)
+        self.editor.on_escape = lambda: self.findbar.get_search_mode() and (
+            self.findbar.close(focus_match=False) or True)
         # Zoom changes only the chapter text, through one app-wide provider above style.css
         # (one per window would pile up on the display, and a closed window's would win).
         self._zoom_css = _zoom_provider(self.get_display())
@@ -853,7 +855,16 @@ class Window(Adw.ApplicationWindow):
 
     def on_commands(self, *_):
         """Search Commands (Ctrl+Shift+P)."""
-        dlg = command_search.CommandSearch(command_search.build(self))
+        # The search field takes the primary selection, which collapses the chapter's
+        # selection; remember it so Bold, Italic and the like still apply to it.
+        view = self.editor.cur_view
+        sel = view.selection_offsets() if view is not None else None
+
+        def restore():
+            if view is not None and sel and view.get_root() is not None:
+                view.grab_focus()
+                view.select_range(*sel)
+        dlg = command_search.CommandSearch(command_search.build(self), before_run=restore)
         self._command_search = dlg
         dlg.present(self)
         GLib.idle_add(lambda: (dlg.entry.grab_focus(), False)[1])

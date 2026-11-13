@@ -17,8 +17,10 @@ class FindBar(Gtk.SearchBar):
         self.matches = []        # [(view, start, end)] in outline order
         self.current = -1
         self._refresh_src = None
+        self._anchor = None      # (view, offset) where the cursor was when the search began
+        self._found_for = None   # the query the matches are for
 
-        self.entry = Gtk.SearchEntry(placeholder_text="Find in this chapter", hexpand=True)
+        self.entry = Gtk.SearchEntry(placeholder_text="Find in this chapter", hexpand=True, search_delay=0)
         self.count = Gtk.Label(width_chars=10, xalign=1)
         self.count.add_css_class("dim-label")
         self.count.add_css_class("numeric")
@@ -49,8 +51,8 @@ class FindBar(Gtk.SearchBar):
         self.set_child(Adw.Clamp(maximum_size=820, child=box))
         self.connect_entry(self.entry)
 
-        self.entry.connect("search-changed", lambda *_: self.refresh(from_cursor=True))
-        self.entry.connect("activate", lambda *_: self.step(1))
+        self.entry.connect("search-changed", lambda *_: self.refresh(after=self._anchor))
+        self.entry.connect("activate", lambda *_: self._activate())
         self.entry.connect("stop-search", lambda *_: self.close())
         keys = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self._entry_key)
@@ -64,10 +66,19 @@ class FindBar(Gtk.SearchBar):
         replace_btn.connect("clicked", lambda *_: self.replace_current())
         replace_all.connect("clicked", lambda *_: self.replace_all())
         self.connect("notify::search-mode-enabled", self._mode_changed)
+        # Escape closes the bar from anywhere in it: only the search field has its own
+        # Escape (stop-search), not the replace field or the buttons.
+        esc = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        esc.connect("key-pressed", self._bar_key)
+        self.add_controller(esc)
 
     # -- opening and closing ------------------------------------------------------------------
 
     def open(self, replace=False, prefill=None):
+        # Where to search from: taken before the search field gets focus, because selecting
+        # its text takes the primary selection from the chapter, which collapses the
+        # chapter's selection to its end (the match after the selected word would win).
+        self._anchor = self._cursor_point()
         if prefill:
             self.entry.set_text(prefill)
         if replace:
@@ -75,20 +86,42 @@ class FindBar(Gtk.SearchBar):
         self.set_search_mode(True)
         self.entry.grab_focus()
         self.entry.select_region(0, -1)
-        self.refresh(from_cursor=True)
+        self.refresh(after=self._anchor)
 
-    def close(self):
-        """Hide the bar and put the cursor in the text at the current match."""
+    def _cursor_point(self):
+        """(view, offset) of the text cursor, or the start of the selection."""
+        view = self.editor.cur_view
+        if view is None or view.get_root() is None:
+            return None
+        sel = view.get_buffer().get_selection_bounds()
+        return (view, sel[0].get_offset() if sel else view.cursor_offset())
+
+    def close(self, focus_match=True):
+        """Hide the bar. focus_match: put the cursor in the text at the current match
+        (from the bar); otherwise leave it where it is (Escape in the text)."""
         target = self.matches[self.current][0] if 0 <= self.current < len(self.matches) else None
         self.set_search_mode(False)
-        view = target or self.editor.cur_view
+        view = (target or self.editor.cur_view) if focus_match else None
         if view is not None:
             view.grab_focus()
+
+    def _bar_key(self, _ctl, keyval, _code, _state):
+        if Gdk.keyval_name(keyval) == "Escape" and self.get_search_mode():
+            self.close()
+            return True
+        return False
 
     def _mode_changed(self, *_):
         if not self.get_search_mode():
             self._clear()
             self.matches, self.current = [], -1
+
+    def _activate(self):
+        """Enter: the next match (finding first if Enter came before the search did)."""
+        if self.entry.get_text() != self._found_for:
+            self.refresh(after=self._anchor)
+        else:
+            self.step(1)
 
     def _entry_key(self, _ctl, keyval, _code, state):
         if Gdk.keyval_name(keyval) in ("Return", "KP_Enter") and state & Gdk.ModifierType.SHIFT_MASK:
@@ -136,6 +169,7 @@ class FindBar(Gtk.SearchBar):
         old = self.matches[self.current] if 0 <= self.current < len(self.matches) else None
         self._clear()
         query = self.entry.get_text()
+        self._found_for = query
         views = self.views()
         self.matches = []
         for v in views:

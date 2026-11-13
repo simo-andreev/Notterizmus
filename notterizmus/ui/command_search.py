@@ -128,12 +128,15 @@ def build(win):
 class CommandSearch(Adw.Dialog):
     __gtype_name__ = "NtzCommandSearch"
 
-    def __init__(self, commands):
+    def __init__(self, commands, before_run=None):
         super().__init__(title="Search Commands", content_width=560, content_height=470)
         self.commands = commands
         self.chosen = None
+        self.before_run = before_run  # e.g. put the text selection back first
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        # no search delay: Enter right after typing must act on what was typed
         self.entry = Gtk.SearchEntry(placeholder_text="Type a command, e.g. “rename” or “table”",
+                                     search_delay=0,
                                      margin_top=12, margin_bottom=6, margin_start=12, margin_end=12)
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE, css_classes=["navigation-sidebar"])
         self.list.set_placeholder(Gtk.Label(label="No matching command", margin_top=24, css_classes=["dim-label"]))
@@ -142,7 +145,7 @@ class CommandSearch(Adw.Dialog):
         box.append(self.scroller)
         self.set_child(box)
         self.entry.connect("search-changed", lambda *_: self.refill())
-        self.entry.connect("activate", lambda *_: self.choose(self.list.get_selected_row()))
+        self.entry.connect("activate", lambda *_: self._activate())
         self.entry.connect("stop-search", lambda *_: self.close())
         keys = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self._key)
@@ -151,7 +154,13 @@ class CommandSearch(Adw.Dialog):
         self.connect("closed", self._closed)
         self.refill()
 
+    def _activate(self):
+        if self.entry.get_text() != self._filled_for:  # Enter beat the list: catch up first
+            self.refill()
+        self.choose(self.list.get_selected_row())
+
     def refill(self):
+        self._filled_for = self.entry.get_text()
         while (row := self.list.get_row_at_index(0)) is not None:
             self.list.remove(row)
         for cmd in search(self.entry.get_text(), self.commands):
@@ -204,4 +213,9 @@ class CommandSearch(Adw.Dialog):
     def _closed(self, *_):
         # Run after the dialog is gone, once it has handed focus back to the editor.
         if self.chosen is not None and self.chosen.run is not None:
-            GLib.idle_add(lambda: (self.chosen.run(), False)[1])
+            def run():
+                if self.before_run is not None:
+                    self.before_run()
+                self.chosen.run()
+                return False
+            GLib.idle_add(run)

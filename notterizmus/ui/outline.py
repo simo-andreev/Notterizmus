@@ -53,6 +53,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         self.rows = {}
         self._labels = []  # reusable spacer/blank line labels
         self._line_h = 0   # height of one text line, once known
+        self.on_escape = None  # set by the window: Escape the editor itself doesn't use
         self.doc = None
         self.current = None
         self.cur_view = None
