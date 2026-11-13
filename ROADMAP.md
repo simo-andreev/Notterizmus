@@ -89,7 +89,7 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 | ID | Item | Why | Size |
 |---|---|---|---|
 | R13 | **UI tests**: turn this project's test-harness scripts (drive keys, step the GTK main loop, check row positions frame by frame) into `tests/ui/` that run without a visible window | The hidden cursor and the tall first item were caught by hand | M. **Done**: `scripts/ui-tests.sh` (49 tests in 1.2.0); the frame-by-frame checks need Weston |
-| R14 | **Split `ui/outline.py`** into keys, selection, clipboard, menus, multi-cursor and undo modules, with no change in behavior | Every item above lands in this one file | M |
+| R14 | **Split `ui/outline.py`** into keys, selection, clipboard, menus, multi-cursor and undo modules, with no change in behavior | Every item above lands in this one file | M. **Done**, not yet released: `outline.py` plus eight `outline_*.py` mixins, methods moved unchanged |
 | R15 | **Large-chapter check**: generate a 500-item chapter and measure open time, typing delay and memory. Only if it's slow, create rows lazily | Every item is its own GtkTextView; the largest real chapter has 56 | S to measure |
 | R16 | **Changes on disk**: notice when the open file changes outside the app (Syncthing, Nextcloud, a second machine) and offer to reload | Chapters are plain JSON in Documents, so they're easy to sync. Without this, an autosave could silently overwrite the other copy | S |
 

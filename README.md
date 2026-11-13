@@ -157,7 +157,8 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | Search Commands: matching, and the list of commands |
 | `notterizmus/find.py`, `notterizmus/ui/findbar.py` | Find and replace: matching, and the find bar |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
-| `notterizmus/ui/outline.py` | Editor: rendering, keys, undo, selection, clipboard, menus, multi-cursor |
+| `notterizmus/ui/outline.py` | Editor widget: building and refreshing rows, focus, scrolling |
+| `notterizmus/ui/outline_*.py` | The editor's mixins, one theme each: `undo`, `keys`, `items`, `selection`, `clipboard`, `menus`, `assist` (spelling, Ctrl+Space), `carets` (multi-cursor) |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |
 | `notterizmus/ui/window.py`, `app.py` | Window, header bar, dialogs, file handling, spelling menu |
 | `data/` | Icons, desktop entry, AppStream metadata, `.notz` MIME type |
