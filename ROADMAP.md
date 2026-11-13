@@ -166,4 +166,4 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 
 ## Open questions
 
-- A one-frame jump when indenting an item whose text wraps (found by the real-frame tests; `test_indent_does_not_make_rows_jump` is marked as a known failure).
+None right now. New ones go here as the items are worked on.

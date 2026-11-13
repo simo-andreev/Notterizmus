@@ -77,7 +77,21 @@ class TextRow(_PrefixRow):
         self.view.connect("content-changed", self._on_changed)
         wire_view(editor, self, self.view)
         self.append(self.view)
+        self._markup = None
         self.connect("map", lambda *_: GLib.timeout_add(20, lambda: (self.view.queue_resize(), False)[1]))
+
+    def set_prefix(self, segs):
+        """The text takes the row's width beside the prefix, so a wider prefix (Tab adds a
+        level) narrows it: tell the view, so that frame already has the re-wrapped height."""
+        markup = _prefix_markup(segs)
+        if markup == self._markup:
+            return
+        self._markup = markup
+        laid_out = self.view.get_width() > 1
+        before = self.prefix.measure(Gtk.Orientation.HORIZONTAL, -1)[1] if laid_out else 0
+        self.prefix.set_markup(markup)
+        if laid_out:
+            self.view.expect_width_change(before - self.prefix.measure(Gtk.Orientation.HORIZONTAL, -1)[1])
 
     def _on_changed(self, _v):
         self.node.runs = self.view.get_runs()

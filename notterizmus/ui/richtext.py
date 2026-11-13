@@ -39,6 +39,7 @@ class RichText(Gtk.TextView):
         self.carets = []  # extra (multi-cursor) carets: GtkTextMarks
         self.last_edit = None  # ("ins"|"del", text, start offset) for undo grouping
         self._size_fix = None
+        self._expect_w = None  # the width the next allocation brings (expect_width_change)
         buf.connect("insert-text", self._before_insert)
         buf.connect_after("insert-text", self._after_insert)
         buf.connect("changed", self._on_changed)
@@ -290,8 +291,63 @@ class RichText(Gtk.TextView):
         buf = self.get_buffer()
         return [buf.get_iter_at_mark(m) for m in self.carets]
 
+    # -- size ------------------------------------------------------------------------------
+
+    def expect_width_change(self, delta):
+        """The next layout will make this view `delta` px wider (narrower if negative),
+        e.g. because its row's prefix changed width. GtkTextView would report the height
+        for the width it was last laid out at, so that frame would draw it at its old
+        height and the rows below would jump a frame later. Until then, measure the text
+        at the coming width (do_measure)."""
+        if not delta or self.get_width() <= 1:
+            return  # unchanged, or not laid out yet (OutlineEditor.size_new_views)
+        self._expect_w = (self.get_width() if self._expect_w is None else self._expect_w) + delta
+        self.queue_resize()
+
+    def height_for_width(self, width):
+        """The height GtkTextView's measure() reports for this text at this content width:
+        each paragraph in a Pango layout with the view's font and bold/italic, wrapped as
+        GtkTextLayout does (1 px less, kept for the cursor, and minus the side margins)."""
+        buf = self.get_buffer()
+        wrap = max(1, width - 1 - self.get_left_margin() - self.get_right_margin())
+        total = self.get_top_margin() + self.get_bottom_margin()
+        for line in range(buf.get_line_count()):
+            start = buf.get_iter_at_line(line)[1]
+            end = start.copy()
+            if not end.ends_line():
+                end.forward_to_line_end()
+            runs = self.get_runs(start, end)
+            layout = self.create_pango_layout("".join(r.text for r in runs))
+            attrs = layout.get_attributes() or Pango.AttrList()
+            pos = 0
+            for r in runs:
+                n = len(r.text.encode())
+                for on, a in ((r.bold, Pango.attr_weight_new(Pango.Weight.BOLD)),
+                              (r.italic, Pango.attr_style_new(Pango.Style.ITALIC))):
+                    if on:
+                        a.start_index, a.end_index = pos, pos + n
+                        attrs.insert(a)
+                pos += n
+            layout.set_attributes(attrs)
+            layout.set_wrap(Pango.WrapMode.WORD_CHAR)  # as in __init__
+            layout.set_width(wrap * Pango.SCALE)
+            total += (layout.get_extents()[1].height + Pango.SCALE // 2) // Pango.SCALE  # PANGO_PIXELS
+        return total
+
+    def do_measure(self, orientation, for_size):
+        # GtkTextView reports no baseline; chaining up from Python turns that into 0
+        # (GTK then warns about a horizontal baseline), so pass -1 on ourselves.
+        if orientation == Gtk.Orientation.VERTICAL and self._expect_w is not None:
+            h = self.height_for_width(self._expect_w)
+            return h, h, -1, -1
+        mn, nat = Gtk.TextView.do_measure(self, orientation, for_size)[:2]
+        return mn, nat, -1, -1
+
     def do_size_allocate(self, width, height, baseline):
         Gtk.TextView.do_size_allocate(self, width, height, baseline)
+        expected, self._expect_w = self._expect_w, None
+        if expected is not None and expected != width:
+            GLib.idle_add(self._requeue)  # it got another width: measure its text again
         # GtkTextView doesn't always ask for a new size when its text re-wraps, e.g. a
         # line laid out before the view had a width keeps that (very tall) height. When
         # the height it's given is off from what its text needs, re-measure, once per

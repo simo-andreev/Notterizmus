@@ -25,14 +25,25 @@ class LayoutTest(ui.UITestCase):
         r = ui.focus(bullet)
         self.assert_no_jumps(ui.record_frames(lambda: ui.press(r.view, "Return", wait=0)))
 
-    # Known: indenting a wrapped item draws one frame at its old height (GtkTextView reports
-    # the height for the width it was last laid out at), so the rows below jump a frame
-    # later. Seen at 60 Hz on Broadway; Weston's timing hides it. Kept visible until fixed.
-    @(unittest.expectedFailure if ui.BROADWAY_PORT else (lambda test: test))
+    # A wider or narrower prefix re-wraps the text, but GtkTextView reports the height for
+    # the width it was last laid out at: one frame at the old height, then the rows below
+    # jump. Shows at 60 Hz on Broadway. Making RichText.expect_width_change do nothing
+    # makes these fail.
     def test_indent_does_not_make_rows_jump(self):
         doc = ui.open_chapter([h("Intro", b("x"), b(LONG), h("One", b(LONG)))])
         r = ui.focus(doc.root.children[0].children[1])
         self.assert_no_jumps(ui.record_frames(lambda: ui.press(r.view, "Tab", wait=0)))
+
+    def test_outdent_does_not_make_rows_jump(self):
+        doc = ui.open_chapter([h("Intro", b("x", b(LONG)), h("One", b(LONG)))])
+        r = ui.focus(doc.root.children[0].children[0].children[0])
+        self.assert_no_jumps(ui.record_frames(lambda: ui.press(r.view, "ISO_Left_Tab", wait=0)))
+
+    def test_outdent_to_a_heading_does_not_make_rows_jump(self):
+        # the bullet becomes a top-level heading: new prefix and bolder text
+        doc = ui.open_chapter([h("Intro", b(LONG)), h("Two", b(LONG))])
+        r = ui.focus(doc.root.children[0].children[0])
+        self.assert_no_jumps(ui.record_frames(lambda: ui.press(r.view, "ISO_Left_Tab", wait=0)))
 
     def test_cursor_stays_visible_when_enter_is_pressed_at_the_bottom(self):
         items = [b(f"note {i}") for i in range(60)]
