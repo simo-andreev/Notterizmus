@@ -66,7 +66,8 @@ class BackupsTest(ui.UITestCase):
         dlg = self.win.get_visible_dialog()
         rows = [w for w in ui.walk(dlg) if isinstance(w, ui.Adw.ActionRow)]
         self.assertEqual([r.get_subtitle() for r in rows], ["1 item · same as now", "1 item", "1 item"])
-        self.assertTrue(rows[0].get_title().startswith("Today"))
+        self.assertRegex(rows[0].get_title(), r"^\d\d:\d\d$")
+        self.assertEqual(rows[0].get_header().get_label(), "Today")
         listbox = rows[0].get_parent()
         listbox.select_row(rows[2])  # the oldest
         ui.pump(0.1)
@@ -96,3 +97,23 @@ class BackupsTest(ui.UITestCase):
 def ui_run(text):
     from notterizmus.model import Run
     return Run(text)
+
+
+class VersionsByDayTest(ui.UITestCase):
+    def tearDown(self):
+        while self.win.get_visible_dialog() is not None:
+            self.win.get_visible_dialog().force_close()
+            ui.pump(0.3)
+
+    def test_copies_are_grouped_by_day(self):
+        doc = ui.open_chapter([h("days")], book="Backups days")
+        folder = backups.folder_for(doc.path, self.win.notes_root_path(), paths.backups_dir())
+        for days in (1, 10):
+            when = datetime.now() - timedelta(days=days)
+            (folder / f"{when:%Y-%m-%dT%H-%M-%S}.notz").write_bytes(doc.path.read_bytes())
+        self.win.lookup_action("versions").activate(None)
+        ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
+        rows = [w for w in ui.walk(self.win.get_visible_dialog()) if isinstance(w, ui.Adw.ActionRow)]
+        headers = [r.get_header().get_label() if r.get_header() else None for r in rows]
+        ten_days = f"{(datetime.now() - timedelta(days=10)):%Y-%m-%d}"
+        self.assertEqual(headers, ["Today", "Yesterday", ten_days])

@@ -48,14 +48,47 @@ class BackupsTest(unittest.TestCase):
         self.assertIsNone(backups.backup(self.chapter, self.folder, now=T0 + timedelta(hours=1), force=True))
         self.assertEqual(self.contents(), ["v1"])
 
-    def test_keeps_only_the_newest(self):
-        for i in range(25):
+    def test_old_copies_are_thinned_by_age(self):
+        now = datetime(2026, 11, 13, 12, 0)
+        self.folder.mkdir(parents=True)
+        when = now - timedelta(days=120)
+        made = 0
+        while when <= now:  # a copy every 10 minutes for 120 days
+            (self.folder / f"{when:%Y-%m-%dT%H-%M-%S}.notz").write_text("x", encoding="utf-8")
+            when += timedelta(minutes=10)
+            made += 1
+        backups.thin(self.folder, now)
+        kept = [b.when for b in backups.list_backups(self.folder)]
+        last_day = [w for w in kept if now - w < timedelta(days=1)]
+        week = [w for w in kept if timedelta(days=1) <= now - w < timedelta(days=7)]
+        months = [w for w in kept if timedelta(days=7) <= now - w < timedelta(days=90)]
+        older = [w for w in kept if now - w >= timedelta(days=90)]
+        self.assertEqual(len(last_day), 144, "every copy of the last day")
+        self.assertEqual(len({w.strftime("%Y-%m-%d %H") for w in week}), len(week), "one per hour")
+        self.assertGreaterEqual(len(week), 6 * 24 - 1)
+        self.assertEqual(len({w.date() for w in months}), len(months), "one per day")
+        self.assertEqual(len({w.isocalendar()[:2] for w in older}), len(older), "one per week")
+        self.assertLess(len(kept), made // 20)
+        self.assertEqual(kept[0], now, "the newest copy stays")
+
+    def test_each_slot_keeps_its_newest_copy(self):
+        now = datetime(2026, 11, 13, 12, 0)
+        self.folder.mkdir(parents=True)
+        hour = now - timedelta(days=3)
+        for minute in (5, 25, 45):
+            (self.folder / f"{hour.replace(minute=minute):%Y-%m-%dT%H-%M-%S}.notz").write_text("x")
+        backups.thin(self.folder, now)
+        self.assertEqual([b.when.minute for b in backups.list_backups(self.folder)], [45])
+
+    def test_a_new_copy_thins_the_old_ones(self):
+        for i in range(30):
             self.write(f"v{i}")
-            backups.backup(self.chapter, self.folder, now=T0 + timedelta(minutes=11 * i))
-        got = self.contents()
-        self.assertEqual(len(got), backups.KEEP)
-        self.assertEqual(got[0], "v24")
-        self.assertEqual(got[-1], f"v{25 - backups.KEEP}")
+            backups.backup(self.chapter, self.folder, now=T0 - timedelta(days=5) + timedelta(minutes=11 * i))
+        self.write("now")
+        backups.backup(self.chapter, self.folder, now=T0)
+        got = backups.list_backups(self.folder)
+        self.assertEqual(got[0].path.read_text(encoding="utf-8"), "now")
+        self.assertEqual(len({b.when.strftime("%Y-%m-%d %H") for b in got[1:]}), len(got) - 1)
 
     def test_missing_chapter_is_skipped(self):
         self.chapter.unlink()

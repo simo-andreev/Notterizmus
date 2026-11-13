@@ -101,7 +101,8 @@ then the dictionary; on a misspelled word it lists fixes.
 - No drawings yet (TopCoding supports Excalidraw; see "Adding a block type").
 - Undo history lasts until the chapter is closed. For older states, **Earlier
   Versions** in the menu has copies kept when the chapter was opened and every
-  10 minutes while it was edited (the newest 20).
+  10 minutes while it was edited: all from the last day, then one per hour for a
+  week, one per day for three months and one per week after that.
 
 ## Files
 
@@ -111,7 +112,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Formatting rules (optional) | `~/.config/notterizmus/rules.toml`, created from [`rules.example.toml`](notterizmus/rules.example.toml) by menu → **Edit Formatting Rules**; apply with **Reload Formatting Rules** |
 | Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
 | Getting Started practice copy, rewritten each time it's opened | `~/.local/share/notterizmus/Getting Started.notz` |
-| Earlier versions of each chapter (newest 20) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
+| Earlier versions of each chapter (thinned with age, kept for good) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
 
 Rules cover numbering format per level, connector characters, spacing, spacer
 and blank lines, and your own bullet markers.

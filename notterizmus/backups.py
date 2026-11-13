@@ -4,17 +4,26 @@ Copies live in <data dir>/backups/<Book>/<chapter file name without .notz>/, nam
 the time they were taken. The window takes one when a chapter is opened (forced) and
 then at most every BACKUP_EVERY seconds while autosave runs, always of the file as it
 is on disk just before it gets overwritten, so each copy is a version you really had.
+
+Older copies are thinned, not capped: all of the last day, then one per hour for a week,
+one per day for three months and one per week after that (the newest in each slot).
 """
 from __future__ import annotations
 
 import hashlib
 import shutil
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 BACKUP_EVERY = 600   # seconds between copies while editing
-KEEP = 20            # copies kept per chapter
+# (copies younger than this, keep the newest per slot); slot None keeps every copy
+TIERS = [
+    (timedelta(days=1), None),
+    (timedelta(days=7), "%Y-%m-%d %H"),     # one per hour
+    (timedelta(days=90), "%Y-%m-%d"),       # one per day
+    (None, "%G-W%V"),                       # one per ISO week, for good
+]
 _STAMP = "%Y-%m-%dT%H-%M-%S"
 
 
@@ -48,11 +57,10 @@ def list_backups(folder):
     return out
 
 
-def backup(chapter, folder, now=None, force=False, every=None, keep=None):
+def backup(chapter, folder, now=None, force=False, every=None):
     """Copy chapter (as it is on disk) into folder unless the newest copy is recent or
-    identical. Returns the new copy's path, or None."""
+    identical, then thin the older copies. Returns the new copy's path, or None."""
     every = BACKUP_EVERY if every is None else every  # read at call time (tests shorten it)
-    keep = KEEP if keep is None else keep
     chapter = Path(chapter)
     if not chapter.is_file():
         return None
@@ -70,9 +78,26 @@ def backup(chapter, folder, now=None, force=False, every=None, keep=None):
     if target.exists():  # two copies in the same second: keep the first
         return None
     shutil.copy2(chapter, target)
-    for old in list_backups(folder)[keep:]:
-        old.path.unlink(missing_ok=True)
+    thin(folder, now)
     return target
+
+
+def thin(folder, now=None):
+    """Delete copies the tiers don't keep. Returns the number deleted."""
+    now = now or datetime.now()
+    seen, gone = set(), 0
+    for b in list_backups(folder):  # newest first, so each slot keeps its newest copy
+        age = now - b.when
+        slot = next(fmt for limit, fmt in TIERS if limit is None or age < limit)
+        if slot is None:
+            continue
+        key = (slot, b.when.strftime(slot))
+        if key in seen:
+            b.path.unlink(missing_ok=True)
+            gone += 1
+        else:
+            seen.add(key)
+    return gone
 
 
 def move(moved, notes_root, root):

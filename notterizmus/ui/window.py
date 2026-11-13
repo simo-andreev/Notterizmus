@@ -903,9 +903,21 @@ class Window(Adw.ApplicationWindow):
                         subtitle += " · same as now"
                 except (OSError, ValueError, KeyError):
                     subtitle = "can't be read"
-                row = Adw.ActionRow(title=_when(b.when), subtitle=subtitle)
+                row = Adw.ActionRow(title=f"{b.when:%H:%M}", subtitle=subtitle, tooltip_text=_when(b.when))
                 row._backup = b
                 lb.append(row)
+
+            def day_header(row, before):
+                # a heading above the first copy of each day: Today, Yesterday, 2026-11-02
+                day = row._backup.when.date()
+                if before is not None and before._backup.when.date() == day:
+                    row.set_header(None)
+                    return
+                label = Gtk.Label(label=_day(day), xalign=0, margin_start=12, margin_top=12, margin_bottom=4)
+                label.add_css_class("heading")
+                label.add_css_class("dim-label")
+                row.set_header(label)
+            lb.set_header_func(day_header)
             preview = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
                                    left_margin=16, right_margin=16, top_margin=12, bottom_margin=12)
             self._versions_preview = preview
@@ -1092,12 +1104,16 @@ def _restore_from_trash(path):
         return False
 
 
+def _day(day):
+    """'Today', 'Yesterday' or '2026-11-02'."""
+    from datetime import date, timedelta
+    if day == date.today():
+        return "Today"
+    if day == date.today() - timedelta(days=1):
+        return "Yesterday"
+    return f"{day:%Y-%m-%d}"
+
+
 def _when(dt):
     """'Today 14:05', 'Yesterday 09:30' or '2026-11-02 18:40'."""
-    from datetime import date, timedelta
-    day = dt.date()
-    if day == date.today():
-        return f"Today {dt:%H:%M}"
-    if day == date.today() - timedelta(days=1):
-        return f"Yesterday {dt:%H:%M}"
-    return f"{dt:%Y-%m-%d %H:%M}"
+    return f"{_day(dt.date())} {dt:%H:%M}"
