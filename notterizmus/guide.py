@@ -100,6 +100,8 @@ def build(rules=None):
              "section, everything. ", key("Ctrl+Shift+W"), " goes back a step.")),
           b((key("Ctrl+A"), " selects all items. ", key("Shift+↑"), " or ", key("Shift+↓"),
              " on the first or last line of an item, or ", key("Shift+click"), ", extends a selection of items.")),
+          b("Dragging the mouse from one item to another selects the items in between; within one "
+            "item it selects text, as usual."),
           b(("Selected items can be copied (", key("Ctrl+C"), "), cut (", key("Ctrl+X"), "), deleted (",
              key("Delete"), "), indented (", key("Tab"), ") or made bold (", key("Ctrl+B"), ") together.")),
           b((key("Alt+↑"), " and ", key("Alt+↓"), " move an item up or down.")),

@@ -31,6 +31,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Undo/redo across the whole chapter, covering text and structure. Each step is one word, one run of deletions, or one structural change.
 - Ctrl+W / Ctrl+Shift+W expands and shrinks the selection: word → item text → item → section → everything.
 - Ctrl+A selects all items. Shift+↑/↓ at the first or last line, or Shift+click, extends an item selection.
+- Dragging the mouse from one item to another selects whole items (within one item it selects text). Past the top or bottom of the window the outline scrolls and the selection keeps growing.
 - Selected items can be copied, cut, deleted, indented or formatted together.
 - Multiple cursors: tap Ctrl twice, keep it held, then press ↑/↓. Typing, Backspace, Delete and cursor keys apply at every cursor.
 

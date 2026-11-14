@@ -57,6 +57,7 @@ walks through the controls; each time you open it, it starts fresh.
 | Select all items | Ctrl+A |
 | Find in the chapter, tables included (Enter / Shift+Enter or Ctrl+G / Ctrl+Shift+G: next / previous match) | Ctrl+F |
 | Find and replace (Replace, or Replace All as one undo step) | Ctrl+H or Ctrl+R |
+| Select items with the mouse | drag from one item to another |
 | Extend item selection | Shift+↑ / Shift+↓ at the first/last line, or Shift+click |
 | Selected items: copy, cut, delete, indent, bold | Ctrl+C, Ctrl+X, Delete, Tab, Ctrl+B |
 | Add cursors above/below | tap Ctrl twice, keep it held, then ↑ / ↓ (Esc to leave) |
@@ -129,10 +130,11 @@ python3 -m unittest discover -s tests -t .
 
 The UI tests in `tests/ui` drive the real editor on a private GTK Broadway display
 (package `libgtk-4-bin`), so no window appears and your own settings and notes aren't
-touched. A small client presses real keys through it, so shortcuts, Escape and focus
-are tested as you'd use them, and paces frames like a 60 Hz screen for the
-frame-by-frame checks. `NOTTERIZMUS_UI_BACKEND=weston` runs them on a headless
-Weston instead (`sudo apt install weston`), without the real key presses.
+touched. A small client presses real keys and drags the mouse through it, so
+shortcuts, Escape, focus and mouse selection are tested as you'd use them, and paces
+frames like a 60 Hz screen for the frame-by-frame checks. `NOTTERIZMUS_UI_BACKEND=weston`
+runs them on a headless Weston instead (`sudo apt install weston`), without the real
+keyboard and mouse input.
 
 ```bash
 scripts/ui-tests.sh

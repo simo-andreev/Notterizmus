@@ -1,4 +1,4 @@
-"""Real keyboard input for the UI tests, through GTK's Broadway display server.
+"""Real keyboard and mouse input for the UI tests, through GTK's Broadway display server.
 
 Broadway's web client sends input to the server over a WebSocket; this is a minimal
 client doing the same with the standard library. Key presses then reach the app as real
@@ -7,7 +7,9 @@ phases, focus), unlike emitting "key-pressed" on one controller.
 
 Protocol (gtk/gdk/broadway): each input message is a binary frame of big-endian int32s,
 [event type, serial, time, ...]; key press is 7 and key release 8, followed by the
-keysym and the modifier state.
+keysym and the modifier state. Pointer events (enter 0, move 2, button press 3, release 4)
+carry the surface under the pointer, the surface the event is for, the root and surface
+coordinates and the button/modifier state; enter adds the crossing mode, a button its number.
 """
 from __future__ import annotations
 
@@ -18,9 +20,11 @@ import struct
 import threading
 import time
 
+ENTER, POINTER_MOVE, BUTTON_PRESS, BUTTON_RELEASE = 0, 2, 3, 4
 KEY_PRESS, KEY_RELEASE, SCREEN_SIZE_CHANGED = 7, 8, 12
 GRAB_NOTIFY, UNGRAB_NOTIFY, CONFIGURE_NOTIFY, ROUNDTRIP_NOTIFY = 9, 10, 11, 14
 MASKS = {"shift": 1, "ctrl": 4, "alt": 8}
+BUTTON_MASKS = {1: 1 << 8, 2: 1 << 9, 3: 1 << 10}
 
 # Server commands: op (u8), serial (u32), then these fields (little-endian).
 OP_GRAB, OP_UNGRAB, OP_NEW_SURFACE, OP_SHOW, OP_HIDE, OP_RAISE, OP_LOWER, OP_DESTROY = range(8)
@@ -48,6 +52,8 @@ class BroadwayInput:
             raise ConnectionError(f"Broadway refused the WebSocket: {reply[:80]!r}")
         self.serial = 0
         self.surfaces = {}  # id -> [x, y, width, height]
+        self.buttons = 0    # mask of the mouse buttons held down
+        self.pos = (0, 0)   # where the pointer is, in the window's surface
         self._lock = threading.Lock()
         self.sock.settimeout(None)
         # Answer the server the way the browser client does. Without roundtrip replies GTK's
@@ -81,7 +87,9 @@ class BroadwayInput:
 
         while pos < len(data):
             op, self.serial = take("BI")
-            if op in (OP_SHOW, OP_HIDE, OP_RAISE, OP_LOWER, OP_DESTROY, OP_KEYBOARD):
+            if op == OP_DESTROY:
+                self.surfaces.pop(take("H")[0], None)
+            elif op in (OP_SHOW, OP_HIDE, OP_RAISE, OP_LOWER, OP_KEYBOARD):
                 take("H")
             elif op == OP_NEW_SURFACE:
                 sid, x, y, w, h = take("HhhHH")
@@ -148,6 +156,33 @@ class BroadwayInput:
         state = sum(MASKS[m] for m, on in (("ctrl", ctrl), ("shift", shift), ("alt", alt)) if on)
         self.send(KEY_PRESS, keysym, state)
         self.send(KEY_RELEASE, keysym, state)
+
+    def main_surface(self):
+        """The id of the biggest surface: the app window (popovers are smaller ones)."""
+        return max(self.surfaces, key=lambda sid: self.surfaces[sid][2] * self.surfaces[sid][3])
+
+    def _pointer(self, event, x, y, *extra):
+        sid = self.main_surface()
+        sx, sy = self.surfaces[sid][:2]
+        x, y = round(x), round(y)
+        self.pos = (x, y)
+        self.send(event, sid, sid, sx + x, sy + y, x, y, self.buttons, *extra)
+
+    def move(self, x, y):
+        """Move the pointer to (x, y) in the window's surface, buttons held as they are."""
+        self._pointer(POINTER_MOVE, x, y)
+
+    def enter(self, x, y):
+        self._pointer(ENTER, x, y, 0)  # GDK_CROSSING_NORMAL
+
+    def button(self, x, y, pressed, button=1):
+        """Press or release a mouse button at (x, y) in the window's surface."""
+        if pressed:
+            self._pointer(BUTTON_PRESS, x, y, button)
+            self.buttons |= BUTTON_MASKS[button]
+        else:
+            self._pointer(BUTTON_RELEASE, x, y, button)
+            self.buttons &= ~BUTTON_MASKS[button]
 
     def close(self):
         try:

@@ -62,6 +62,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         self.sel = []
         self.sel_anchor = self.sel_head = None
         self._wstack = []
+        self._setup_drag_select()
         # history
         self._undo, self._redo = [], []
         self._cur = None
@@ -118,6 +119,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
     # -- loading / rendering ----------------------------------------------------
 
     def load(self, doc):
+        self._end_drag()
         self.rows = {}
         self._labels = []
         self.doc = doc

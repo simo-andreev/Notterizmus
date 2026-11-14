@@ -4,9 +4,9 @@
 # or GTK prints a warning. Extra arguments go to unittest, e.g. -v or -k cursor.
 #
 # Uses GTK's Broadway server (package libgtk-4-bin). The tests connect a small client to
-# it (tests/ui/broadway_input.py) that presses real keys and answers frame roundtrips, so
-# frames run at full speed. NOTTERIZMUS_UI_BACKEND=weston runs on a headless Weston
-# instead (no real key presses there; those tests are skipped).
+# it (tests/ui/broadway_input.py) that presses real keys, drags the mouse and answers
+# frame roundtrips, so frames run at full speed. NOTTERIZMUS_UI_BACKEND=weston runs on a
+# headless Weston instead (no real keyboard or mouse input there; those tests are skipped).
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -45,7 +45,7 @@ elif command -v gtk4-broadwayd >/dev/null; then
     spid=$!
     wait_for "$rundir/broadway$((n + 1)).socket"
     display="GDK_BACKEND=broadway BROADWAY_DISPLAY=:$n NOTTERIZMUS_UI_BROADWAY_PORT=$((18000 + n)) NOTTERIZMUS_UI_FRAMES=1"
-    echo "UI tests on Broadway, with real key presses"
+    echo "UI tests on Broadway, with real keyboard and mouse input"
 else
     echo "Needs gtk4-broadwayd: sudo apt install libgtk-4-bin" >&2
     exit 2

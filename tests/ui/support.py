@@ -5,6 +5,9 @@ appears on your screen), points the config, data and Documents folders at a scra
 directory and fails if GTK printed any warnings. A plain
 `python3 -m unittest discover -s tests -t .` skips these tests.
 
+Real mouse drags: real_drag() presses, moves and releases the left button through
+Broadway, so the app's own gestures and GtkTextView's run as for a real mouse.
+
 Two ways to press keys:
 - real_key() / real_type(): real key events through Broadway (tests/ui/broadway_input.py),
   so GTK's whole dispatch runs: app shortcuts, capture/bubble, the focused widget. Use
@@ -193,6 +196,49 @@ def real_type(text, wait=0.05):
         _keyboard.key(Gdk.unicode_to_keyval(ord(ch)), shift=ch.isupper())
         pump(wait)
     pump(0.1)
+
+
+def surface_point(widget, x, y):
+    """(x, y) in the widget -> the same point in its window's surface."""
+    native = widget.get_native()
+    ok, p = widget.compute_point(native, Graphene.Point().init(x, y))
+    if not ok:
+        raise AssertionError(f"{widget} isn't in a window")
+    tx, ty = native.get_surface_transform()
+    return p.x + tx, p.y + ty
+
+
+def real_drag(*points, steps=6, wait=0.02, hold=False):
+    """Drag with the left mouse button for real (Broadway): press at the first point, move
+    through the others in small steps, release at the last (unless hold). Each point is
+    (widget, x, y), resolved when the pointer gets there, or (x, y) in the window surface."""
+    if _keyboard is None:
+        raise unittest.SkipTest("real mouse input needs the Broadway display (the default runner)")
+
+    def where(p):
+        return surface_point(*p) if len(p) == 3 else p
+
+    x, y = where(points[0])
+    _keyboard.enter(x, y)
+    _keyboard.move(x, y)
+    pump(wait)
+    _keyboard.button(x, y, True)
+    pump(0.05)
+    for p in points[1:]:
+        tx, ty = where(p)
+        for i in range(1, steps + 1):
+            _keyboard.move(x + (tx - x) * i / steps, y + (ty - y) * i / steps)
+            pump(wait)
+        x, y = tx, ty
+    if not hold:
+        release_mouse()
+
+
+def release_mouse():
+    """Release the left button where the pointer is (if it's held)."""
+    if _keyboard is not None and _keyboard.buttons:
+        _keyboard.button(*_keyboard.pos, False)
+        pump(0.1)
 
 
 def type_text(view, text, wait=0.12):

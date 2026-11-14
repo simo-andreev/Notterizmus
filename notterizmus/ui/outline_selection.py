@@ -1,9 +1,16 @@
-"""OutlineEditor, part: item selection (Ctrl+A, Ctrl+W / Ctrl+Shift+W, Shift+arrows)
-and formatting several items at once."""
+"""OutlineEditor, part: item selection (Ctrl+A, Ctrl+W / Ctrl+Shift+W, Shift+arrows,
+dragging across items) and formatting several items at once."""
 from __future__ import annotations
+
+from dataclasses import dataclass
+
+from gi.repository import Gdk, Graphene, Gtk
 
 from ..model import indent, normalize_runs, outdent
 from .rows import TableRow, TextRow
+
+DRAG_EDGE = 30        # px from the top or bottom of the outline where a drag scrolls it
+DRAG_MAX_SPEED = 2400  # px per second, with the pointer far past the edge
 
 
 def _top_level(nodes):
@@ -16,6 +23,25 @@ def _top_level(nodes):
         if p is None:
             out.append(n)
     return out
+
+
+def _offset_at(view, x, y):
+    """Character offset in view nearest to (x, y), a point in the view (may be outside it)."""
+    y = max(0, min(y, view.get_height() - 1))
+    bx, by = view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(x), int(y))
+    _over_text, it = view.get_iter_at_location(bx, by)
+    return it.get_offset()
+
+
+@dataclass
+class _Drag:
+    row: object          # the row where the left button went down
+    view: object         # its text view under the pointer
+    offset: int          # where in that text
+    items: bool = False  # selecting items (the pointer has been over another row)
+    point: tuple = (0, 0)  # the pointer, in the outline's own coordinates
+    time: int = 0        # frame time of the last autoscroll step
+
 
 class SelectionMixin:
     """Mixed into OutlineEditor (outline.py); uses its state."""
@@ -32,7 +58,7 @@ class SelectionMixin:
 
     def set_selection(self, nodes):
         self.sel = _top_level(list(nodes))
-        if self.sel and self.cur_view is not None:
+        if self.sel and self.cur_view is not None and self.cur_view.has_selection():
             self.cur_view.set_cursor(self.cur_view.cursor_offset())  # drop the text selection
         self._apply_sel_css()
 
@@ -55,6 +81,133 @@ class SelectionMixin:
         self.sel_head = order[i]
         a, b = sorted((order.index(self.sel_anchor), i))
         self.set_selection(order[a:b + 1])
+
+    # -- selecting items by dragging across them ---------------------------------------------
+    # A left-button drag begins as GtkTextView's own text selection in the row where it was
+    # pressed. Once the pointer is over another row, it selects whole items instead, from
+    # that row to the row under the pointer (like Shift+click); back over the first row it
+    # selects text again. GtkTextView's gestures claim the pointer, and a claim denies the
+    # gestures of the widgets around it, so the outline follows the drag with a motion
+    # controller and a legacy one (for the release), which a claim can't stop.
+
+    def _setup_drag_select(self):
+        self._drag = None
+        self._drag_tick = None
+        motion = Gtk.EventControllerMotion(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        motion.connect("motion", self._drag_motion)
+        self.add_controller(motion)
+        release = Gtk.EventControllerLegacy(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        release.connect("event", self._drag_event)
+        self.add_controller(release)
+
+    def start_drag_select(self, row, view, x, y):
+        """The left button went down at (x, y) in view, a text view of row."""
+        offset = _offset_at(view, x, y)
+        sel = view.get_buffer().get_selection_bounds()
+        if sel and sel[0].get_offset() <= offset < sel[1].get_offset():
+            self._drag = None  # pressed in selected text: GtkTextView drags that text
+        else:
+            self._drag = _Drag(row, view, offset)
+
+    def _drag_motion(self, ctl, x, y):
+        d = self._drag
+        if d is None:
+            return
+        if not ctl.get_current_event_state() & Gdk.ModifierType.BUTTON1_MASK:
+            self._end_drag()  # released where the outline didn't see it
+            return
+        d.point = (x, y)
+        self._drag_to(x, y)
+        if d.items and self._drag_tick is None and self._edge_speed(y):
+            d.time = 0
+            self._drag_tick = self.add_tick_callback(self._drag_scroll)
+
+    def _drag_event(self, ctl, _event):
+        if self._drag is not None:
+            event = ctl.get_current_event()  # PyGObject passes the signal's own event as None
+            if event is not None and event.get_event_type() == Gdk.EventType.BUTTON_RELEASE:
+                self._end_drag()
+        return False
+
+    def _end_drag(self):
+        self._drag = None
+        if self._drag_tick is not None:
+            self.remove_tick_callback(self._drag_tick)
+            self._drag_tick = None
+
+    def _drag_to(self, x, y):
+        """Select for the pointer at (x, y) in the outline."""
+        d = self._drag
+        ok, p = self.compute_point(self.box, Graphene.Point().init(x, y))
+        target = self._row_at(p.y) if ok else None
+        if target is None:
+            return
+        if target is d.row:
+            if d.items:  # back over the row where the drag began: select text again
+                self.clear_selection()
+                ok, q = self.compute_point(d.view, Graphene.Point().init(x, y))
+                if ok:
+                    d.view.select_range(d.offset, _offset_at(d.view, q.x, q.y))
+            return
+        if not d.items:
+            d.items = True
+            # Take the rest of the drag from GtkTextView, which could otherwise go on
+            # extending its text selection (and scrolling to it) as the pointer moves.
+            ctrls = d.view.observe_controllers()
+            for i in range(ctrls.get_n_items()):
+                c = ctrls.get_item(i)
+                if isinstance(c, Gtk.GestureDrag):
+                    c.set_state(Gtk.EventSequenceState.DENIED)
+        order = self._order()
+        if d.row.node not in order or target.node not in order:
+            return  # the chapter was rebuilt under the drag
+        self.sel_anchor, self.sel_head = d.row.node, target.node
+        a, b = sorted((order.index(d.row.node), order.index(target.node)))
+        self.set_selection(order[a:b + 1])
+
+    def _row_at(self, y):
+        """The row at height y in the outline's box: the last one that starts at or above
+        y (the first row when y is above them all)."""
+        best = None
+        for node in self._order():
+            row = self.rows.get(node.id)
+            if row is None or row.get_parent() is not self.box or not row.get_visible():
+                continue
+            ok, p = row.compute_point(self.box, Graphene.Point().init(0, 0))
+            if not ok:
+                continue
+            if best is not None and p.y > y:
+                break
+            best = row
+        return best
+
+    def _edge_speed(self, y):
+        """Autoscroll speed (px per second, negative upwards) for the pointer at height y in
+        the outline: none away from the edges, faster the further it goes past one."""
+        h = self.get_height()
+        if y < DRAG_EDGE:
+            over = y - DRAG_EDGE
+        elif y > h - DRAG_EDGE:
+            over = y - (h - DRAG_EDGE)
+        else:
+            return 0
+        speed = min(DRAG_MAX_SPEED, max(60, abs(over) * 20))
+        return speed if over > 0 else -speed
+
+    def _drag_scroll(self, _widget, clock):
+        d = self._drag
+        speed = self._edge_speed(d.point[1]) if d is not None and d.items else 0
+        if not speed:
+            self._drag_tick = None
+            return False
+        now = clock.get_frame_time()
+        if d.time:
+            adj = self.get_vadjustment()
+            step = speed * min(now - d.time, 100_000) / 1e6
+            adj.set_value(max(0.0, min(adj.get_value() + step, adj.get_upper() - adj.get_page_size())))
+            self._drag_to(*d.point)
+        d.time = now
+        return True
 
     def _sel_state(self):
         if self.sel:

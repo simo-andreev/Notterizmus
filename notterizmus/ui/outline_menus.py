@@ -249,6 +249,8 @@ class MenusMixin:
             gesture.set_state(Gtk.EventSequenceState.CLAIMED)
             return
         self.clear_selection()
+        if btn == 1:
+            self.start_drag_select(row, view, x, y)
 
     def _prepare_context(self, row, view, point):
         """Fill the text view's right-click menu (shown below GTK's cut/copy/paste)."""
