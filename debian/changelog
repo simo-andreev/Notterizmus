@@ -1,3 +1,14 @@
+notterizmus (1.3.2) resolute; urgency=medium
+
+  * Drag the mouse across items to select them, scrolling at the edge.
+  * Paste a table copied on its own or with plain text after the item.
+  * Report a damaged chapter or rules.toml instead of failing to start.
+  * Keep fields and format name from newer versions when saving.
+  * Renumbering, reordering and renaming cope with unreadable chapters.
+  * Deleting a top-level item turns its bullets into numbered items.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Mon, 16 Nov 2026 10:56:18 +0200
+
 notterizmus (1.3.1) resolute; urgency=medium
 
   * Draw text hinted so thin strokes stay visible (the top bar of '='

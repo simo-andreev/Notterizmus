@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.2 — 2026-11-16
+
+- Dragging the mouse from one item to another selects whole items (within one item it still selects text); near the top or bottom edge the outline scrolls and the selection keeps growing.
+- A table copied on its own (from a web page, say), or together with plain text, is pasted after the current item instead of being lost.
+- A chapter file that is damaged or isn't a chapter, or a `rules.toml` with a value of the wrong kind, is reported instead of keeping the app from starting; the defaults apply for the rules.
+- Fields and a format name written by a newer version are kept when a chapter is saved; a save that fails leaves no temporary file behind.
+- Renumbering or reordering chapters stops before moving anything if one of them can't be read; renaming a book carries on past a chapter it can't rewrite and says which.
+- Deleting a top-level item turns its bullets into numbered items, as outdenting them would.
+- After an undo, typing and shortcuts go to the item that has the cursor.
+- Development: each UI test run is isolated in its own runtime folder, so runs can go in parallel; a hung test is stopped with a traceback, and Python warnings fail the run.
+
 ## 1.3.1 — 2026-11-14
 
 - Text is drawn hinted (GTK's manual font rendering when the desktop is on automatic), so thin strokes stay visible: the top bar of "=" faded until it looked like "-".

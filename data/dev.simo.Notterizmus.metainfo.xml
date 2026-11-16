@@ -35,6 +35,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.3.2" date="2026-11-16">
+      <description>
+        <p>Mouse selection, pasted tables and sturdier file handling.</p>
+        <ul>
+          <li>Dragging the mouse from one item to another selects whole items, scrolling at the window's edge.</li>
+          <li>A table copied on its own, or with plain text, is pasted after the current item.</li>
+          <li>A damaged chapter or settings file is reported instead of keeping the app from starting.</li>
+          <li>Renumbering, reordering and renaming handle chapters that can't be read or written without losing track of files.</li>
+          <li>Deleting a top-level item turns its bullets into numbered items.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-11-14">
       <description>
         <p>Fixes for text, find and earlier versions.</p>
