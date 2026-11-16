@@ -258,6 +258,11 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
                 return False
             row.focus(0 if offset is None else offset)
             self.current = node
+            # When the focus was in this row already (undo keeps the row and its focus),
+            # no focus event follows to say which view has the cursor: say it here.
+            focused = next((v for v in views if v.is_focus()), None)
+            if focused is not None:
+                self.cur_view = focused
         self._focus_hint = None
         return False
 

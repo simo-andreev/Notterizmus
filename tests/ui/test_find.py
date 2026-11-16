@@ -34,7 +34,8 @@ class FindTest(ui.UITestCase):
     def find(self, text, replace=False):
         self.win.lookup_action("replace" if replace else "find").activate(None)
         self.bar.entry.set_text(text)
-        ui.pump(0.3)  # search-changed is delayed a little
+        ui.wait_for(lambda: self.bar._found_for == text, "the find bar to search for the text")
+        ui.pump(0.05)
 
     def test_keys(self):
         accels = {a: self.app.get_accels_for_action(f"win.{a}") for a in ("find", "replace", "find-next", "find-prev")}
@@ -127,8 +128,7 @@ class FindTest(ui.UITestCase):
     def test_typing_in_the_chapter_updates_the_matches(self):
         self.find("scale")
         ui.type_text(ui.row(self.intro.children[1]).view, " scale")
-        ui.pump(0.4)
-        self.assertEqual(len(self.bar.matches), 6)
+        ui.wait_for(lambda: len(self.bar.matches) == 6, "the matches to follow the typing")
 
     def test_escape_closes_it_and_leaves_the_match_selected(self):
         self.find("bold")

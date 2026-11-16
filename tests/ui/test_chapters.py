@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 from notterizmus.guide import b, h
+from notterizmus.library import parse_name
 from notterizmus.model import Document
 from notterizmus.rules import config_dir
 
@@ -12,6 +13,11 @@ from . import support as ui
 
 def names(folder):
     return sorted(f.name for f in Path(folder).glob("*.notz"))
+
+
+def number(path):
+    """The chapter number in a file name (it isn't always two digits)."""
+    return parse_name(Path(path).stem)[0]
 
 
 class ChaptersTest(ui.UITestCase):
@@ -81,9 +87,9 @@ class ChaptersTest(ui.UITestCase):
         self.assertIn("Final", self.win.wtitle.get_title())
         self.assertIn("Final", [label for label, _p, _s in self.win.sidebar.chapter_rows()])
         ui.type_text(ui.row(self.win.doc.root.children[0]).view, " more")
-        ui.pump(1.2)  # autosave goes to the new file, and the old one doesn't come back
+        # autosave goes to the new file, and the old one doesn't come back
+        ui.wait_for(lambda: " more" in Document.load(self.win.doc.path).root.children[0].text, "the autosave")
         self.assertFalse(old.exists())
-        self.assertIn(" more", Document.load(self.win.doc.path).root.children[0].text)
         self.assertEqual(json.loads((config_dir() / "state.json").read_text())["last_file"], str(self.win.doc.path))
 
     def test_a_taken_number_is_swapped_and_the_dialog_says_so(self):
@@ -95,14 +101,14 @@ class ChaptersTest(ui.UITestCase):
         hint = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.Label) and "swap" in w.get_text())
         self.assertTrue(hint.get_visible())
         self.respond(dlg, "apply")
-        n1 = int(first.name[:2])
+        n1 = number(first)
         self.assertEqual(names(first.parent), [f"{n1:02d} Two.notz", f"{n1 + 1:02d} One.notz"])
         self.assertEqual(Document.load(first.parent / f"{n1:02d} Two.notz").chapter_no, n1)
 
     def test_moving_to_another_book_is_blocked_while_its_number_is_taken(self):
         mine = self.book("Move from", ["Wanderer"])[0]
         self.book("Move to", ["Resident"])
-        resident_no = int(names(ui.scratch() / "Documents" / "Notterizmus" / "Move to")[0][:2])
+        resident_no = number(names(ui.scratch() / "Documents" / "Notterizmus" / "Move to")[0])
         self.win.lookup_action("chapter-props").activate(ui.GLib.Variant.new_string(str(mine)))
         dlg = self.dialog()
         combo = self.field(dlg, ui.Adw.ComboRow)
@@ -124,7 +130,7 @@ class ChaptersTest(ui.UITestCase):
         row.grab_focus()
         ui.pump(0.1)
         self.assertTrue(ui.press(self.win.sidebar.list, "Down", alt=True, wait=0.4))
-        na, nb = int(a.name[:2]), int(b2.name[:2])
+        na, nb = number(a), number(b2)
         self.assertEqual(names(a.parent), [f"{na:02d} Bb.notz", f"{nb:02d} Aa.notz"])
         focused = self.win.sidebar.focused_row()
         self.assertTrue(focused is not None and focused._path.name == f"{nb:02d} Aa.notz",
@@ -132,7 +138,7 @@ class ChaptersTest(ui.UITestCase):
 
     def test_dragging_a_chapter_reorders_the_book(self):
         x, y, z = self.book("Drag", ["X", "Y", "Z"])
-        nums = sorted(int(p.name[:2]) for p in (x, y, z))
+        nums = sorted(number(p) for p in (x, y, z))
         self.assertTrue(self.win.sidebar.drop_chapter(str(z), x, after=False))
         ui.pump(0.3)
         self.assertEqual(names(x.parent), [f"{nums[0]:02d} Z.notz", f"{nums[1]:02d} X.notz", f"{nums[2]:02d} Y.notz"])
@@ -183,8 +189,50 @@ class ChaptersTest(ui.UITestCase):
 
     def test_the_list_menu_has_numbered_choices(self):
         path = self.book("Menu", ["Only"])[0]
-        self.win.sidebar.show_menu(self.sidebar_row(path=path))
+        # with the Menu key, on the focused row: the list scrolls to the row first (a menu
+        # for a row that is out of sight has nowhere to appear)
+        self.sidebar_row(path=path).grab_focus()
         ui.pump(0.2)
+        self.assertTrue(ui.press(self.win.sidebar.list, "Menu"))
+        ui.wait_for(ui.open_popovers, "the chapter's menu")
         choices = [(n, t) for n, t, _r in ui.menu_choices(ui.open_popovers()[0])]
         self.assertEqual(choices, [("1", "Chapter Properties…"), ("2", "Move Up"), ("3", "Move Down"),
                                    ("4", "Move to Trash")])
+
+    # -- a file in the book that isn't a chapter (damaged, or put there by something else) --------
+
+    def broken_book(self, name):
+        a, b2 = self.book(name, ["Aa", "Bb"])
+        broken = a.parent / "03 Broken.notz"
+        broken.write_text("[]", encoding="utf-8")
+        self.win._reload_sidebar()
+        return a, b2, broken
+
+    def test_reordering_past_a_file_that_is_not_a_chapter_is_refused_and_nothing_moves(self):
+        a, b2, broken = self.broken_book("Broken order")
+        before = sorted(f.name for f in a.parent.iterdir())
+        toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: toasts.append(msg)
+        try:
+            self.assertTrue(self.win.sidebar.drop_chapter(str(broken), a, after=False))  # dragged to the top
+            ui.pump(0.2)
+        finally:
+            del self.win.toast
+        self.assertEqual(toasts, ["Could not reorder the chapters: this isn't a Notterizmus chapter file"])
+        self.assertEqual(sorted(f.name for f in a.parent.iterdir()), before,
+                         "every chapter keeps its name; none is left under a hidden one")
+        self.assertEqual(Path(self.win.doc.path).resolve(), b2.resolve())
+        self.assertEqual([label for label, p, _s in self.win.sidebar.chapter_rows() if Path(p).parent == a.parent],
+                         ["Aa", "Bb", "Broken"])
+
+    def test_renaming_a_book_takes_a_file_that_is_not_a_chapter_along(self):
+        a, b2, broken = self.broken_book("Broken rename")
+        self.win.apply_book_rename(a.parent, "Renamed with it")
+        ui.pump(0.2)
+        new = a.parent.parent / "Renamed with it"
+        self.assertFalse(a.parent.exists())
+        self.assertEqual(names(new), [a.name, b2.name, "03 Broken.notz"])
+        self.assertEqual((new / "03 Broken.notz").read_text(encoding="utf-8"), "[]")
+        self.assertEqual({Document.load(new / f).book for f in (a.name, b2.name)}, {"Renamed with it"})
+        self.assertEqual((Path(self.win.doc.path), self.win.doc.book), (new / b2.name, "Renamed with it"),
+                         "the open chapter follows its book")

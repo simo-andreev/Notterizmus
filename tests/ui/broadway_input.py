@@ -17,6 +17,7 @@ import base64
 import os
 import socket
 import struct
+import sys
 import threading
 import time
 
@@ -33,12 +34,19 @@ OP_UPLOAD_TEXTURE, OP_RELEASE_TEXTURE, OP_SET_NODES, OP_ROUNDTRIP = 13, 14, 15, 
 
 
 class BroadwayInput:
-    def __init__(self, port, width=1280, height=900):
-        self.sock = socket.create_connection(("127.0.0.1", port), timeout=5)
+    def __init__(self, address, width=1280, height=900):
+        """address: the path of the server's unix socket (gtk4-broadwayd --unixsocket),
+        or a TCP port on 127.0.0.1 (--port)."""
+        if isinstance(address, int):
+            self.sock = socket.create_connection(("127.0.0.1", address), timeout=5)
+        else:
+            self.sock = socket.socket(socket.AF_UNIX)
+            self.sock.settimeout(5)
+            self.sock.connect(str(address))
         key = base64.b64encode(os.urandom(16)).decode()
         self.sock.sendall((
             "GET /socket HTTP/1.1\r\n"
-            f"Host: 127.0.0.1:{port}\r\n"
+            "Host: localhost\r\n"
             "Upgrade: websocket\r\nConnection: Upgrade\r\n"
             f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
             "Sec-WebSocket-Protocol: broadway\r\n\r\n").encode())
@@ -51,14 +59,18 @@ class BroadwayInput:
         if b" 101 " not in reply.split(b"\r\n", 1)[0]:
             raise ConnectionError(f"Broadway refused the WebSocket: {reply[:80]!r}")
         self.serial = 0
-        self.surfaces = {}  # id -> [x, y, width, height]
+        self.surfaces = {}  # id -> [x, y, width, height]; written by the reader thread
         self.buttons = 0    # mask of the mouse buttons held down
         self.pos = (0, 0)   # where the pointer is, in the window's surface
-        self._lock = threading.Lock()
+        self.closed = None  # why the reader thread stopped, once it has
+        self._time = 0      # the time stamp of the last event sent
+        self._closing = False
+        self._lock = threading.Lock()      # one frame at a time on the socket
+        self._surfaces = threading.Lock()  # self.surfaces, shared with the reader thread
         self.sock.settimeout(None)
         # Answer the server the way the browser client does. Without roundtrip replies GTK's
         # frame clock stalls, and with it every animation (a revealer never opens).
-        threading.Thread(target=self._read, daemon=True).start()
+        threading.Thread(target=self._read, daemon=True, name="broadway-input").start()
         self.send(SCREEN_SIZE_CHANGED, width, height, 1)
 
     def _read(self):
@@ -73,8 +85,16 @@ class BroadwayInput:
                 payload = self._recv(length) if length else b""
                 if head[0] & 0x0F == 2:
                     self._commands(payload)
-        except OSError:
-            pass
+        except Exception as e:  # noqa: BLE001  (a thread can't raise into the tests)
+            # Without this thread no frame is ever answered and every test would time out
+            # one by one; say why instead (see _check).
+            self.closed = f"{type(e).__name__}: {e}"
+            if not self._closing:
+                print(f"tests/ui/broadway_input.py: lost the Broadway display ({self.closed})", file=sys.stderr)
+
+    def _check(self):
+        if self.closed is not None:
+            raise ConnectionError(f"the connection to Broadway is gone ({self.closed})")
 
     def _commands(self, data):
         pos = 0
@@ -88,12 +108,15 @@ class BroadwayInput:
         while pos < len(data):
             op, self.serial = take("BI")
             if op == OP_DESTROY:
-                self.surfaces.pop(take("H")[0], None)
+                sid = take("H")[0]
+                with self._surfaces:
+                    self.surfaces.pop(sid, None)
             elif op in (OP_SHOW, OP_HIDE, OP_RAISE, OP_LOWER, OP_KEYBOARD):
                 take("H")
             elif op == OP_NEW_SURFACE:
                 sid, x, y, w, h = take("HhhHH")
-                self.surfaces[sid] = [x, y, w, h]
+                with self._surfaces:
+                    self.surfaces[sid] = [x, y, w, h]
                 self.send(CONFIGURE_NOTIFY, sid, x, y, w, h)
             elif op == OP_TRANSIENT:
                 take("HH")
@@ -103,11 +126,15 @@ class BroadwayInput:
                 self.send(ROUNDTRIP_NOTIFY, sid, tag)
             elif op == OP_MOVE_RESIZE:
                 sid, flags = take("HB")
-                geo = self.surfaces.setdefault(sid, [0, 0, 0, 0])
-                if flags & 1:
-                    geo[0], geo[1] = take("hh")
-                if flags & 2:
-                    geo[2], geo[3] = take("HH")
+                moved = take("hh") if flags & 1 else None
+                resized = take("HH") if flags & 2 else None
+                with self._surfaces:
+                    geo = self.surfaces.setdefault(sid, [0, 0, 0, 0])
+                    if moved:
+                        geo[0], geo[1] = moved
+                    if resized:
+                        geo[2], geo[3] = resized
+                    geo = list(geo)
                 self.send(CONFIGURE_NOTIFY, sid, *geo)
             elif op == OP_UPLOAD_TEXTURE:
                 _tid, size = take("II")
@@ -144,47 +171,70 @@ class BroadwayInput:
         return data
 
     def send(self, event, *args):
-        payload = struct.pack(f">{3 + len(args)}i", event, self.serial & 0x7FFFFFFF,
-                              int(time.monotonic() * 1000) & 0x7FFFFFFF, *args)
-        mask = os.urandom(4)
-        frame = bytes([0x82, 0x80 | len(payload)]) + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+        """Send one event; returns its time stamp. The stamps only ever go up, so each
+        event has its own: the app's events carry them (Gdk.Event.get_time()), which is
+        how the tests tell that a key press or pointer movement has arrived."""
+        self._check()
         with self._lock:
+            self._time = stamp = max(int(time.monotonic() * 1000) & 0x7FFFFFFF, self._time + 1)
+            payload = struct.pack(f">{3 + len(args)}i", event, self.serial & 0x7FFFFFFF, stamp, *args)
+            mask = os.urandom(4)
+            frame = bytes([0x82, 0x80 | len(payload)]) + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
             self.sock.sendall(frame)
+        return stamp
 
     def key(self, keysym, ctrl=False, shift=False, alt=False):
-        """Press and release one key, with modifiers held."""
+        """Press and release one key, with modifiers held. Returns the press's time stamp."""
         state = sum(MASKS[m] for m, on in (("ctrl", ctrl), ("shift", shift), ("alt", alt)) if on)
-        self.send(KEY_PRESS, keysym, state)
+        stamp = self.send(KEY_PRESS, keysym, state)
         self.send(KEY_RELEASE, keysym, state)
+        return stamp
 
     def main_surface(self):
-        """The id of the biggest surface: the app window (popovers are smaller ones)."""
-        return max(self.surfaces, key=lambda sid: self.surfaces[sid][2] * self.surfaces[sid][3])
+        """(id, x, y) of the biggest surface: the app window (popovers are smaller ones)."""
+        with self._surfaces:
+            if not self.surfaces:
+                raise ConnectionError("Broadway has shown no window yet")
+            sid = max(self.surfaces, key=lambda s: self.surfaces[s][2] * self.surfaces[s][3])
+            return sid, self.surfaces[sid][0], self.surfaces[sid][1]
 
     def _pointer(self, event, x, y, *extra):
-        sid = self.main_surface()
-        sx, sy = self.surfaces[sid][:2]
+        sid, sx, sy = self.main_surface()
         x, y = round(x), round(y)
         self.pos = (x, y)
-        self.send(event, sid, sid, sx + x, sy + y, x, y, self.buttons, *extra)
+        return self.send(event, sid, sid, sx + x, sy + y, x, y, self.buttons, *extra)
 
     def move(self, x, y):
-        """Move the pointer to (x, y) in the window's surface, buttons held as they are."""
-        self._pointer(POINTER_MOVE, x, y)
+        """Move the pointer to (x, y) in the window's surface, buttons held as they are.
+        Like button(), returns the event's time stamp."""
+        return self._pointer(POINTER_MOVE, x, y)
 
     def enter(self, x, y):
-        self._pointer(ENTER, x, y, 0)  # GDK_CROSSING_NORMAL
+        return self._pointer(ENTER, x, y, 0)  # GDK_CROSSING_NORMAL
 
     def button(self, x, y, pressed, button=1):
         """Press or release a mouse button at (x, y) in the window's surface."""
+        # The press or release itself carries the buttons as they were before it, as X11
+        # and Wayland report it: GTK takes a press with no button in its state as the
+        # start of a drag and keeps sending that drag's events to the widget pressed,
+        # also from outside the window.
         if pressed:
-            self._pointer(BUTTON_PRESS, x, y, button)
+            stamp = self._pointer(BUTTON_PRESS, x, y, button)
             self.buttons |= BUTTON_MASKS[button]
         else:
-            self._pointer(BUTTON_RELEASE, x, y, button)
+            stamp = self._pointer(BUTTON_RELEASE, x, y, button)
             self.buttons &= ~BUTTON_MASKS[button]
+        # Then the server is told the new state at once, with a movement that goes nowhere.
+        # It answers GDK's "which buttons are down?" from the last state it was sent, and
+        # GTK asks that whenever it makes up a motion event of its own (after the layout
+        # changes under the pointer). Without this, such an event right after a press said
+        # "no button down", and the app ended the drag that had just begun: a drag test
+        # failed whenever a layout happened to fall between the press and the first move.
+        self._pointer(POINTER_MOVE, x, y)
+        return stamp
 
     def close(self):
+        self._closing = True
         try:
             self.sock.close()
         except OSError:

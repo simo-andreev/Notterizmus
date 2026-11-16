@@ -11,7 +11,7 @@ from . import support as ui
 class RealKeysTest(ui.UITestCase):
     def setUp(self):
         super().setUp()
-        if ui.BROADWAY_PORT is None:
+        if not ui.REAL_INPUT:
             self.skipTest("real key presses need the Broadway display (the default runner)")
         self.win.findbar.set_search_mode(False)
         self.win.set_zoom(100, save=True, announce=False)
@@ -117,11 +117,13 @@ class RealKeysTest(ui.UITestCase):
         ui.real_key("p", ctrl=True, shift=True)
         self.assertIsNotNone(self.win.get_visible_dialog())
         ui.real_type("bold")
-        ui.real_key("Return", wait=0.6)
+        ui.real_key("Return")
+        # the command runs once the dialog has closed and given the focus back
+        ui.wait_for(lambda: any(run.bold for run in bullet.runs), "Bold to run")
         self.assertEqual([(run.text, run.bold) for run in bullet.runs], [("make", True), (" me bold", False)])
         ui.real_key("p", ctrl=True, shift=True)
-        ui.real_key("Escape", wait=0.6)
-        self.assertIsNone(self.win.get_visible_dialog())
+        ui.real_key("Escape")
+        ui.wait_for(lambda: self.win.get_visible_dialog() is None, "Escape to close Search Commands")
 
     # -- editing ------------------------------------------------------------------------------------
 
@@ -147,26 +149,28 @@ class RealKeysTest(ui.UITestCase):
         target = doc.root.children[0].children[1]
         ui.focus(target, 0)
         ui.real_type("compl")
-        ui.real_key("space", ctrl=True, wait=0.4)
+        ui.real_key("space", ctrl=True)
         self.assertIsNotNone(self.ed._assist_pop)
-        ui.real_key("1", wait=0.4)
-        self.assertEqual(target.text, "completion")
+        ui.real_key("1")
+        ui.wait_for(lambda: target.text == "completion", "the first completion to be picked")
 
     def test_alt_insert_and_a_digit_add_a_sub_item(self):
         doc = self.chapter(h("Intro"))
         intro = doc.root.children[0]
         ui.focus(intro)
-        ui.real_key("Insert", alt=True, wait=0.4)
+        ui.real_key("Insert", alt=True)
         pop = ui.open_popovers()[0]
         num = next(n for n, t, _r in ui.menu_choices(pop) if t.startswith("Sub-item"))
-        ui.real_key(num, wait=0.4)
+        ui.real_key(num)
+        ui.wait_for(lambda: intro.children, "the sub-item to be added")
         self.assertEqual([c.kind for c in intro.children], ["heading"])
 
     def test_ctrl_t_inserts_a_table_and_tab_moves_between_cells(self):
         doc = self.chapter(h("Intro", b("before")))
         ui.focus(doc.root.children[0].children[0])
-        ui.real_key("t", ctrl=True, wait=0.4)
+        ui.real_key("t", ctrl=True)
         table = next(n for n in self.win.doc.root.walk() if n.kind == "table")
+        ui.wait_for(lambda: self.ed.cur_view in ui.row(table).views(), "the cursor to be in the new table")
         ui.real_type("a")
         ui.real_key("Tab")
         ui.real_type("b")
@@ -177,18 +181,21 @@ class RealKeysTest(ui.UITestCase):
     def test_f2_opens_chapter_properties_and_escape_closes_it(self):
         doc = self.chapter(h("Intro"))
         ui.focus(doc.root.children[0])
-        ui.real_key("F2", wait=0.5)
+        ui.real_key("F2")
+        ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "F2 to open Chapter Properties")
         dlg = self.win.get_visible_dialog()
         self.assertEqual(dlg.get_heading(), "Chapter Properties")
-        ui.real_key("Escape", wait=0.6)
-        self.assertIsNone(self.win.get_visible_dialog())
+        ui.pump(0.3)  # the dialog takes the keyboard once it has opened
+        ui.real_key("Escape")
+        ui.wait_for(lambda: self.win.get_visible_dialog() is None, "Escape to close the dialog")
 
     def test_f9_and_ctrl_page_down(self):
         paths = [self.chapter(h(t), title=t, book="Real keys book").path for t in ("One", "Two")]
         self.win.open_path(paths[0])
         ui.settle()
         ui.focus(self.win.doc.root.children[0])
-        ui.real_key("Page_Down", ctrl=True, wait=0.4)
+        ui.real_key("Page_Down", ctrl=True)
+        ui.settle()
         self.assertEqual(Path(self.win.doc.path).resolve(), paths[1].resolve())
         shown = self.win.split.get_show_sidebar()
         ui.real_key("F9")
@@ -208,7 +215,7 @@ class RealKeysTest(ui.UITestCase):
     def test_copy_for_topcoding_key(self):
         doc = self.chapter(h("Intro", b("note")))
         ui.focus(doc.root.children[0])
-        ui.real_key("c", ctrl=True, shift=True, wait=0.3)
+        ui.real_key("c", ctrl=True, shift=True)
         self.assertIn("Ⅰ) ", ui.clipboard("text/html"))
 
     # -- typing fast ----------------------------------------------------------------------------------
@@ -219,8 +226,10 @@ class RealKeysTest(ui.UITestCase):
         shown = self.win.split.get_show_sidebar()
         ui.real_key("p", ctrl=True, shift=True, wait=0.4)
         ui.real_type("chapter list", wait=0)  # no pause before Enter, as a fast typist
-        ui.real_key("Return", wait=0.6)
-        self.assertEqual(self.win.split.get_show_sidebar(), not shown)
+        ui.real_key("Return")
+        ui.wait_for(lambda: self.win.get_visible_dialog() is None, "Search Commands to close")
+        ui.wait_for(lambda: self.win.split.get_show_sidebar() != shown, "the chapter list to be toggled")
+        ui.pump(0.3)
         self.assertIsNone(self.win.get_visible_dialog(), "no other command (like New Chapter) ran")
 
     def test_enter_right_after_typing_finds_the_typed_text(self):
@@ -228,7 +237,7 @@ class RealKeysTest(ui.UITestCase):
         ui.focus(doc.root.children[0])
         ui.real_key("f", ctrl=True, wait=0.4)
         ui.real_type("omega", wait=0)
-        ui.real_key("Return", wait=0.3)
+        ui.real_key("Return")
         bar = self.win.findbar
         self.assertEqual(bar.entry.get_text(), "omega")
         self.assertEqual(bar.matches[bar.current][0], ui.row(doc.root.children[0].children[1]).view)

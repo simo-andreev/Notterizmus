@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 import tomllib
 from pathlib import Path
@@ -108,6 +109,38 @@ def _merge(base, over):
     return base
 
 
+_KINDS = {str: "text in quotes", bool: "true or false", int: "a whole number", list: "a list"}
+
+
+def _toml(value):
+    """A value as it's written in TOML (true, "text", [1, 2]); JSON spells these the same."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _problem(data):
+    """What makes these rules unusable (a user's file with the wrong kind of value), or
+    None. Settings this version doesn't know are left alone."""
+    for section, defaults in DEFAULTS.items():
+        got = data.get(section)
+        if not isinstance(got, dict):
+            return f"[{section}] must be a table of settings"
+        if section == "markers":
+            for name, spec in got.items():
+                if not isinstance(spec, dict) or not isinstance(spec.get("symbol"), str) or not spec["symbol"]:
+                    return f'[markers.{name}] needs a symbol, such as symbol = "?"'
+                for key in ("trigger", "label"):
+                    if not isinstance(spec.get(key, ""), str):
+                        return f"markers.{name}.{key} must be {_KINDS[str]}"
+            continue
+        for key, default in defaults.items():
+            if type(got.get(key)) is not type(default):
+                return f"{section}.{key} must be {_KINDS[type(default)]}, such as {_toml(default)}"
+    levels = data["numbering"]["levels"]
+    if not levels or not all(isinstance(name, str) for name in levels):
+        return "numbering.levels must name at least one format"
+    return None
+
+
 class Rules:
     def __init__(self, data=None):
         self.data = data or copy.deepcopy(DEFAULTS)
@@ -115,6 +148,8 @@ class Rules:
 
     @classmethod
     def load(cls, path=None):
+        """The defaults with the user's file on top. A file that can't be used (not TOML,
+        or a value of the wrong kind) is reported in .error and left out entirely."""
         data = copy.deepcopy(DEFAULTS)
         r = cls(data)
         p = Path(path) if path else user_rules_path()
@@ -122,8 +157,12 @@ class Rules:
             try:
                 with open(p, "rb") as f:
                     _merge(data, tomllib.load(f))
-            except (OSError, tomllib.TOMLDecodeError) as e:
-                r.error = f"{p}: {e}"
+                problem = _problem(data)
+            except (OSError, ValueError, TypeError, AttributeError) as e:  # ValueError: not TOML
+                problem = str(e)
+            if problem:
+                r.error = f"{p}: {problem}"
+                r.data = copy.deepcopy(DEFAULTS)
         return r
 
     def __getitem__(self, k):

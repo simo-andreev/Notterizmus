@@ -44,6 +44,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 
   Pasted items are renumbered to fit where they land.
 - Text with no outline markers, such as paragraphs from a PDF, goes into the current item as one paragraph. Words hyphenated across lines are re-joined. A notification offers **One Item per Paragraph**.
+- A table copied on its own (from a web page, say), or together with such text, is added after the current item.
 - Ctrl+Shift+V pastes as plain text, joined into the current item.
 - Items copied inside the app paste back with their exact structure.
 

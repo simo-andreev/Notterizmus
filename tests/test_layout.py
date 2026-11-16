@@ -89,5 +89,99 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(to_plain(layout(d2.root, Rules())), EXPECTED)
 
 
+def plain(root, **changes):
+    rules = Rules()
+    for name, value in changes.items():
+        section, key = name.split("__")
+        rules.data[section][key] = value
+    return to_plain(layout(root, rules))
+
+
+class ShapeTest(unittest.TestCase):
+    """Smaller outlines, one rule at a time."""
+
+    def tree(self):
+        return Node("root", children=[H("A", B("b"), H("A1"), H("A2", B("c"))), H("B")])
+
+    def test_bullets_nest_four_columns_deeper_each_level(self):
+        root = Node("root", children=[H("A", B("b1", "dot", B("b2", "plus", B("b3", "minus"))), H("A1"))])
+        self.assertEqual(plain(root), "Ⅰ) A\n"
+                                      "│    • b1\n"
+                                      "│        + b2\n"
+                                      "│            - b3\n"
+                                      "└ Ⅰ.1) A1\n")
+
+    def test_bullets_after_the_last_numbered_child_have_no_trunk(self):
+        root = Node("root", children=[H("A", B("before"), H("A1"), B("after"))])
+        self.assertEqual(plain(root), "Ⅰ) A\n"
+                                      "│    • before\n"
+                                      "└ Ⅰ.1) A1\n"
+                                      "     • after\n")
+
+    def test_a_spacer_comes_before_a_numbered_child_unless_a_bullet_precedes_it(self):
+        self.assertEqual(plain(self.tree()), "Ⅰ) A\n"
+                                             "│    • b\n"
+                                             "├ Ⅰ.1) A1\n"
+                                             "│\n"
+                                             "└ Ⅰ.2) A2\n"
+                                             "       • c\n"
+                                             "\n"
+                                             "Ⅱ) B\n")
+
+    def test_spacer_lines_can_be_turned_off(self):
+        self.assertNotIn("│\n", plain(self.tree(), tree__spacer_lines=False))
+        self.assertIn("├ Ⅰ.1) A1\n└ Ⅰ.2) A2\n", plain(self.tree(), tree__spacer_lines=False))
+
+    def test_spacers_after_bullets_can_be_turned_on(self):
+        self.assertIn("│    • b\n│\n├ Ⅰ.1) A1\n", plain(self.tree(), tree__spacer_after_leaf=True))
+
+    def test_the_blank_line_between_top_level_items_can_be_turned_off(self):
+        text = plain(self.tree(), tree__blank_between_top_level=False)
+        self.assertNotIn("\n\n", text)
+        self.assertTrue(text.endswith("       • c\nⅡ) B\n"))
+
+    def test_bullet_columns_follow_the_indent_rules(self):
+        root = Node("root", children=[H("A", B("b", "dot", B("deep")), H("A1", B("c")))])
+        self.assertEqual(plain(root, bullets__indent=2, bullets__nested_indent=1), "Ⅰ) A\n"
+                                                                                  "│ • b\n"
+                                                                                  "│  • deep\n"
+                                                                                  "└ Ⅰ.1) A1\n"
+                                                                                  "    • c\n")
+
+    def test_connectors_come_from_the_rules(self):
+        text = plain(self.tree(), tree__branch="+-", tree__last="`-", tree__trunk="|")
+        self.assertIn("+-Ⅰ.1) A1\n", text)
+        self.assertIn("`-Ⅰ.2) A2\n", text)
+        self.assertIn("|    • b\n", text)
+
+    def test_numbering_skips_bullets_and_restarts_in_each_item(self):
+        root = Node("root", children=[H("A", H("x"), B("note"), H("y")), H("B", H("z"))])
+        labels = [ln.prefix_text().strip("├└│ ") for ln in layout(root, Rules()) if ln.node and ln.node.kind == "heading"]
+        self.assertEqual(labels, ["Ⅰ)", "Ⅰ.1)", "Ⅰ.2)", "Ⅱ)", "Ⅱ.1)"])
+
+    def test_a_marker_from_a_newer_rules_file_is_drawn_as_a_bullet(self):
+        root = Node("root", children=[H("A", B("b", "unheard-of"))])
+        self.assertIn("     • b\n", plain(root))
+
+    def test_each_item_is_one_line_and_knows_its_node(self):
+        root = self.tree()
+        lines = layout(root, Rules())
+        items = [ln.node for ln in lines if ln.kind == "item"]
+        self.assertEqual(items, [n for n in root.walk() if n is not root])
+        self.assertEqual([ln.kind for ln in lines],
+                         ["item", "item", "item", "spacer", "item", "item", "blank", "item"])
+        self.assertTrue(all(ln.node is None for ln in lines if ln.kind in ("spacer", "blank")))
+
+    def test_segments_tell_connectors_labels_markers_and_text_apart(self):
+        root = Node("root", children=[H("A", Node("bullet", [Run("x"), Run("y", bold=True)]), H("A1"))])
+        bullet = layout(root, Rules())[1]
+        self.assertEqual([(s.role, s.text, s.bold) for s in bullet.segs()],
+                         [("connector", "│    ", False), ("marker", "• ", False), ("text", "x", False),
+                          ("text", "y", True)])
+        heading = layout(root, Rules())[2]
+        self.assertEqual([(s.role, s.text) for s in heading.segs()],
+                         [("connector", "└ "), ("label", "Ⅰ.1) "), ("text", "A1")])
+
+
 if __name__ == "__main__":
     unittest.main()

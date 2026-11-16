@@ -9,7 +9,8 @@ Future kinds (e.g. "drawing") only need a data codec here, a layout rule
 in layout.py, an exporter in export.py and a row widget in ui/rows.py.
 
 Kinds and fields this version doesn't know (written by a newer one) are kept
-unchanged when the file is saved; the editor shows such blocks read-only.
+unchanged when the file is saved; the editor shows such blocks read-only. That goes for
+the fields of the file itself too (Document.extra), and for its format name.
 """
 from __future__ import annotations
 
@@ -39,7 +40,11 @@ class Run:
 
     @staticmethod
     def from_json(d):
-        return Run(d.get("t", ""), bool(d.get("b")), bool(d.get("i")))
+        text = d.get("t")
+        text = "" if text is None else text
+        if not isinstance(text, str):
+            raise TypeError("a piece of text isn't text")
+        return Run(text, bool(d.get("b")), bool(d.get("i")))
 
 
 def runs_text(runs):
@@ -166,8 +171,17 @@ class Node:
 
     @staticmethod
     def from_json(d):
+        """Raises KeyError, TypeError or AttributeError for JSON that isn't an item
+        (Document.from_json turns those into one ValueError)."""
         kind = d["kind"]
-        children = [Node.from_json(c) for c in d.get("children", [])]
+        if not isinstance(kind, str) or not isinstance(d.get("id") or "", str) \
+                or (kind in BLOCK_KINDS and d.get("marker") is not None
+                                          and not isinstance(d["marker"], str)):
+            raise TypeError("an item's kind, id or marker isn't text")
+        children = d.get("children") or []
+        if not isinstance(children, list):
+            raise TypeError("an item's sub-items aren't a list")
+        children = [Node.from_json(c) for c in children]
         if kind not in BLOCK_KINDS:
             node = Node(kind, id=d.get("id"), children=children)
             node.extra = {k: v for k, v in d.items() if k not in ("kind", "id", "children")}
@@ -178,7 +192,7 @@ class Node:
         node = Node(
             kind,
             runs=runs_from_json(d.get("runs")),
-            marker=d.get("marker", "dot"),
+            marker="dot" if d.get("marker") is None else d["marker"],
             data=data,
             id=d.get("id"),
             children=children,
@@ -236,14 +250,18 @@ def move(node, delta):
 
 
 def remove_promote(node):
-    """Remove node; its children take its place in the parent."""
+    """Remove node; its children take its place in the parent. A bullet that lands at
+    the top level becomes a numbered item, as when it is outdented there."""
     par = node.parent
     idx = node.index()
     node.detach()
-    for k, c in enumerate(list(node.children)):
+    for c in list(node.children):
         c.parent = None
         if can_contain(par, c):
-            par.insert(idx + k, c)
+            if par.kind == "root" and c.kind == "bullet":
+                c.kind = "heading"  # top level is always numbered
+            par.insert(idx, c)
+            idx += 1
     node.children = []
 
 
@@ -302,6 +320,11 @@ class Document:
         self.chapter_no = chapter_no
         self.chapter_title = chapter_title
         self.path = Path(path) if path else None
+        # From a file written by a newer version, saved back unchanged: its format name,
+        # and the fields of the file and of its "chapter" entry this version doesn't know.
+        self.format = FORMAT
+        self.extra = {}
+        self.chapter_extra = {}
 
     @classmethod
     def new(cls, book, chapter_no, chapter_title, path=None):
@@ -309,35 +332,75 @@ class Document:
         return cls(root, book, chapter_no, chapter_title, path)
 
     def to_json(self):
-        return {
-            "format": FORMAT,
+        d = {
+            "format": self.format,
             "book": self.book,
-            "chapter": {"number": self.chapter_no, "title": self.chapter_title},
+            "chapter": {**self.chapter_extra, "number": self.chapter_no, "title": self.chapter_title},
             **({"lang": self.lang} if self.lang else {}),
             "content": [c.to_json() for c in self.root.children],
         }
+        for k, v in self.extra.items():
+            d.setdefault(k, v)
+        return d
 
     @classmethod
     def from_json(cls, d, path=None):
-        ch = d.get("chapter", {})
-        root = Node("root", children=[Node.from_json(c) for c in d.get("content", [])])
-        if not root.children:
-            root.append(Node("heading"))
-        return cls(root, d.get("book", ""), ch.get("number", 1), ch.get("title", ""), path, d.get("lang"))
+        """Raises ValueError for JSON that isn't a chapter: the wrong shape, or a value of
+        the wrong kind. (Fields that are missing or null get their defaults.)"""
+        try:
+            ch = d.get("chapter") or {}
+            book, title, number = d.get("book") or "", ch.get("title") or "", ch.get("number")
+            lang, fmt, content = d.get("lang"), d.get("format") or FORMAT, d.get("content") or []
+            number = 1 if number is None else number
+            if isinstance(number, float) and number.is_integer():
+                number = int(number)
+            if not (isinstance(book, str) and isinstance(title, str) and type(number) is int
+                    and isinstance(fmt, str) and (lang is None or isinstance(lang, str))
+                    and isinstance(content, list)):
+                raise TypeError("its book, chapter, language or content isn't what a chapter has")
+            root = Node("root", children=[Node.from_json(c) for c in content])
+            if not root.children:
+                root.append(Node("heading"))
+            doc = cls(root, book, number, title, path, lang)
+            doc.format = fmt
+            doc.extra = {k: v for k, v in d.items() if k not in ("format", "book", "chapter", "lang", "content")}
+            doc.chapter_extra = {k: v for k, v in ch.items() if k not in ("number", "title")}
+            return doc
+        except (AttributeError, KeyError, TypeError, RecursionError) as e:  # Recursion: nested too deep
+            raise ValueError("this isn't a Notterizmus chapter file") from e
 
     @classmethod
     def load(cls, path):
+        """Raises OSError if the file can't be read, ValueError if it isn't a chapter."""
         with open(path, encoding="utf-8") as f:
-            return cls.from_json(json.load(f), path)
+            try:
+                data = json.load(f)
+            except RecursionError as e:  # nested too deep to read
+                raise ValueError("this isn't a Notterizmus chapter file") from e
+        return cls.from_json(data, path)
 
     def save(self, path=None):
         path = Path(path or self.path)
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".", suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(self.to_json(), f, ensure_ascii=False, indent=1)
-            f.write("\n")
-        os.replace(tmp, path)
+        try:
+            try:
+                f = os.fdopen(fd, "w", encoding="utf-8")
+            except BaseException:
+                os.close(fd)
+                raise
+            with f:
+                json.dump(self.to_json(), f, ensure_ascii=False, indent=1)
+                f.write("\n")
+            os.replace(tmp, path)
+        except BaseException:
+            # A save that fails (a full disk, say) is retried by every autosave: don't
+            # leave a half-written file in the book's folder each time.
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
         self.path = path
 
 

@@ -1,5 +1,6 @@
 """A block type from a newer version: shown read-only, skipped by the cursor, kept in the file."""
 import json
+from pathlib import Path
 
 from notterizmus.guide import b, h
 from notterizmus.model import Node
@@ -51,8 +52,7 @@ class UnknownBlockTest(ui.UITestCase):
     def test_editing_around_it_keeps_its_data_in_the_file(self):
         doc, _intro, before, _block, _after = self.open()
         ui.type_text(ui.focus(before).view, " edited")
-        ui.pump(1.2)  # autosave
-        self.assertIn("before edited", doc.path.read_text(encoding="utf-8"))
+        ui.wait_for(lambda: "before edited" in doc.path.read_text(encoding="utf-8"), "the autosave")
         self.assertEqual(saved_block(doc.path), DRAWING)
 
     def test_copy_for_topcoding_leaves_it_out(self):
@@ -73,3 +73,39 @@ class UnknownBlockTest(ui.UITestCase):
         kids = self.win.doc.root.children[0].children
         self.assertEqual([c.kind for c in kids], ["bullet", "drawing", "bullet"])
         self.assertEqual(kids[1].to_json(), DRAWING)
+
+
+class UnknownFileFieldsTest(ui.UITestCase):
+    """Fields of the file itself from a newer version, and its format name, stay in the
+    file through editing, autosave and a rename."""
+
+    NEWER = {"format": "notterizmus/2", "book": "Newer book", "tags": ["draft"], "created": {"by": "2.0"},
+             "chapter": {"number": 1, "title": "From the future", "subtitle": "kept"},
+             "content": [{"kind": "heading", "id": "h1", "runs": [{"t": "Intro"}]}]}
+
+    def test_editing_and_renaming_keep_what_this_version_does_not_know(self):
+        path = self.win.notes_root_path() / "Newer book" / "01 From the future.notz"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.NEWER), encoding="utf-8")
+        self.win.open_path(path)
+        ui.settle()
+        self.assertEqual(self.win.wtitle.get_title(), "Chapter 1 — From the future")
+        ui.type_text(ui.focus(self.win.doc.root.children[0]).view, " edited")
+        ui.wait_for(lambda: "Intro edited" in path.read_text(encoding="utf-8"), "the autosave")
+
+        def unknown(p):
+            d = json.loads(Path(p).read_text(encoding="utf-8"))
+            return d["format"], d["tags"], d["created"], d["chapter"].get("subtitle")
+
+        expected = ("notterizmus/2", ["draft"], {"by": "2.0"}, "kept")
+        self.assertEqual(unknown(path), expected)
+        self.win.apply_chapter_props(path, path.parent, 5, "Renamed")
+        ui.pump(0.2)
+        renamed = path.parent / "05 Renamed.notz"
+        self.assertEqual(Path(self.win.doc.path), renamed)
+        self.assertEqual(unknown(renamed), expected)
+        ui.type_text(ui.row(self.win.doc.root.children[0]).view, " again")
+        ui.wait_for(lambda: "edited again" in renamed.read_text(encoding="utf-8"), "the autosave after the rename")
+        self.assertEqual(unknown(renamed), expected, "the open chapter kept them through the rename")
+        self.assertEqual(json.loads(renamed.read_text(encoding="utf-8"))["chapter"],
+                         {"subtitle": "kept", "number": 5, "title": "Renamed"})

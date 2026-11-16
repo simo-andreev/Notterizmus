@@ -253,9 +253,18 @@ def parse(items, rules):
             attach(parent, n)
             bstack.append((ind, n))
         else:
-            attach(hstack[-1] if hstack else None,
-                   Node("table", data={"header": p[2], "rows": _square(p[1])}))
+            attach(hstack[-1] if hstack else None, table_node(p[1], p[2]))
     return forest
+
+
+def table_node(rows, header=False):
+    """A table node from pasted rows (lists of cells, each a list of runs)."""
+    return Node("table", data={"header": bool(header), "rows": _square(rows)})
+
+
+def table_nodes(items):
+    """The tables among pasted items, as nodes."""
+    return [table_node(it[1], it[2]) for it in items if it[0] == "table"]
 
 
 def _square(rows):

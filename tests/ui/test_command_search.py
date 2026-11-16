@@ -14,9 +14,13 @@ class CommandSearchTest(ui.UITestCase):
         self.win.lookup_action("commands").activate(None)
         ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
         dlg = self.win._command_search
-        dlg.entry.set_text(text)
-        ui.pump(0.25)  # search-changed is delayed a little
+        self.search(dlg, text)
         return dlg
+
+    def search(self, dlg, text):
+        dlg.entry.set_text(text)
+        ui.wait_for(lambda: dlg._filled_for == text, "the list to follow the search")
+        ui.pump(0.05)
 
     def titles(self, dlg):
         return [r._cmd.title for r in dlg.rows()]
@@ -36,8 +40,7 @@ class CommandSearchTest(ui.UITestCase):
         ui.open_chapter([h("Intro", b("note"))])
         dlg = self.open_search("rename")
         self.assertEqual(self.titles(dlg)[0], "Chapter Properties…")
-        dlg.entry.set_text("new chap")
-        ui.pump(0.25)
+        self.search(dlg, "new chap")
         first = dlg.list.get_row_at_index(0)
         self.assertEqual(first._cmd.title, "New Chapter")
         shown = [w for w in ui.walk(first) if isinstance(w, ui.Adw.ShortcutLabel)]

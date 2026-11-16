@@ -508,7 +508,7 @@ class Window(Adw.ApplicationWindow):
         except FileExistsError:
             self.toast(f"“{Path(folder).name}” already has a chapter {number}")
             return
-        except OSError as e:
+        except (OSError, ValueError) as e:  # ValueError: a file that isn't a chapter
             self.toast(f"Could not change the chapter: {e}")
             return
         if not same_book:
@@ -541,24 +541,28 @@ class Window(Adw.ApplicationWindow):
     def apply_book_rename(self, folder, name):
         self._flush_save()
         old_folder = Path(folder)
+        failed = []
         try:
-            moved = library.rename_book(old_folder, name)
+            moved = library.rename_book(old_folder, name, failed)
         except FileExistsError:
             self.toast("Another book already has that name")
             return
-        except OSError as e:
+        except (OSError, ValueError) as e:
             self.toast(f"Could not rename the book: {e}")
             return
         if old_folder.name in self.sidebar.expanded:
             self.sidebar.expanded.discard(old_folder.name)
             self.sidebar.expanded.add(library.safe_name(name))
         self._after_move(moved)
+        if failed:
+            self.toast(f"Renamed, but {len(failed)} chapter(s) kept the old book name: "
+                       + ", ".join(f.name for f in failed))
 
     def _reorder_chapters(self, order, moving):
         self._flush_save()
         try:
             moved = library.reorder(order)
-        except (FileExistsError, OSError) as e:
+        except (OSError, ValueError) as e:  # FileExistsError is an OSError
             self.toast(f"Could not reorder the chapters: {e}")
             self._reload_sidebar()
             return

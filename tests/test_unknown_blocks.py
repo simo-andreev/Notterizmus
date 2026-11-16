@@ -81,6 +81,79 @@ class UnknownBlocksTest(unittest.TestCase):
         self.assertEqual(node.children[0].text, "SECRET child")
 
 
+class UnknownFileFieldsTest(unittest.TestCase):
+    """The same for the file as a whole: its own fields, its "chapter" entry, its format name."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def newer(self):
+        d = chapter(heading("Intro", bullet("note")))
+        d.update(format="notterizmus/2", lang="en_US", tags=["draft", "ch1"], created={"by": "2.0", "at": 1},
+                 chapter={"number": 1, "title": "T", "subtitle": "kept", "part": 2})
+        return d
+
+    def write(self, d, name="01 T.notz", book="B"):
+        path = self.dir / book / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(d), encoding="utf-8")
+        return path
+
+    def read(self, path):
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+
+    def test_fields_of_the_file_and_of_its_chapter_entry_are_saved_back(self):
+        d = self.newer()
+        path = self.write(d)
+        Document.load(path).save()
+        self.assertEqual(self.read(path), d)
+
+    def test_they_survive_editing_what_this_version_does_know(self):
+        d = self.newer()
+        path = self.write(d)
+        doc = Document.load(path)
+        doc.chapter_title, doc.chapter_no, doc.book, doc.lang = "New title", 7, "Other", "bg_BG"
+        doc.root.children[0].children[0].runs = []
+        doc.save()
+        got = self.read(path)
+        self.assertEqual(got["chapter"], {"number": 7, "title": "New title", "subtitle": "kept", "part": 2})
+        self.assertEqual((got["book"], got["lang"], got["tags"], got["created"]),
+                         ("Other", "bg_BG", ["draft", "ch1"], {"by": "2.0", "at": 1}))
+        self.assertEqual(got["format"], "notterizmus/2", "a newer file isn't relabelled as an older one")
+
+    def test_a_field_cannot_shadow_one_this_version_writes(self):
+        doc = Document.load(self.write(self.newer()))
+        doc.extra["book"] = "from extra"
+        doc.chapter_extra["title"] = "from extra"
+        got = doc.to_json()
+        self.assertEqual((got["book"], got["chapter"]["title"]), ("B", "T"))
+
+    def test_a_file_without_a_format_name_gets_this_versions(self):
+        path = self.write({"book": "B", "chapter": {"number": 1, "title": "T"}, "content": []})
+        Document.load(path).save()
+        self.assertEqual(self.read(path)["format"], "notterizmus/1")
+        self.assertEqual(Document.new("B", 1, "T").to_json()["format"], "notterizmus/1")
+
+    def test_renaming_renumbering_and_moving_a_chapter_keep_them(self):
+        from notterizmus.library import rename_book, renumber, set_chapter
+        d = self.newer()
+        path = self.write(d)
+        moved = set_chapter(path, 4, "Renamed")
+        path = moved[path]
+        moved = renumber({path: 9})
+        path = moved[path]
+        moved = set_chapter(path, 9, "Renamed", self.dir / "Second book")
+        path = moved[path]
+        rename_book(self.dir / "Second book", "Third book")
+        got = self.read(self.dir / "Third book" / "09 Renamed.notz")
+        self.assertEqual(got["chapter"], {"number": 9, "title": "Renamed", "subtitle": "kept", "part": 2})
+        self.assertEqual((got["book"], got["format"], got["tags"], got["created"]),
+                         ("Third book", "notterizmus/2", d["tags"], d["created"]))
+        self.assertEqual(got["content"], d["content"])
+
+
 def _drop_none(items):
     out = []
     for it in items:

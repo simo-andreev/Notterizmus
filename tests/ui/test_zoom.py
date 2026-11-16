@@ -23,7 +23,7 @@ class ZoomTest(ui.UITestCase):
     def zoom(self, action, times=1):
         for _ in range(times):
             self.win.lookup_action(action).activate(None)
-        ui.pump(0.4)
+        ui.settle()  # the new size takes effect in the next frame, the rows' heights after it
 
     def font_size(self, widget):
         """The widget's font size as Pango has it (GTK turns CSS points into pixels)."""

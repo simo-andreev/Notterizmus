@@ -2,8 +2,20 @@
 
 Run the tests with scripts/ui-tests.sh. It starts a private Broadway display (no window
 appears on your screen), points the config, data and Documents folders at a scratch
-directory and fails if GTK printed any warnings. A plain
+directory and fails if GTK or Python printed any warnings. A plain
 `python3 -m unittest discover -s tests -t .` skips these tests.
+
+Waiting: the app does much of its work a moment later (focus in an idle callback, layout
+in the next frames, input through the display server), so nothing here assumes how long
+that takes. The helpers wait for what they started: press(), type_text() and focus() until
+the editor has put the cursor where it wants it, real_key() and real_drag() until the
+app has received the input, settle() until the outline has stopped moving. In a test,
+wait for a condition with wait_for() or pump_until() rather than for a time with pump(); a
+fixed pause passes on a fast machine and fails on a busy one.
+
+Every test starts from the same window state (UITestCase.setUp), fails if the app raised
+an exception in one of its callbacks (GTK only prints those), and is stopped with a
+traceback if it hangs.
 
 Real mouse drags: real_drag() presses, moves and releases the left button through
 Broadway, so the app's own gestures and GtkTextView's run as for a real mouse.
@@ -17,9 +29,13 @@ Two ways to press keys:
 """
 from __future__ import annotations
 
+import collections
+import faulthandler
 import itertools
 import os
+import sys
 import time
+import traceback
 import unittest
 from pathlib import Path
 
@@ -27,7 +43,13 @@ ENABLED = os.environ.get("NOTTERIZMUS_UI_TESTS") == "1"
 # Frame-by-frame checks need a display that draws at a normal rate: Broadway with our
 # input client connected (it answers the frame roundtrips) or Weston.
 FRAMES = os.environ.get("NOTTERIZMUS_UI_FRAMES") == "1"
-BROADWAY_PORT = os.environ.get("NOTTERIZMUS_UI_BROADWAY_PORT")
+# The Broadway server's socket for input (real keys and mouse); unset on Weston.
+BROADWAY = os.environ.get("NOTTERIZMUS_UI_BROADWAY")
+REAL_INPUT = bool(BROADWAY)
+# A test that takes longer than this is hung: the run stops with every thread's traceback.
+TEST_TIMEOUT = float(os.environ.get("NOTTERIZMUS_UI_TEST_TIMEOUT", "180"))
+
+_INPUT_EVENTS = ()
 
 if ENABLED:
     import gi
@@ -38,9 +60,16 @@ if ENABLED:
     gi.require_version("Graphene", "1.0")
     from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk, Pango  # noqa: F401
 
+    _INPUT_EVENTS = (Gdk.EventType.KEY_PRESS, Gdk.EventType.BUTTON_PRESS, Gdk.EventType.BUTTON_RELEASE,
+                     Gdk.EventType.MOTION_NOTIFY)
+
 _app = None
 _keyboard = None
-_chapter_no = itertools.count(1)
+_chapter_no = collections.defaultdict(lambda: itertools.count(1))  # the next chapter number, per book
+_app_errors = []  # exceptions the app raised in callbacks since the current test began
+# Real input: the time stamp of the newest event the app has received, and how far the
+# stamps the app sees are from the ones sent (see _watch_input).
+_input = {"seen": 0, "offset": 0}
 
 
 def _check_scratch():
@@ -59,16 +88,66 @@ def app():
         _check_scratch()
         from notterizmus.ui.app import App
         global _keyboard
-        if BROADWAY_PORT and _keyboard is None:  # before the window: it answers frame roundtrips
+        if BROADWAY and _keyboard is None:  # before the window: it answers frame roundtrips
             from .broadway_input import BroadwayInput
-            _keyboard = BroadwayInput(int(BROADWAY_PORT))
+            _keyboard = BroadwayInput(BROADWAY)
+        _watch_exceptions()
         a = App()
         a.set_flags(a.get_flags() | Gio.ApplicationFlags.NON_UNIQUE)
         a.register(None)
         a.activate()
         _app = a
-        pump(1.0)
+        _watch_input(a.win)
+        if not pump_until(lambda: a.win.get_mapped() and a.win.get_width() > 0, 15):
+            raise RuntimeError("the app's window never appeared on the test display")
+        pump(0.5)
+        if _keyboard is not None:
+            # Broadway hands events on with their time stamps moved by a fixed amount:
+            # measure it with one pointer movement, the only input so far.
+            _keyboard.enter(5, 5)
+            stamp = _keyboard.move(5, 5)
+            if not pump_until(lambda: _input["seen"], 15):
+                raise RuntimeError("real input sent through Broadway doesn't reach the app")
+            _input["offset"] = stamp - _input["seen"]
     return _app
+
+
+def _watch_exceptions():
+    """PyGObject prints an exception raised in a signal handler, idle or timeout callback
+    and carries on, so the test that caused it would pass. Collect them instead."""
+    printed = sys.excepthook
+
+    def hook(etype, value, tb):
+        _app_errors.append("".join(traceback.format_exception(etype, value, tb)))
+        printed(etype, value, tb)
+
+    sys.excepthook = hook
+
+
+def _watch_input(widget):
+    """Note the time stamp of each real key press and pointer event as `widget` receives
+    it, before any widget inside can take it: real_key() and real_drag() wait for the
+    stamps of the events they sent (broadway_input.send), so they know the app has
+    handled them. Watched on the window and, while they are open, on its dialog and
+    popups (_watch_modals): those get the events first-hand, and the window never sees
+    them."""
+    widget._input_watched = True
+    ctl = Gtk.EventControllerLegacy(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+
+    def event(ctl, _event):
+        ev = ctl.get_current_event()  # PyGObject passes the signal's own event as None
+        if ev is not None and ev.get_event_type() in _INPUT_EVENTS:
+            _input["seen"] = max(_input["seen"], ev.get_time())
+        return False
+
+    ctl.connect("event", event)
+    widget.add_controller(ctl)
+
+
+def _arrived(stamp, what):
+    """Wait until the app has received the real input event sent with this time stamp.
+    It has then handled it as well: an event is dispatched in one go."""
+    wait_for(lambda: _input["seen"] + _input["offset"] >= stamp, f"{what} to reach the app")
 
 
 class UITestCase(unittest.TestCase):
@@ -81,8 +160,42 @@ class UITestCase(unittest.TestCase):
         cls.ed = cls.win.editor
 
     def setUp(self):
-        close_popovers()
-        self.ed.clear_carets()
+        """Subclasses that define setUp must call this first (super().setUp())."""
+        faulthandler.dump_traceback_later(TEST_TIMEOUT, exit=True)
+        self.addCleanup(faulthandler.cancel_dump_traceback_later)
+        reset_window()
+        del _app_errors[:]
+        self.addCleanup(self._no_app_errors)
+
+    def _no_app_errors(self):
+        pump(0.05)  # what the test left for the main loop still counts as its own
+        errors, _app_errors[:] = list(_app_errors), []
+        if errors:
+            self.fail(f"the app raised {len(errors)} exception(s) in its callbacks during this test; "
+                      "the first:\n" + errors[0])
+
+
+def reset_window():
+    """Bring the window back to the state every test starts from, whatever the test before
+    left behind: no dialog, popup, find bar, selection, extra cursors or held mouse
+    button; normal text size; the chapter list shown at its default width."""
+    win = app().win
+    ed = win.editor
+    release_mouse()
+    while (dlg := win.get_visible_dialog()) is not None:
+        dlg.force_close()
+        wait_for(lambda: win.get_visible_dialog() is not dlg, "a dialog to close")
+    close_popovers()
+    if win.findbar.get_search_mode():
+        win.findbar.set_search_mode(False)
+    ed.clear_carets()
+    ed.clear_selection()
+    if win._zoom != 100:
+        win.set_zoom(100, save=True, announce=False)
+    if not win.split.get_show_sidebar():
+        win.split.set_show_sidebar(True)
+    if win._sidebar_w != 260:
+        win.set_sidebar_width(260, save=True)
 
 
 # -- main loop --------------------------------------------------------------------------
@@ -96,7 +209,11 @@ def pump(seconds=0.1):
         time.sleep(0.003)
 
 
-def pump_until(cond, timeout=4.0):
+def pump_until(cond, timeout=10.0):
+    """Run the main loop until cond() is true; False if it still isn't after timeout
+    seconds (generous, since it only matters when something is wrong or the machine busy)."""
+    if _keyboard is not None:
+        _keyboard._check()  # without the display nothing is drawn: say so rather than time out
     ctx = GLib.MainContext.default()
     end = time.monotonic() + timeout
     while time.monotonic() < end:
@@ -105,17 +222,38 @@ def pump_until(cond, timeout=4.0):
         if cond():
             return True
         time.sleep(0.003)
-    return cond()
+    return bool(cond())
+
+
+def wait_for(cond, what="the expected state", timeout=10.0):
+    """pump_until() that fails the test when the condition never comes."""
+    if not pump_until(cond, timeout):
+        raise AssertionError(f"timed out after {timeout:g} s waiting for {what}")
+
+
+def _editor_busy():
+    """True while the editor still has the cursor to place or to scroll to."""
+    ed = app().win.editor
+    return ed._focus_hint is not None or ed._focus_wait is not None or ed._ensure_tick is not None
+
+
+def wait_editor(pause=0.03):
+    """After something that changes the outline: let the editor finish what it deferred
+    (it focuses the new item from an idle callback, then scrolls to the cursor)."""
+    pump(pause)
+    pump_until(lambda: not _editor_busy())
 
 
 # -- chapters -----------------------------------------------------------------------------
 
 def open_chapter(nodes, title="Test", book="Book"):
-    """Save a chapter with these top-level nodes in the scratch notes folder and open it."""
+    """Save a chapter with these top-level nodes in the scratch notes folder and open it.
+    It gets the next number in its book (the default book has well over a hundred by the
+    end of a run: a chapter number isn't always two digits)."""
     from notterizmus.model import Document, Node, chapter_filename
     from notterizmus.ui.window import notes_root
     win = app().win
-    no = next(_chapter_no)
+    no = next(_chapter_no[book])
     doc = Document(Node("root", children=nodes), book, no, title,
                    notes_root() / book / chapter_filename(no, title), lang="en_US")
     doc.save()
@@ -124,10 +262,41 @@ def open_chapter(nodes, title="Test", book="Book"):
     return win.doc
 
 
-def settle(extra=0.35):
-    """Wait until every text view has a real width, then a few more frames."""
+def _geometry():
+    """Where every row of the outline is drawn and how tall it is, and the scroll position."""
     ed = app().win.editor
-    pump_until(lambda: all(v.get_width() > 1 for v in ed.all_views()) and ed._focus_wait is None)
+    out = [round(ed.get_vadjustment().get_value())]
+    c = ed.box.get_first_child()
+    while c is not None:
+        p = point_in(c, ed.box)
+        out.append((round(p[1]) if p else None, c.get_height()))
+        c = c.get_next_sibling()
+    return out
+
+
+def settle(extra=0.05, frames=4, timeout=10.0):
+    """Wait until the outline is laid out and still: every text view has a real width,
+    the cursor is where the editor wants it, and no row has moved or changed height over
+    several frames in a row. (Rows are measured again 20-30 ms after they're added, and
+    once more when their text turns out to wrap differently, each a frame or two apart.)"""
+    win = app().win
+    ed = win.editor
+    pump(0.06)  # past the editor's own short timers
+    state = {"last": None, "same": 0}
+
+    def painted(_clock):
+        now = _geometry() if not _editor_busy() and all(v.get_width() > 1 for v in ed.all_views()) else None
+        state["same"] = state["same"] + 1 if now is not None and now == state["last"] else 0
+        state["last"] = now
+
+    clock = win.get_frame_clock()
+    hid = clock.connect("after-paint", painted)
+    tick = ed.add_tick_callback(lambda *_: True)  # keep frames coming while we watch
+    try:
+        pump_until(lambda: state["same"] >= frames, timeout)
+    finally:
+        clock.disconnect(hid)
+        ed.remove_tick_callback(tick)
     pump(extra)
 
 
@@ -138,7 +307,7 @@ def row(node):
 def focus(node, offset=-1):
     r = row(node)
     r.focus(offset)
-    pump(0.15)
+    wait_editor(0.05)
     return r
 
 
@@ -168,7 +337,7 @@ def press(widget, name, ctrl=False, shift=False, alt=False, wait=0.12):
         if on:
             state |= getattr(Gdk.ModifierType, _MODS[flag])
     handled = key_controller(widget).emit("key-pressed", Gdk.keyval_from_name(name), 0, state)
-    pump(wait)
+    wait_editor(wait)
     return handled
 
 
@@ -184,18 +353,37 @@ def real_key(name, ctrl=False, shift=False, alt=False, wait=0.15):
     keyval = Gdk.keyval_from_name(name)
     if keyval in (0, 0xFFFFFF):
         raise ValueError(f"unknown key name {name!r}")
-    _keyboard.key(keyval, ctrl=ctrl, shift=shift, alt=alt)
-    pump(wait)
+    _press(keyval, ctrl=ctrl, shift=shift, alt=alt)
+    wait_editor(wait)
+
+
+def _press(keyval, **mods):
+    """Press one real key and wait until the app has handled the press."""
+    _watch_modals()
+    _arrived(_keyboard.key(keyval, **mods), "a real key press")
+
+
+def _watch_modals():
+    """Before sending real input: also watch for it on the dialog and popups open now."""
+    for w in [app().win.get_visible_dialog(), *open_popovers()]:
+        if w is not None and not getattr(w, "_input_watched", False):
+            _watch_input(w)
 
 
 def real_type(text, wait=0.05):
-    """Type text for real, one key per character."""
+    """Type text for real, one key per character. wait=0 sends the keys without letting
+    the app run in between, as a fast typist's arrive: together with the key after them."""
     if _keyboard is None:
         raise unittest.SkipTest("real key presses need the Broadway display (the default runner)")
+    _watch_modals()
     for ch in text:
-        _keyboard.key(Gdk.unicode_to_keyval(ord(ch)), shift=ch.isupper())
-        pump(wait)
-    pump(0.1)
+        if wait:
+            _press(Gdk.unicode_to_keyval(ord(ch)), shift=ch.isupper())
+            pump(wait)
+        else:
+            _keyboard.key(Gdk.unicode_to_keyval(ord(ch)), shift=ch.isupper())
+    if wait:
+        wait_editor(0.05)
 
 
 def surface_point(widget, x, y):
@@ -218,17 +406,20 @@ def real_drag(*points, steps=6, wait=0.02, hold=False):
     def where(p):
         return surface_point(*p) if len(p) == 3 else p
 
+    def move(px, py):
+        _arrived(_keyboard.move(px, py), "the pointer movement")
+        pump(wait)
+
+    _watch_modals()
     x, y = where(points[0])
     _keyboard.enter(x, y)
-    _keyboard.move(x, y)
-    pump(wait)
-    _keyboard.button(x, y, True)
+    move(x, y)
+    _arrived(_keyboard.button(x, y, True), "the mouse button press")
     pump(0.05)
     for p in points[1:]:
-        tx, ty = where(p)
+        tx, ty = where(p)  # resolved now: the outline may have scrolled under the drag
         for i in range(1, steps + 1):
-            _keyboard.move(x + (tx - x) * i / steps, y + (ty - y) * i / steps)
-            pump(wait)
+            move(x + (tx - x) * i / steps, y + (ty - y) * i / steps)
         x, y = tx, ty
     if not hold:
         release_mouse()
@@ -237,14 +428,15 @@ def real_drag(*points, steps=6, wait=0.02, hold=False):
 def release_mouse():
     """Release the left button where the pointer is (if it's held)."""
     if _keyboard is not None and _keyboard.buttons:
-        _keyboard.button(*_keyboard.pos, False)
-        pump(0.1)
+        _watch_modals()
+        _arrived(_keyboard.button(*_keyboard.pos, False), "the mouse button release")
+        pump(0.05)
 
 
-def type_text(view, text, wait=0.12):
+def type_text(view, text, wait=0.05):
     view.grab_focus()
     view.get_buffer().insert_interactive_at_cursor(text, -1, True)
-    pump(wait)
+    wait_editor(wait)
 
 
 # -- what's on screen ------------------------------------------------------------------------------
@@ -307,9 +499,12 @@ def open_popovers():
 
 
 def close_popovers():
-    for p in open_popovers():
+    pops = open_popovers()
+    for p in pops:
         p.popdown()
-    pump(0.05)
+    if pops:
+        pump_until(lambda: not open_popovers())
+        pump(0.05)  # the app's menus unparent themselves from an idle callback
 
 
 def menu_choices(pop):
@@ -349,10 +544,10 @@ def clipboard(mime):
         out.splice_async(stream, flags, GLib.PRIORITY_DEFAULT, None, spliced)
 
     cb.read_async([mime], GLib.PRIORITY_DEFAULT, None, opened)
-    pump_until(lambda: box, 3)
+    wait_for(lambda: box, f"the clipboard's {mime}")
     if "error" in box:
         raise AssertionError(f"clipboard read failed: {box['error']}")
-    return box.get("text")
+    return box["text"]
 
 
 def scratch():

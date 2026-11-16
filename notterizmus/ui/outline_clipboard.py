@@ -6,7 +6,7 @@ import json
 from gi.repository import Gdk, Gio, GLib
 
 from ..export import runs_html, to_html, to_plain
-from ..importer import html_items, join_lines, parse, text_items
+from ..importer import html_items, join_lines, parse, table_nodes, text_items
 from ..layout import layout
 from ..model import (Node, Run, can_contain, enclosing_heading, fresh_ids, leaf_insert_index, runs_from_json,
                      runs_text, runs_to_json)
@@ -158,9 +158,12 @@ class ClipboardMixin:
             return
         forest = parse(items, self.rules)
         if forest is None:
-            # plain paragraphs: keep them together in this item (formatting kept)
+            # plain paragraphs: keep them together in this item (formatting kept); a table
+            # copied on its own or with such text goes after the item
             with self._op():
-                v.insert_runs(join_lines(lines))
+                if lines:
+                    v.insert_runs(join_lines(lines))
+                self._insert_tables(node, table_nodes(items))
             paras, cur = [], []
             for l in lines + [[]]:
                 if runs_text(l).strip():
@@ -170,7 +173,7 @@ class ClipboardMixin:
                     cur = []
             if len(paras) > 1:
                 self.emit("toast", f"Pasted {len(paras)} paragraphs into one item", "One Item per Paragraph",
-                          lambda: self._resplit(ctx, paras))
+                          lambda: self._resplit(ctx, paras, table_nodes(items)))
             return
         count = sum(1 for top in forest for _ in top.walk())
         self.insert_forest(node, forest)
@@ -178,18 +181,30 @@ class ClipboardMixin:
         self.emit("toast", f"Pasted {count} items as an outline", "Paste as Plain Text",
                   lambda: self._replace_with_plain(ctx, plain_text))
 
-    def _resplit(self, ctx, lines):
+    def _resplit(self, ctx, lines, tables=()):
         self.undo()
         row = self.rows.get(ctx[0])
         if isinstance(row, TextRow):
             row.view.set_cursor(ctx[1])
-            self._paste_lines(row.node, row.view, lines)
+            self._paste_lines(row.node, row.view, lines, tables)
+
+    def _insert_tables(self, node, tables):
+        """Put pasted tables after node, where Ctrl+T would put one, and the cursor in the
+        last; False if there are none. Call inside _op()."""
+        after = node
+        for t in tables:
+            self._insert_leaf(after, t)
+            if node.kind != "heading":  # under a numbered item they line up by themselves
+                after = t
+        if tables:
+            self.refresh(focus=tables[-1], offset=0)
+        return bool(tables)
 
     def _replace_with_plain(self, ctx, text):
         self.undo()
         self._pasted(ctx, "text/plain", text, True)
 
-    def _paste_lines(self, node, v, lines):
+    def _paste_lines(self, node, v, lines, tables=()):
         if not lines:
             return
         with self._op():
@@ -201,7 +216,8 @@ class ClipboardMixin:
                            marker=node.marker)
                 prev.parent.insert(prev.index() + 1, new)
                 prev = new
-            self.refresh(focus=prev, offset=-1)
+            if not self._insert_tables(prev, tables):
+                self.refresh(focus=prev, offset=-1)
 
     def insert_forest(self, anchor, forest):
         if not forest:

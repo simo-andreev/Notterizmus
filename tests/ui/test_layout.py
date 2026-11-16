@@ -55,7 +55,7 @@ class LayoutTest(ui.UITestCase):
             ui.type_text(self.ed.cur_view or r.view, " more", wait=0.02)
             ui.press(self.ed.cur_view or r.view, "Return", wait=0.4)
             view = self.ed.cur_view
-            self.assertTrue(ui.pump_until(lambda: ui.cursor_in_view(view), 1.5),
+            self.assertTrue(ui.pump_until(lambda: ui.cursor_in_view(view)),
                             "the cursor is below the visible area after Enter")
 
     def test_first_item_has_its_real_height_when_a_chapter_opens(self):

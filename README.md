@@ -84,7 +84,8 @@ hand-written notes (`Ⅱ.1)`, `II.1)`, `2.1)`, `•`/`+`/`-`/`*` bullets nested 
 indentation) and renumbers everything; the notification offers **Paste as Plain
 Text** to undo that. Text without outline markers, such as paragraphs from a PDF,
 goes into the current item as one paragraph with line-break hyphenation removed;
-the notification offers **One Item per Paragraph**.
+the notification offers **One Item per Paragraph**. A table copied on its own, or
+with such text, is added after the item.
 
 **Spelling.** The language button in the header bar (e.g. `EN-US`) switches
 language or turns checking off. A new chapter picks its language from its text,
@@ -132,9 +133,11 @@ The UI tests in `tests/ui` drive the real editor on a private GTK Broadway displ
 (package `libgtk-4-bin`), so no window appears and your own settings and notes aren't
 touched. A small client presses real keys and drags the mouse through it, so
 shortcuts, Escape, focus and mouse selection are tested as you'd use them, and paces
-frames like a 60 Hz screen for the frame-by-frame checks. `NOTTERIZMUS_UI_BACKEND=weston`
-runs them on a headless Weston instead (`sudo apt install weston`), without the real
-keyboard and mouse input.
+frames like a 60 Hz screen for the frame-by-frame checks. A run fails if a test fails,
+if the app raises an exception in a callback, or if GTK or Python prints a warning.
+Each run has its own display in a scratch folder, so several can go at once.
+`NOTTERIZMUS_UI_BACKEND=weston` runs them on a headless Weston instead
+(`sudo apt install weston`), without the real keyboard and mouse input.
 
 ```bash
 scripts/ui-tests.sh

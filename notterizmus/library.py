@@ -111,10 +111,12 @@ def book_name(book_dir):
     return Path(book_dir).name
 
 
-def _rewrite(path, new_path, **fields):
-    """Save the chapter at path to new_path with some fields changed; remove the old file."""
+def _rewrite(path, new_path, doc=None, **fields):
+    """Save the chapter at path (already loaded as doc, if given) to new_path with some
+    fields changed; remove the old file."""
     from .model import Document
-    doc = Document.load(path)
+    if doc is None:
+        doc = Document.load(path)
     if "number" in fields:
         doc.chapter_no = fields["number"]
     if "title" in fields:
@@ -180,14 +182,18 @@ def renumber(changes):
     """Apply {path: new number} to chapters of one book, numbers possibly swapping
     between them; titles are kept. Returns {old path: new path}."""
     from .model import Document, chapter_filename
+    # Read every chapter before moving any: one that can't be read then stops the change
+    # while all the files still have their names.
+    docs = {Path(path): Document.load(path) for path in changes}
     staged = []
     for path, number in changes.items():
         path = Path(path)
-        doc = Document.load(path)
+        doc = docs[path]
         if doc.chapter_no == number and path.name == chapter_filename(number, doc.chapter_title):
             continue
-        tmp = _rewrite(path, _temp_path(path.parent), number=number)
-        staged.append((path, tmp, doc.chapter_no, path.parent / chapter_filename(number, doc.chapter_title)))
+        old_number = doc.chapter_no  # before _rewrite changes it
+        tmp = _rewrite(path, _temp_path(path.parent), doc=doc, number=number)
+        staged.append((path, tmp, old_number, path.parent / chapter_filename(number, doc.chapter_title)))
     taken = [new for _p, _t, _n, new in staged if new.exists()]
     if taken:  # another chapter's file is in the way: put everything back
         for path, tmp, old_number, _new in staged:
@@ -208,9 +214,13 @@ def reorder(chapters):
     return renumber({c.path: n for c, n in zip(numbered, numbers)})
 
 
-def rename_book(book_dir, new_name):
-    """Rename a book's folder and the book name stored in its chapters.
-    Raises FileExistsError if another book already uses that name (ignoring case)."""
+def rename_book(book_dir, new_name, failed=None):
+    """Rename a book's folder and the book name stored in its chapters (a chapter file
+    that can't be read as one just moves along with the folder).
+    Raises FileExistsError if another book already uses that name (ignoring case).
+    Once the folder has moved, a chapter that can't be rewritten (a full disk, say) keeps
+    its old book name and the rest go on: it is added to the list failed, if given, so
+    the folder and the paths returned always agree."""
     book_dir = Path(book_dir)
     new_dir = book_dir.parent / safe_name(new_name)
     clash = [d for d in book_dir.parent.iterdir()
@@ -222,6 +232,12 @@ def rename_book(book_dir, new_name):
     moved = {}
     for f in sorted(new_dir.glob("*.notz")):
         if not f.name.startswith("."):
-            _rewrite(f, f, book=new_name)
+            try:
+                _rewrite(f, f, book=new_name)
+            except ValueError:
+                pass  # not a chapter
+            except OSError:
+                if failed is not None:
+                    failed.append(f)
             moved[book_dir / f.name] = f
     return moved

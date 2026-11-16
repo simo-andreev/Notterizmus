@@ -6,11 +6,11 @@ same book (book-specific terms recur), and the Hunspell dictionary's word list.
 from __future__ import annotations
 
 import bisect
-import json
 import os
 from collections import Counter
 from pathlib import Path
 
+from .model import Document
 from .spell import WORD_RE
 
 MIN_WORD = 3        # shorter words aren't worth completing
@@ -26,17 +26,6 @@ def node_texts(root):
         for row in n.data.get("rows", []) if n.kind == "table" else []:
             for cell in row:
                 yield "".join(r.text for r in cell)
-
-
-def _json_texts(items):
-    for it in items:
-        for key in ("runs",):
-            if it.get(key):
-                yield "".join(r.get("t", "") for r in it[key])
-        for row in (it.get("data") or {}).get("rows", []) if it.get("kind") == "table" else []:
-            for cell in row:
-                yield "".join(r.get("t", "") for r in cell)
-        yield from _json_texts(it.get("children", []))
 
 
 def count_words(texts):
@@ -72,12 +61,11 @@ class BookWords:
                 mtime = p.stat().st_mtime
                 hit = self._files.get(p)
                 if hit is None or hit[0] != mtime:
-                    with open(p, encoding="utf-8") as f:
-                        content = json.load(f).get("content", [])
-                    hit = self._files[p] = (mtime, count_words(_json_texts(content)))
+                    root = Document.load(p).root
+                    hit = self._files[p] = (mtime, count_words(node_texts(root)))
                 total.update(hit[1])
             except (OSError, ValueError):
-                continue
+                continue  # unreadable, or not a chapter
         return total
 
 

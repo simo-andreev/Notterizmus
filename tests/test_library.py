@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -143,6 +144,233 @@ class ChangeTest(unittest.TestCase):
         self.chapter("book", 1, "A")
         rename_book(self.root / "book", "Book")
         self.assertEqual([d.name for d in self.root.iterdir()], ["Book"])
+
+
+class NamesTest(unittest.TestCase):
+    def test_numbers_and_titles_in_file_names(self):
+        self.assertEqual(parse_name("  7   Spaced  title "), (7, "Spaced  title"))
+        self.assertEqual(parse_name("007 Bond"), (7, "Bond"))
+        self.assertEqual(parse_name("3rd chapter"), (None, "3rd chapter"), "the number must stand alone")
+        self.assertEqual(parse_name("12.5 x"), (None, "12.5 x"))
+
+    def test_what_the_list_shows_for_a_chapter(self):
+        from notterizmus.library import Chapter
+        self.assertEqual(Chapter(4, "Title", Path("/b/04 Title.notz")).label, "Title")
+        self.assertEqual(Chapter(4, "", Path("/b/04.notz")).label, "Chapter 4")
+        self.assertEqual(Chapter(None, "", Path("/b/notes.notz")).label, "notes")
+
+    def test_book_names_as_folder_names(self):
+        self.assertEqual(safe_name(" a/b\\c "), "a_b_c")
+        self.assertEqual(safe_name("Чиста архитектура"), "Чиста архитектура")
+        self.assertEqual(safe_name("   "), "Unsorted")
+        self.assertEqual(safe_name(""), "Unsorted")
+
+    def test_a_chapter_file_name_round_trips_through_the_list(self):
+        for number, title in ((1, "Intro"), (12, "Чиста архитектура"), (7, ""), (3, "a: b? c!"), (100, "x")):
+            name = chapter_filename(number, title)
+            self.assertEqual(parse_name(name[:-len(".notz")]), (number, title))
+
+
+class ScanOrderTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+
+    def make(self, book, *names):
+        d = self.root / book
+        d.mkdir(parents=True, exist_ok=True)
+        for n in names:
+            (d / n).write_text("{}", encoding="utf-8")
+        return d
+
+    def test_unnumbered_files_come_last_and_equal_numbers_sort_by_title(self):
+        self.make("Book", "notes.notz", "02 b.notz", "02 A.notz", "1 x.notz", "appendix.notz")
+        self.assertEqual([c.path.name for c in scan(self.root)[0].chapters],
+                         ["1 x.notz", "02 A.notz", "02 b.notz", "appendix.notz", "notes.notz"])
+
+    def test_a_folder_named_like_a_chapter_and_files_in_the_root_are_ignored(self):
+        d = self.make("Book", "01 A.notz")
+        (d / "02 Folder.notz").mkdir()
+        (self.root / "00 stray.notz").write_text("{}", encoding="utf-8")
+        books = scan(self.root)
+        self.assertEqual([(b.name, [c.label for c in b.chapters]) for b in books], [("Book", ["A"])])
+
+    def test_books_sort_without_regard_to_case(self):
+        for name in ("beta", "Alpha", "gamma", "Delta"):
+            self.make(name, "01.notz")
+        self.assertEqual([b.name for b in scan(self.root)], ["Alpha", "beta", "Delta", "gamma"])
+
+    def test_finding_a_chapter_that_is_not_there(self):
+        self.make("Book", "01 A.notz")
+        books = scan(self.root)
+        self.assertEqual(find(books, None), (None, None))
+        self.assertEqual(find(books, self.root / "Book" / "09 Gone.notz"), (None, None))
+        self.assertEqual(find([], self.root / "Book" / "01 A.notz"), (None, None))
+
+    def test_neighbors_step_over_more_than_one(self):
+        d = self.make("Book", "01 A.notz", "02 B.notz", "03 C.notz")
+        books = scan(self.root)
+        self.assertEqual(neighbor(books, d / "01 A.notz", 2).label, "C")
+        self.assertIsNone(neighbor(books, d / "01 A.notz", 3))
+
+
+class MoreChangesTest(ChangeTest):
+    def test_changing_nothing_changes_nothing(self):
+        p = self.chapter("Book", 3, "C", "c")
+        before = p.read_bytes()
+        self.assertEqual(set_chapter(p, 3, "C"), {p: p})
+        self.assertEqual(self.state(), [("03 C.notz", 3, "C", "Book", "c")])
+        self.assertEqual(json.loads(p.read_text(encoding="utf-8")), json.loads(before))
+
+    def test_a_swap_and_a_new_title_in_one_step(self):
+        a = self.chapter("Book", 1, "A", "a")
+        b = self.chapter("Book", 2, "B", "b")
+        moved = set_chapter(a, 2, "A renamed")
+        self.assertEqual(self.state(), [("01 B.notz", 1, "B", "Book", "b"), ("02 A renamed.notz", 2, "A renamed", "Book", "a")])
+        self.assertEqual(moved, {a: self.root / "Book" / "02 A renamed.notz", b: self.root / "Book" / "01 B.notz"})
+
+    def test_a_rename_never_overwrites_another_chapters_file(self):
+        x = self.chapter("Book", 1, "X", "x text")
+        self.chapter("Book", 1, "Y", "y text")  # two chapters with the same number, e.g. copied in by hand
+        with self.assertRaises(FileExistsError):
+            set_chapter(x, 1, "Y")
+        self.assertEqual(self.state(), [("01 X.notz", 1, "X", "Book", "x text"), ("01 Y.notz", 1, "Y", "Book", "y text")])
+
+    def test_removing_the_title_leaves_just_the_number(self):
+        p = self.chapter("Book", 4, "Titled", "t")
+        set_chapter(p, 4, "")
+        self.assertEqual(self.state(), [("04.notz", 4, "", "Book", "t")])
+
+    def test_moving_to_a_book_that_does_not_exist_yet_creates_it(self):
+        p = self.chapter("Book", 3, "C", "c")
+        moved = set_chapter(p, 3, "C", self.root / "Fresh")
+        self.assertEqual(moved, {p: self.root / "Fresh" / "03 C.notz"})
+        self.assertEqual(self.state("Fresh"), [("03 C.notz", 3, "C", "Fresh", "c")])
+        self.assertEqual(self.state(), [])
+
+    def test_a_chapter_moved_to_a_book_gets_the_books_stored_name(self):
+        a = self.chapter("Book", 1, "A")
+        self.chapter("Other / Two", 1, "X")
+        set_chapter(a, 2, "A", self.root / safe_name("Other / Two"))
+        self.assertEqual(Document.load(self.root / "Other _ Two" / "02 A.notz").book, "Other / Two",
+                         "not the folder's name, which lost its slash")
+
+    def test_the_stored_book_name_falls_back_to_the_folder(self):
+        from notterizmus.library import book_name
+        d = self.root / "Odd"
+        d.mkdir()
+        (d / "01 broken.notz").write_text("{not json", encoding="utf-8")
+        self.assertEqual(book_name(d), "Odd")
+        (d / "02 fine.notz").write_text(json.dumps({"book": "Real / Name", "content": []}), encoding="utf-8")
+        self.assertEqual(book_name(d), "Real / Name", "the unreadable chapter is skipped")
+
+    def test_renumbering_a_chapter_alone(self):
+        a = self.chapter("Book", 1, "A", "a")
+        self.assertEqual(renumber({a: 7}), {a: self.root / "Book" / "07 A.notz"})
+        self.assertEqual(self.state(), [("07 A.notz", 7, "A", "Book", "a")])
+        self.assertEqual(renumber({self.root / "Book" / "07 A.notz": 7}), {}, "already there: nothing moves")
+
+    def test_two_chapters_with_the_same_title_can_swap(self):
+        a = self.chapter("Book", 1, "Same", "first")
+        b = self.chapter("Book", 2, "Same", "second")
+        renumber({a: 2, b: 1})
+        self.assertEqual(self.state(), [("01 Same.notz", 1, "Same", "Book", "second"),
+                                        ("02 Same.notz", 2, "Same", "Book", "first")])
+
+    def test_a_chapter_that_cannot_be_read_stops_a_renumbering_before_anything_moves(self):
+        a = self.chapter("Book", 1, "A", "a")
+        b = self.chapter("Book", 2, "B", "b")
+        broken = self.root / "Book" / "03 Broken.notz"
+        broken.write_text("[]", encoding="utf-8")
+        before = sorted(f.name for f in (self.root / "Book").iterdir())
+        with self.assertRaises(ValueError):
+            renumber({a: 3, b: 1, broken: 2})
+        with self.assertRaises(ValueError):
+            reorder([c for name in ("03 Broken.notz", "01 A.notz", "02 B.notz")
+                     for c in scan(self.root)[0].chapters if c.path.name == name])
+        self.assertEqual(sorted(f.name for f in (self.root / "Book").iterdir()), before,
+                         "no chapter is left under a hidden staging name")
+        self.assertEqual([(d.chapter_no, d.chapter_title, d.root.children[0].text)
+                          for d in (Document.load(a), Document.load(b))], [(1, "A", "a"), (2, "B", "b")])
+
+    def test_renaming_a_book_takes_an_unreadable_chapter_along_untouched(self):
+        self.chapter("Old", 1, "A", "a")
+        (self.root / "Old" / "02 Broken.notz").write_text("{not json", encoding="utf-8")
+        (self.root / "Old" / "03 Odd.notz").write_text("[]", encoding="utf-8")
+        moved = rename_book(self.root / "Old", "New")
+        new = self.root / "New"
+        self.assertEqual(sorted(f.name for f in new.iterdir()), ["01 A.notz", "02 Broken.notz", "03 Odd.notz"])
+        self.assertEqual(Document.load(new / "01 A.notz").book, "New")
+        self.assertEqual((new / "02 Broken.notz").read_text(encoding="utf-8"), "{not json")
+        self.assertEqual((new / "03 Odd.notz").read_text(encoding="utf-8"), "[]")
+        self.assertEqual(moved[self.root / "Old" / "03 Odd.notz"], new / "03 Odd.notz")
+
+    def test_renaming_a_book_goes_on_past_a_chapter_it_cannot_write(self):
+        from unittest import mock
+        from notterizmus import library
+        self.chapter("Old", 1, "A")
+        self.chapter("Old", 2, "B")
+        real = library._rewrite
+
+        def rewrite(path, new_path, **fields):
+            if Path(path).name.startswith("01"):
+                raise OSError("disk full")
+            return real(path, new_path, **fields)
+
+        failed = []
+        with mock.patch.object(library, "_rewrite", rewrite):
+            moved = rename_book(self.root / "Old", "New", failed)
+        new = self.root / "New"
+        self.assertEqual(failed, [new / "01 A.notz"])
+        self.assertEqual(sorted(moved.values()), [new / "01 A.notz", new / "02 B.notz"])
+        self.assertEqual([Document.load(new / n).book for n in ("01 A.notz", "02 B.notz")], ["Old", "New"])
+
+    def test_renumbering_leaves_no_staging_files(self):
+        a = self.chapter("Book", 1, "A")
+        b = self.chapter("Book", 2, "B")
+        c = self.chapter("Book", 3, "C")
+        renumber({a: 3, b: 1, c: 2})
+        self.assertEqual(sorted(f.name for f in (self.root / "Book").iterdir()), ["01 B.notz", "02 C.notz", "03 A.notz"])
+
+    def test_reorder_leaves_unnumbered_files_alone(self):
+        a = self.chapter("Book", 1, "A")
+        b = self.chapter("Book", 2, "B")
+        loose = self.root / "Book" / "notes.notz"
+        loose.write_text(json.dumps({"book": "Book", "content": []}), encoding="utf-8")
+        chapters = scan(self.root)[0].chapters
+        by_name = {c.path.name: c for c in chapters}
+        reorder([by_name["notes.notz"], by_name["02 B.notz"], by_name["01 A.notz"]])
+        self.assertEqual(sorted(f.name for f in (self.root / "Book").iterdir()), ["01 B.notz", "02 A.notz", "notes.notz"])
+        self.assertTrue(a.name != b.name)
+
+    def test_reordering_into_the_same_order_moves_nothing(self):
+        self.chapter("Book", 1, "A")
+        self.chapter("Book", 2, "B")
+        self.assertEqual(reorder(scan(self.root)[0].chapters), {})
+
+    def test_renaming_a_book_to_its_own_name_keeps_everything(self):
+        p = self.chapter("Book", 1, "A", "a")
+        self.assertEqual(rename_book(self.root / "Book", "Book"), {p: p})
+        self.assertEqual(self.state(), [("01 A.notz", 1, "A", "Book", "a")])
+
+    def test_renaming_a_book_skips_hidden_files(self):
+        self.chapter("Old", 1, "A")
+        hidden = self.root / "Old" / ".moving-12345678.notz"
+        hidden.write_text("not a chapter", encoding="utf-8")
+        rename_book(self.root / "Old", "New")
+        self.assertEqual((self.root / "New" / ".moving-12345678.notz").read_text(encoding="utf-8"), "not a chapter")
+
+    def test_the_chapter_with_a_number(self):
+        from notterizmus.library import chapter_numbered
+        a = self.chapter("Book", 1, "A")
+        b = self.chapter("Book", 2, "B")
+        folder = self.root / "Book"
+        self.assertEqual(chapter_numbered(folder, 2).path, b)
+        self.assertIsNone(chapter_numbered(folder, 2, exclude=b))
+        self.assertIsNone(chapter_numbered(folder, 9))
+        self.assertEqual(chapter_numbered(folder, 1, exclude=b).path, a)
+        self.assertIsNone(chapter_numbered(self.root / "No such book", 1))
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from . import support as ui
 class DragSelectTest(ui.UITestCase):
     def setUp(self):
         super().setUp()
-        if ui.BROADWAY_PORT is None:
+        if not ui.REAL_INPUT:
             self.skipTest("real mouse input needs the Broadway display (the default runner)")
         self.win.findbar.set_search_mode(False)
         self.win.set_zoom(100, save=True, announce=False)
@@ -76,7 +76,7 @@ class DragSelectTest(ui.UITestCase):
         ui.pump(0.2)
         bottom = ui.surface_point(self.ed, 40, self.ed.get_height() + 30)
         ui.real_drag(self.at(items[0]), bottom, hold=True)
-        ui.pump(1.0)
+        ui.pump_until(lambda: adj.get_value() > 0 and len(self.ed.sel) > 20)
         self.assertGreater(adj.get_value(), 0, "the outline scrolls while the pointer is below it")
         self.assertGreater(len(self.ed.sel), 20, "the items scrolled into view get selected")
         ui.release_mouse()

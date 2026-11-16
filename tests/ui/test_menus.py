@@ -9,7 +9,9 @@ class MenusTest(ui.UITestCase):
         choices = ui.menu_choices(pop)
         num = next((n for n, text, _row in choices if text.startswith(label_start)), None)
         self.assertTrue(num, f"no numbered choice starting with {label_start!r} in {[c[:2] for c in choices]}")
-        self.assertTrue(ui.press(pop, num, wait=0.3))
+        self.assertTrue(ui.press(pop, num))
+        ui.wait_for(lambda: not ui.open_popovers(), "the menu to close after a pick")
+        ui.wait_editor()
 
     def test_alt_insert_adds_a_sub_item_by_its_number(self):
         doc = ui.open_chapter([h("Intro")])
@@ -45,8 +47,8 @@ class MenusTest(ui.UITestCase):
         self.assertIsNotNone(pop)
         first = ui.menu_choices(pop)[0]
         self.assertEqual(first[:2], ("1", "completion"))
-        ui.press(pop, "1", wait=0.3)
-        self.assertEqual(target.text, "completion")
+        ui.press(pop, "1")
+        ui.wait_for(lambda: target.text == "completion", "the first completion to be picked")
 
     def test_ctrl_space_narrows_as_you_type_and_escape_closes(self):
         doc = ui.open_chapter([h("Intro", b("complete completion compliance"), b(""))])

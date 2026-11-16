@@ -32,8 +32,7 @@ class GuideTest(ui.UITestCase):
         self.open_guide()
         first = self.win.doc.root.children[0]
         ui.type_text(ui.row(first).view, " PRACTICE")
-        ui.pump(1.2)  # autosave
-        self.assertIn("PRACTICE", paths.guide_path().read_text(encoding="utf-8"))
+        ui.wait_for(lambda: "PRACTICE" in paths.guide_path().read_text(encoding="utf-8"), "the autosave")
         self.open_guide()
         self.assertNotIn("PRACTICE", paths.guide_path().read_text(encoding="utf-8"))
         self.assertNotIn("PRACTICE", self.win.doc.root.children[0].text)
@@ -44,17 +43,22 @@ class GuideTest(ui.UITestCase):
         if not self.win.speller.dict or not (self.win.speller.lang or "").startswith("en"):
             self.skipTest("no English dictionary installed")
         self.open_guide()
-        ui.pump(0.6)
-        marked = set()
-        for v in self.ed.all_views():
-            buf = v.get_buffer()
-            it = buf.get_start_iter()
-            while it.forward_to_tag_toggle(v.tag_spell):
-                if it.starts_tag(v.tag_spell):
-                    end = it.copy()
-                    end.forward_to_tag_toggle(v.tag_spell)
-                    marked.add(buf.get_text(it, end, True))
-        self.assertEqual(marked, {"misspeled"})
+
+        def marked():
+            words = set()
+            for v in self.ed.all_views():
+                buf = v.get_buffer()
+                it = buf.get_start_iter()
+                while it.forward_to_tag_toggle(v.tag_spell):
+                    if it.starts_tag(v.tag_spell):
+                        end = it.copy()
+                        end.forward_to_tag_toggle(v.tag_spell)
+                        words.add(buf.get_text(it, end, True))
+            return words
+
+        ui.pump(0.6)  # spelling is checked a moment after the text is set
+        ui.pump_until(lambda: marked() == {"misspeled"})
+        self.assertEqual(marked(), {"misspeled"})
 
 
 def ui_h(text):
