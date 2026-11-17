@@ -1,3 +1,3 @@
 APP_ID = "dev.simo.Notterizmus"
 APP_NAME = "Notterizmus"
-VERSION = "1.4.0"
+VERSION = "1.4.1"

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1 — 2026-11-17
+
+- **Copy for TopCoding** takes drawings along when TopCoding is open in Firefox too; before, only the text and tables arrived there.
+
 ## 1.4.0 — 2026-11-17
 
 - **Drawings** (Ctrl+D, the menu, Alt+Insert or Search Commands): [Excalidraw](https://excalidraw.com) opens inside the app, offline. **Done** puts the drawing under the item as a picture; double-click it or use **Edit Drawing** to change it. Adding, changing and deleting a drawing are undo steps.
