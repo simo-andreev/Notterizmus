@@ -1,6 +1,6 @@
 # Notterizmus roadmap
 
-Written 2026-11-06 after 1.1.0 and updated the same day with your answers.
+Written 2026-11-06 after 1.1.0; brought up to date on 2026-11-17, after 1.4.2.
 Items have IDs so we can refer to them.
 
 Sizes: **S** one focused change · **M** several changes across modules ·
@@ -9,11 +9,11 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 ## Decisions so far
 
 - **Audience**: mainly you, and maybe other students on the TopCoding course
-  later. Distribution (R17–R22) comes after 1.2, but before the app is shared
-  with the course.
-- **Order**: daily-use items (1.2) come before drawings (2.0).
-- **What slows you down now**: learning the controls. R23 and R24 are added to 1.2
-  for that.
+  later. Distribution (R17–R22) comes after the daily-use items, but before the
+  app is shared with the course.
+- **Order**: daily-use items come before drawings.
+- **What slows you down now**: learning the controls. R23 and R24 were added to
+  the daily-use items for that.
 - **Source code**: public, on GitHub and Launchpad (R22).
 - **Stores**: both the Snap Store and Flathub (R17, R21).
 - **App ID**: `dev.simo_andreev.notterizmus`, all lowercase, from your domain
@@ -32,28 +32,36 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 ## Where things stand
 
-- 1.1.0 is in the PPA for Ubuntu 26.04 only. Users on 26.10 get nothing from it
-  yet, and 25.10, which the README still names as the minimum, is now obsolete.
-- One user so far; one book, two chapters, the largest with 56 items.
+As of 2026-11-17:
+
+- 1.4.2 was uploaded to the PPA, for Ubuntu 26.04 only. Users on 26.10 get
+  nothing from it yet (R19), and 24.04 and older need the snap (R17).
+- One user so far; one book, six chapters, the largest with 192 items. One
+  chapter has three drawings and is the largest file: 257 KB, 137 KB of it the
+  drawings' scenes.
 - Strong: outline editing, clean paste into TopCoding, bilingual spelling and
   word completion.
-- Gaps found in the README's known limits and in this review:
-  - The only way to switch chapters is the file dialog.
-  - There is no find.
-  - An item is a single paragraph.
-  - There are no drawings.
-  - Connectors drift in TopCoding's proportional font.
-  - Undo is lost on close, and there are no backups beyond the current file.
-  - The UI is English only.
-  - The app doesn't show up in App Center search.
-  - The editor (`ui/outline.py`, 1,737 lines) has no automated tests.
-  - Block types that 1.x doesn't know are handled poorly. It saves their data
-    unchanged (tested), but shows them as an empty, editable text item and
-    exports them as a blank line.
+- Closed since 1.1.0: the chapter list (R1), find (R3), earlier versions (R4),
+  unknown block types (R6), drawings (R12), UI tests (R13) and the editor split
+  (R14).
+- Gaps found in the README's known limits and in the reviews:
+  - An item is a single paragraph (R7).
+  - Connectors drift in TopCoding's proportional font (R11).
+  - Undo is lost on close; Earlier Versions (R4) is the way back.
+  - Drawings haven't been pasted for real between the app and TopCoding, in
+    either direction (R30).
+  - An autosave can overwrite a chapter that a sync tool changed on disk (R16).
+  - The UI is English only (R20).
+  - The app doesn't show up in App Center search (R17).
+  - The GitHub repository has no CI (R22).
 
 ## Proposed releases
 
-### 1.2 — Daily-use gaps
+The groups were first planned as 1.2, 1.3 and 2.0. The daily-use items shipped
+in 1.2.0 and 1.3.0 and drawings in 1.4.0, so the groups are now named by theme
+and get a version number when they ship.
+
+### Daily-use gaps — done in 1.2.0 and 1.3.0
 
 | ID | Item | Why | Size |
 |---|---|---|---|
@@ -68,7 +76,7 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 | R5 | **Zoom**: Ctrl+= / Ctrl+- / Ctrl+0, remembered | Text size is fixed in CSS | S. **Done** in 1.3.0; also Ctrl + scroll and a menu row |
 | R6 | **Unknown block types**: show them as a read-only "made with a newer version" row and leave them out of Copy for TopCoding | A file with a drawing (R12) opened in an older version would otherwise show an empty item; text typed there isn't saved | S. **Done** in 1.2.0. Also keeps unknown fields of known items (1.1 dropped them) |
 
-### 1.3 — Richer notes
+### Richer notes — not started
 
 | ID | Item | Why | Size |
 |---|---|---|---|
@@ -78,29 +86,44 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 | R10 | **Drag to reorder**: drag an item by its prefix to move it or change its level | Alt+↑/↓ is the only way to move items | M |
 | R11 | **Connectors that line up in TopCoding**: pad with Unicode spaces sized to Roboto's character widths so the `│` columns align | Listed known limit. `export.code_prefix` aligns them but adds a code background | L (spike: measure in the browser and confirm TopCoding keeps those spaces) |
 
-### 2.0 — Drawings
+### Drawings — done in 1.4.0
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R12 | **Excalidraw block**. Spike first: can a native app put Lexical's clipboard JSON (`application/x-lexical-editor`) on the clipboard so that Chrome on Linux passes it to TopCoding? Then choose how to edit drawings: an embedded Excalidraw (adds a WebKitGTK dependency) or opening excalidraw.com and pasting the drawing back | The planned block type; TopCoding has a native Excalidraw node | L. **Built, not released** (2026-11-17): embedded Excalidraw in WebKitGTK, bundled for offline use; Ctrl+D. Paste spike (2026-11-17): TopCoding's Excalidraw node has no HTML import, so a chapter with a drawing is copied as Lexical clipboard JSON inside Chrome's `chromium/x-web-custom-data` (`lexical.py`); the editor accepts that JSON (synthetic paste, same text and tables as the HTML path). Still to confirm: a real Ctrl+V from the app |
+| R12 | **Excalidraw block**. Spike first: can a native app put Lexical's clipboard JSON (`application/x-lexical-editor`) on the clipboard so that Chrome on Linux passes it to TopCoding? Then choose how to edit drawings: an embedded Excalidraw (adds a WebKitGTK dependency) or opening excalidraw.com and pasting the drawing back | The planned block type; TopCoding has a native Excalidraw node | L. **Done** in 1.4.0: embedded Excalidraw in WebKitGTK, bundled for offline use; Ctrl+D. Paste spike (2026-11-17): TopCoding's Excalidraw node has no HTML import, so a chapter with a drawing is copied as Lexical clipboard JSON inside Chrome's `chromium/x-web-custom-data` (`lexical.py`), and since 1.4.1 inside Firefox's `application/x-moz-custom-clipdata` too; the editor accepts that JSON (synthetic paste, same text and tables as the HTML path). The real pastes are still to try (R30) |
 
-## Foundations (alongside 1.2)
+### Drawing follow-ups
+
+Added 2026-11-17, after drawings shipped in 1.4.0.
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R13 | **UI tests**: turn this project's test-harness scripts (drive keys, step the GTK main loop, check row positions frame by frame) into `tests/ui/` that run without a visible window | The hidden cursor and the tall first item were caught by hand | M. **Done**: `scripts/ui-tests.sh`; real key presses through Broadway since 1.3 |
+| R29 | **Excalidraw performance**. Measure first, as in R15: time to open the drawing window, typing and drawing delay inside it, time to Done, preview rendering when a chapter with several drawings opens, and the effect of large scenes (pasted images) on autosave, undo and Earlier Versions. Then fix what is slow. Candidates: keep one warm, hidden web view instead of starting a new one (and a new web process loading the 5.6 MB bundle) for every Ctrl+D or Edit Drawing; render previews in parallel or ahead of time; keep scene data out of the undo snapshots. Undo turns the whole chapter into JSON after every edit, drawings included, and keeps up to 500 such snapshots | Drawings are new and untested at the scale of a real chapter; each one adds a WebKit page and its scene to every save and undo step. The one real chapter with drawings is 257 KB, 137 KB of it the scenes of its three drawings | S to measure, then M |
+| R30 | **Excalidraw copy and paste polish**. First confirm the two untried real pastes: the app → TopCoding in Chrome (Ctrl+V into the notes editor), and TopCoding → the app (a real Ctrl+C there, read by `lexical.pasted_items`; built after 1.4.2, not released yet). Fix what they turn up. Then, to be agreed: paste a selection copied in Excalidraw itself (excalidraw.com or the drawing window) as a new drawing; offer a copied drawing as a PNG too, for apps that don't take Excalidraw scenes; and match the header cells TopCoding makes from HTML (we write `headerState` 1 everywhere, it uses 3 in the first column) | Copy and paste is how drawings reach TopCoding, and both directions are built only from synthetic pastes and checked node shapes | M |
+
+### Review assistant
+
+| ID | Item | Why | Size |
+|---|---|---|---|
+| R31 | **Built-in LLM review box**: a panel beside the chapter where a language model reviews the notes, for example gaps against the chapter's headings, unclear or wrong statements, and spelling and grammar in English and Bulgarian. Suggestions are shown for you to accept one at a time, each as an undo step; nothing is changed without you. Spike first: which provider and model, where the API key is kept, how the chapter is sent (the app makes no network requests today, and the project has no pip dependencies, so plain HTTPS from the standard library), what is sent (text only, or drawings as pictures too) and what it costs | A second reader for the notes before they go to TopCoding | L (spike: provider, privacy and cost, see Open questions) |
+
+## Foundations (alongside the daily-use items)
+
+| ID | Item | Why | Size |
+|---|---|---|---|
+| R13 | **UI tests**: turn this project's test-harness scripts (drive keys, step the GTK main loop, check row positions frame by frame) into `tests/ui/` that run without a visible window | The hidden cursor and the tall first item were caught by hand | M. **Done**: `scripts/ui-tests.sh`; real key presses through Broadway since 1.3.1 |
 | R14 | **Split `ui/outline.py`** into keys, selection, clipboard, menus, multi-cursor and undo modules, with no change in behavior | Every item above lands in this one file | M. **Done** in 1.3.1: `outline.py` plus eight `outline_*.py` mixins, methods moved unchanged |
-| R15 | **Large-chapter check**: generate a 500-item chapter and measure open time, typing delay and memory. Only if it's slow, create rows lazily | Every item is its own GtkTextView; the largest real chapter has 56 | S to measure |
+| R15 | **Large-chapter check**: generate a 500-item chapter and measure open time, typing delay and memory. Only if it's slow, create rows lazily | Every item is its own GtkTextView; the largest real chapter has 192 items (56 on 2026-11-06) | S to measure |
 | R16 | **Changes on disk**: notice when the open file changes outside the app (Syncthing, Nextcloud, a second machine) and offer to reload | Chapters are plain JSON in Documents, so they're easy to sync. Without this, an autosave could silently overwrite the other copy | S |
 
 ## Distribution and reach
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R25 | **New app ID** `dev.simo_andreev.notterizmus`. Rename 11 files (desktop entry, metainfo, MIME definition, 8 icons) and update the ID in 11 places (`APP_ID`, `debian/install`, `snap/snapcraft.yaml`, `install.sh`, docs). Add a `<replaces>` entry for the old ID `dev.simo.Notterizmus` to the metainfo so App Center treats the PPA upgrade as the same app. The `.notz` MIME type and `~/.config/notterizmus` stay as they are | Flathub accepts only IDs whose domain you control, and it doesn't allow a rename shortly after acceptance, so the new ID has to come first | S |
+| R25 | **New app ID** `dev.simo_andreev.notterizmus`. Rename 11 files (desktop entry, metainfo, MIME definition, 8 icons) and update the ID wherever `git grep dev.simo.Notterizmus` finds it (`APP_ID`, `debian/install`, `debian/copyright`, `snap/snapcraft.yaml`, `install.sh`, the renamed files themselves, docs). Add a `<replaces>` entry for the old ID `dev.simo.Notterizmus` to the metainfo so App Center treats the PPA upgrade as the same app. The `.notz` MIME type and `~/.config/notterizmus` stay as they are | Flathub accepts only IDs whose domain you control, and it doesn't allow a rename shortly after acceptance, so the new ID has to come first | S |
 | R26 | **A page on `simo-andreev.dev`** (for example GitHub Pages on that domain) that links to the app and serves Flathub's verification file at `/.well-known/org.flathub.VerifiedApps.txt`. A DNS TXT record at `_flathub.simo-andreev.dev` also works for verification | The domain has no website yet. Flathub wants the domain reachable over HTTPS and prefers a page linking it to the app; the page can also be the app's homepage in App Center | S |
 | R19 | **Every current Ubuntu release in the PPA**: copy each app version to 26.10 (`stonking`) and to each new Ubuntu release as it comes out (Launchpad copies the built package; nothing is rebuilt) | 26.10 users can't install the app today | S per release |
-| R22 | **Public source repository**: GitHub for issues and CI (unit tests, lintian, release checks); Launchpad imports it, so snap builds (R17) and the PPA live next to the code | Needed for R17, R18 and R21, and for bug reports from others | S |
+| R22 | **Public source repository**: GitHub for issues and CI (unit tests, lintian, release checks); Launchpad imports it, so snap builds (R17) and the PPA live next to the code | Needed for R17, R18 and R21, and for bug reports from others | S. **Partly done**: public on GitHub (`simo-andreev/Notterizmus`) with issues on; no CI yet; the Launchpad import isn't checked |
 | R17 | **Snap Store**: Launchpad builds the snap from the repository and uploads it to the store, so publishing doesn't need snapcraft and LXD on your machine (they're still the quickest way to test). App Center search then finds the app, and the snap covers Ubuntu 20.04–24.04 | Today App Center lists the app only once it's installed, and the PPA can't reach older releases | M (needs your store account) |
 | R18 | **Store listing**: screenshots and a short feature list in the AppStream metadata | Shown by App Center, the Snap Store and Flathub; screenshots need a public URL (R22) | S |
 | R21 | **Flathub**: GNOME runtime, the English and Bulgarian dictionaries bundled, and access to the Documents folder (checked against the localized path, as was done for the snap) | Reaches Linux Mint, Fedora and other distributions where snaps are rare | M |
@@ -156,14 +179,23 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 
 1. R23, then R13 and R6. R23 helps you right away. Tests come before the big
    changes, and R6 should be on users' machines well before any file contains a
-   drawing.
-2. R2 and R28 (renaming and reordering), R27, R4, R24, then R3 and R5.
-3. R14, the split, once the tests cover the keys and clipboard.
+   drawing. **Done.**
+2. R2 and R28 (renaming and reordering), R27, R4, R24, then R3 and R5. **Done.**
+3. R14, the split, once the tests cover the keys and clipboard. **Done.**
 4. Before sharing with the course: R25 (the new ID), R19, R22 with R26, R17
-   and R18, and later R21 and R20.
-5. 1.3 in the order R7, R8, R9, R10, with R11 as a separate spike.
-6. 2.0 (R12).
+   and R18, and later R21 and R20. R22 is partly done.
+5. Richer notes in the order R7, R8, R9, R10, with R11 as a separate spike.
+6. Drawings (R12). **Done** in 1.4.0, ahead of steps 4 and 5.
+7. Added 2026-11-17 and not yet placed against steps 4 and 5: R30's two
+   real-paste checks, which are quick; then R29's measurements, R30's fixes and
+   R31's spike.
 
 ## Open questions
 
-None right now. New ones go here as the items are worked on.
+- **R31, the review box**: which provider and model (a cloud API, or a local
+  model that keeps notes on the machine)? Is a paid API key acceptable? "Not
+  planned" rules out built-in accounts, and a provider key is close to one.
+  What should a review check: content against the book, wording, spelling,
+  the outline's structure?
+- **R30**: which of the candidate polish items matter to you (Excalidraw → app
+  paste, PNG copy, matching TopCoding's header cells)?

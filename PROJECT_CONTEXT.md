@@ -1,7 +1,8 @@
 # Notterizmus — context for coding agents
 
 ## Purpose
-- GNOME desktop outline editor for book chapter notes; output is pasted into TopCoding's notes editor (`app.topcoding.bg/assignments`). Snapshot: v1.4.0, 2026-11-17.
+- GNOME desktop outline editor for book chapter notes; output is pasted into TopCoding's notes editor (`app.topcoding.bg/assignments`). Snapshot: v1.4.2 plus the unreleased paste of drawings from TopCoding, 2026-11-17.
+- Plans and their IDs (R1, R2, …, used below and in commit messages) are in ROADMAP.md.
 - Single main user: Ubuntu 26.04 (`resolute`), GNOME 50, Wayland, locale `bg_BG.UTF-8`, notes in English and Bulgarian.
 - Distributed as a Debian package via `ppa:simeonandreev/ppa-library`; GPL-3.0-or-later.
 
@@ -49,7 +50,7 @@
 - On this machine `libwebkitgtk-6.0-4` is installed but its typelib isn't: `sudo apt install gir1.2-webkit-6.0`. Without it the app runs and says what is missing when a drawing is opened. The real-Excalidraw UI tests run with `NOTTERIZMUS_UI_WEBKIT=1 scripts/ui-tests.sh` (they work on Broadway).
 - Unknown kinds (R6): `layout` emits a `Line("unknown")` and skips their children, the exporters drop those lines, spacer decisions ignore them, the editor shows `rows.UnknownRow` (read-only note with a delete button, no text view, skipped by the cursor).
 - Ctrl+Space (`OutlineEditor.show_assist`): completions from `completion.py` (chapter words, then other `.notz` in the book folder via `BookWords`, then the Hunspell `.dic` stems for the word's alphabet), plus spelling fixes. Spelling fixes are hidden while the cursor is at the end of a word that has completions (an unfinished word always looks misspelled). Ctrl+Shift+Space cycles item type.
-- Clipboard MIME types: internal `application/x-notterizmus-nodes+json` and `-runs+json`, plus `text/html` and `text/plain`.
+- Clipboard MIME types: internal `application/x-notterizmus-nodes+json` and `-runs+json`, plus `text/html` and `text/plain`. A copy with a drawing also carries TopCoding's editor JSON (`application/x-lexical-editor`) packed into `chromium/x-web-custom-data` and `application/x-moz-custom-clipdata` (`lexical.clipboard_data`); Ctrl+V reads those two right after the app's own types.
 - Paste from TopCoding: after the app's own types, Ctrl+V reads `chromium/x-web-custom-data` / `application/x-moz-custom-clipdata` and uses the Lexical JSON in it only when it holds a non-empty drawing (`lexical.pasted_items`: the same items as `importer.html_items` plus `("drawing", data)`, the scene cut down by `drawing.from_scene` as the drawing window saves one); otherwise, or when it can't be read, the paste goes on to the HTML as before. Drawings are placed like tables (`importer.block_nodes`, `ClipboardMixin._insert_blocks`). This also brings drawings back from the app's own Copy for TopCoding.
 - Paste: `importer.parse()` returns `None` for text without outline markers → it is joined into the current item (user wants long text in one item); Ctrl+Shift+V always joins. A table is not a marker: tables that come without any (`importer.table_nodes`) are put after the item, where Ctrl+T would put one (`ClipboardMixin._insert_tables`), in the same undo step as the text.
 - Spelling: Enchant/Hunspell via ctypes because the `gir1.2-spelling-1` typelib isn't installed. Primary language comes from the chapter text, not the locale (the `bg_BG` locale once marked all English red). Words in the other alphabet use a matching dictionary.
@@ -60,6 +61,7 @@
 - `export.to_html` writes one `<p>` with `<br>` per line, breaking only for tables; real pastes of this format are confirmed good by the user.
 - Testing paste in the browser: dispatch a synthetic `ClipboardEvent('paste')` with a `DataTransfer` on `[data-lexical-editor]`; never click Save/Submit there; restore with `editor.setEditorState(...)`. Chapter 12 of assignment 2522 is the user's scratch chapter.
 - Drawings (checked 2026-11-17 in the scratch chapter): the `excalidraw` node has no `importDOM`, so HTML can't carry one. Its JSON is `{type: "excalidraw", version: 1, data: "<JSON text of {elements, appState, files}>"}`, a block node. A paste whose `application/x-lexical-editor` is `{namespace: "SummaryEditor", nodes: [...]}` is used instead of the HTML; `lexical.to_nodes` writes paragraphs, tables and drawings in the shapes the editor makes from our HTML (text `format`: 1 bold, 2 italic, 16 code; adjacent same-format text merged; `<th>` cells get `headerState` 3 in the first column and 1 elsewhere from HTML, we write 1). The app adds this format only when the copied lines contain a drawing.
+- Firefox ignores `chromium/x-web-custom-data`; it reads its own `application/x-moz-custom-clipdata` (`lexical.moz_custom_data`), confirmed on Firefox 160 by a WebDriver Ctrl+V (geckodriver, Firefox and the clipboard owner both on X11: under Wayland an unfocused owner can't take the clipboard) whose paste event got `application/x-lexical-editor` intact.
 
 ## Verifying changes
 - Unit tests: `python3 -m unittest discover -s tests -t .` (also run during the Debian build). They cover the non-GTK modules; the UI suites skip themselves there.
@@ -81,9 +83,8 @@
 - Installed layout: code in `/usr/share/notterizmus/notterizmus/`, launcher `/usr/bin/notterizmus`, icons in hicolor PNG 16–512.
 - lintian baseline: only pedantic `repeated-path-segment`. Man pages must stay ASCII (groff warns on Cyrillic or Roman-numeral characters).
 - `install.sh` is a per-user developer launcher; remove it (`--uninstall`) before installing the package.
+- Ubuntu releases (decided 2026-11-06; ROADMAP → Ubuntu support): the PPA for 26.04 and newer, each version copied to new series on Launchpad (R19), and a snap for 20.04–24.04 (R17). No native packages for 22.04 or 24.04. Today the PPA has `resolute` builds only.
 
 ## Open questions
-- Whether to support Ubuntu releases other than `resolute`.
-- Drawings: Firefox ignores `chromium/x-web-custom-data`; it reads its own `application/x-moz-custom-clipdata` (`lexical.moz_custom_data`), confirmed on Firefox 160 by a WebDriver Ctrl+V (geckodriver, Firefox and the clipboard owner both on X11: under Wayland an unfocused owner can't take the clipboard) whose paste event got `application/x-lexical-editor` intact.
-- Drawings, the other way: does a real Ctrl+C in TopCoding's editor leave its JSON in those custom formats as `lexical.pasted_items` expects? Built from the node shapes checked in the scratch chapter and from Lexical's copy (which sets `application/x-lexical-editor` on the copy event's `DataTransfer`); not yet tried with a real copy.
-- Drawings: does a real Ctrl+V in Chrome hand TopCoding the `application/x-lexical-editor` data the app offers inside `chromium/x-web-custom-data`? Not testable through the Chrome extension (its Ctrl+V delivered only `text/plain`, even with HTML on the clipboard) or from an X11 clipboard owner; needs the user's own paste from the running app.
+- Drawings, TopCoding → app (ROADMAP R30): does a real Ctrl+C in TopCoding's editor leave its JSON in `chromium/x-web-custom-data` / `application/x-moz-custom-clipdata` as `lexical.pasted_items` expects? Built from the node shapes checked in the scratch chapter and from Lexical's copy (which sets `application/x-lexical-editor` on the copy event's `DataTransfer`); not yet tried with a real copy.
+- Drawings, app → TopCoding (ROADMAP R30): does a real Ctrl+V in Chrome hand TopCoding the `application/x-lexical-editor` data the app offers inside `chromium/x-web-custom-data`? Not testable through the Chrome extension (its Ctrl+V delivered only `text/plain`, even with HTML on the clipboard) or from an X11 clipboard owner; needs the user's own paste from the running app.

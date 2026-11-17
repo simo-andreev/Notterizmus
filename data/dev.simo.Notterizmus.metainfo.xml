@@ -19,8 +19,9 @@
       <li>Bullets for notes, pros and cons; bold, italic, tables and Excalidraw drawings</li>
       <li>Paste that recognises outline structure and renumbers it</li>
       <li>Undo and redo for text and structure, selection scopes and multiple cursors</li>
+      <li>Find and replace, and a command search that shows each command's key</li>
       <li>Spell checking in English and Bulgarian, chosen per chapter</li>
-      <li>One autosaved file per book chapter</li>
+      <li>One autosaved file per book chapter, a list of books and chapters, and earlier versions of each chapter to go back to</li>
     </ul>
   </description>
   <launchable type="desktop-id">dev.simo.Notterizmus.desktop</launchable>

@@ -1,6 +1,6 @@
 <img src="data/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png" width="96" align="right" alt="">
 
-# Notterizmus 1.3
+# Notterizmus 1.4
 
 A GNOME outline editor for book chapter notes. Numbering (`Ⅱ.1.a)`) and tree
 connectors (`├ └ │`) are generated as you type, and **Copy for TopCoding** puts
@@ -8,9 +8,10 @@ the outline on the clipboard as HTML that pastes cleanly into the chapter notes
 editor at `app.topcoding.bg/assignments`. Made for personal book notes in
 English and Bulgarian; it is not a general word processor or Markdown editor.
 
-Updated 2026-11-16 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
+Updated 2026-11-17 · Python 3 + GTK 4 + libadwaita · GPL-3.0-or-later ·
 [FEATURES.md](FEATURES.md) · [CHANGELOG.md](CHANGELOG.md) ·
-[PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (briefing for coding agents)
+[ROADMAP.md](ROADMAP.md) · [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (briefing for
+coding agents)
 
 ## Install
 
@@ -25,8 +26,9 @@ sudo add-apt-repository ppa:simeonandreev/ppa-library
 sudo apt install notterizmus
 ```
 
-Requires Ubuntu 25.10 or newer (libadwaita 1.8+); the package is currently built
-for 26.04 (`resolute`) only. Notes and settings are kept when the app is removed.
+The package is built for Ubuntu 26.04 (`resolute`) only for now; 26.10, and a
+snap for older releases, are planned (ROADMAP R19, R17). Notes and settings are
+kept when the app is removed.
 
 ## Using it
 
@@ -108,7 +110,11 @@ then the dictionary; on a misspelled word it lists fixes.
   **Copy for TopCoding** sends a chapter that has a drawing as the editor's own
   clipboard format (TopCoding takes drawings in no other), packed both the way
   Chrome and the way Firefox read it; TopCoding's editor was checked to accept it,
-  but a real Ctrl+V from the app into TopCoding has not been confirmed yet. If the drawing doesn't arrive, the text and tables still do.
+  but a real Ctrl+V from the app into TopCoding has not been confirmed yet. If the
+  drawing doesn't arrive, the text and tables still do. The other way, Ctrl+V
+  reads the drawings of a copy from TopCoding out of that same format; that hasn't
+  been tried with a real copy either, and if it fails, the text and tables paste
+  from the HTML as before.
   Excalidraw's shape library, Mermaid import and CJK hand-drawn font are left out.
 - Undo history lasts until the chapter is closed. For older states, **Earlier
   Versions** in the menu has copies kept when the chapter was opened and every
@@ -214,6 +220,7 @@ Each release:
    Launchpad emails on acceptance and build result; tag the commit `v<version>`.
 
 The script refuses uncommitted changes and a `VERSION`/`debian/changelog`
-mismatch. A PPA accepts each
-version once per Ubuntu series; for another series add an entry like
-`1.0.0~questing1` targeting it.
+mismatch. A PPA accepts each version once per Ubuntu series. To offer a release
+on another series, copy it there on Launchpad (the PPA's **Copy packages**,
+keeping the existing binaries), as ROADMAP R19 plans; an upload built for that
+series instead needs a version like `1.4.2~stonking1` targeting it.
