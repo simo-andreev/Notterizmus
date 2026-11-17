@@ -23,4 +23,5 @@ Description: outline editor for book chapter notes
  .
  It supports bullets for notes, pros and cons, bold and italic text, tables,
  Excalidraw drawings, structure-aware paste, document-wide undo, selection
- scopes, multiple cursors and spell checking.
+ scopes, multiple cursors, find and replace, a chapter list, earlier versions
+ of each chapter and spell checking.
