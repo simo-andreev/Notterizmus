@@ -1,0 +1,6 @@
+# Excalidraw's bundled code can embed tweets and Reddit posts, so it names their
+# widget scripts. The drawing page never loads them: its Content-Security-Policy
+# allows no network at all (notterizmus/drawing_web/index.html), and the app's web
+# view loads nothing but its own files.
+notterizmus: privacy-breach-twitter * [usr/share/notterizmus/notterizmus/drawing_web/*]
+notterizmus: privacy-breach-generic * [usr/share/notterizmus/notterizmus/drawing_web/*]

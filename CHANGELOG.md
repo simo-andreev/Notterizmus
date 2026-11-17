@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 — 2026-11-17
+
+- **Drawings** (Ctrl+D, the menu, Alt+Insert or Search Commands): [Excalidraw](https://excalidraw.com) opens inside the app, offline. **Done** puts the drawing under the item as a picture; double-click it or use **Edit Drawing** to change it. Adding, changing and deleting a drawing are undo steps.
+- **Copy** above a drawing, or a click on it and Ctrl+C, copies that drawing alone.
+- **Copy for TopCoding** takes drawings along: a copy with a drawing also carries the TopCoding editor's own format, which is the only way it accepts drawings. Copies without drawings are unchanged.
+- Needs WebKitGTK (`gir1.2-webkit-6.0`), installed with the package. The package is about 6 MB larger for the bundled Excalidraw.
+
 ## 1.3.2 — 2026-11-16
 
 - Dragging the mouse from one item to another selects whole items (within one item it still selects text); near the top or bottom edge the outline scrolls and the selection keeps growing.

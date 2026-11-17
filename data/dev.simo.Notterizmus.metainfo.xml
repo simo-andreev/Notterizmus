@@ -35,6 +35,16 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.0" date="2026-11-17">
+      <description>
+        <p>Drawings.</p>
+        <ul>
+          <li>Ctrl+D opens Excalidraw inside the app, offline. Done puts the drawing under the item as a picture; a double-click changes it.</li>
+          <li>Copy above a drawing copies it alone.</li>
+          <li>Copy for TopCoding takes drawings along in the form TopCoding's editor accepts.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.2" date="2026-11-16">
       <description>
         <p>Mouse selection, pasted tables and sturdier file handling.</p>

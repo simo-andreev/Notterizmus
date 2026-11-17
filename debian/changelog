@@ -1,3 +1,12 @@
+notterizmus (1.4.0) resolute; urgency=medium
+
+  * Excalidraw drawings: Ctrl+D opens Excalidraw in the app, offline;
+    the drawing is shown under the item and copied to TopCoding.
+  * Copy a single drawing with its Copy button or a click and Ctrl+C.
+  * Depend on gir1.2-webkit-6.0 for the drawing editor.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Tue, 17 Nov 2026 12:40:11 +0200
+
 notterizmus (1.3.2) resolute; urgency=medium
 
   * Drag the mouse across items to select them, scrolling at the edge.

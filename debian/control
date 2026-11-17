@@ -22,5 +22,5 @@ Description: outline editor for book chapter notes
  the result is copied as formatted HTML that pastes cleanly into TopCoding.
  .
  It supports bullets for notes, pros and cons, bold and italic text, tables,
- Excalidraw drawings, structure-aware paste, document-wide undo, selection scopes, multiple
- cursors and spell checking.
+ Excalidraw drawings, structure-aware paste, document-wide undo, selection
+ scopes, multiple cursors and spell checking.
