@@ -1,7 +1,7 @@
 import unittest
 
 from notterizmus.export import to_html, to_plain
-from notterizmus.importer import (drop_chars, html_items, join_lines, parse, strip_runs, table_nodes,
+from notterizmus.importer import (block_nodes, drop_chars, html_items, join_lines, parse, strip_runs,
                                   text_items)
 from notterizmus.layout import layout
 from notterizmus.model import Node, Run
@@ -164,12 +164,12 @@ class HtmlTest(unittest.TestCase):
         items = html_items("<p>Some text about it.</p><table><tr><th>k</th><th>v</th></tr><tr><td>1</td></tr></table>"
                            "<table><tr><td>second</td></tr></table>")
         self.assertIsNone(parse(items, Rules()), "no markers: the text is ordinary text")
-        first, second = table_nodes(items)
+        first, second = block_nodes(items)
         self.assertEqual((first.kind, first.data["header"], second.data["header"]), ("table", True, False))
         self.assertEqual(first.data["rows"], [[[Run("k")], [Run("v")]], [[Run("1")], []]], "short rows filled out")
         self.assertEqual(second.data["rows"], [[[Run("second")]]])
         self.assertNotEqual(first.id, second.id)
-        self.assertEqual(table_nodes(text_items("- no table here")), [])
+        self.assertEqual(block_nodes(text_items("- no table here")), [])
 
     def test_text_before_a_table_ends_its_line(self):
         items = html_items("- before<table><tr><td>c</td></tr></table>- after")

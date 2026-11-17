@@ -13,6 +13,7 @@ from notterizmus import drawing
 from notterizmus.guide import b, h
 from notterizmus.model import Node
 
+from ..test_drawing import BR, editor_copy, editor_drawing, editor_paragraph, editor_text
 from . import support as ui
 
 # A 2×2 white PNG.
@@ -362,6 +363,77 @@ class DrawingRowTest(DrawingTestCase):
         first, second = self.drawings()
         self.assertEqual(drawing.scene(second.data), drawing.scene(first.data))
         self.assertNotEqual(first.id, second.id)
+
+
+class PasteFromTopCodingTest(DrawingTestCase):
+    """Ctrl+V of a copy from TopCoding's editor: its drawings come only in the editor's
+    own JSON, which the browser packs into its custom clipboard data."""
+
+    def setUp(self):
+        super().setUp()
+        self.toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: self.toasts.append((msg, button, cb))
+        self.addCleanup(lambda: self.win.__dict__.pop("toast", None))
+
+    def put(self, nodes, html, browser="chrome"):
+        """Put a copy from TopCoding's editor on the clipboard, as the browser leaves it."""
+        mime, data = editor_copy(nodes, browser)
+        formats = [(mime, data), ("text/html", html.encode("utf-8")),
+                   ("text/plain;charset=utf-8", b"[from the browser]")]
+        self.win.get_clipboard().set_content(ui.Gdk.ContentProvider.new_union(
+            [ui.Gdk.ContentProvider.new_for_bytes(m, ui.GLib.Bytes.new(d)) for m, d in formats]))
+        ui.pump(0.05)
+
+    def paste(self, row, until, what="the paste"):
+        row.view.emit("paste-clipboard")
+        ui.wait_for(until, what)
+        ui.settle()
+        ui.wait_editor()
+
+    def test_a_copy_with_a_drawing_builds_the_outline_with_the_drawing_in_place(self):
+        doc = ui.open_chapter([h("")])
+        self.put([editor_paragraph(editor_text("Ⅰ) Intro"), BR, editor_text("├ • before")),
+                  editor_drawing(scene()),
+                  editor_paragraph(editor_text("└ • after"))],
+                 html="<p>Ⅰ) Intro<br>├ • before<br>└ • after</p>")
+        self.paste(ui.focus(doc.root.children[0], 0), lambda: self.drawings())
+        intro, = self.win.doc.root.children
+        self.assertEqual(intro.text, "Intro")
+        self.assertEqual([(n.kind, n.text) for n in intro.children], [("bullet", "before"), ("drawing", ""),
+                                                                      ("bullet", "after")])
+        self.assertEqual(drawing.scene(intro.children[1].data), scene())
+        from notterizmus.ui.rows import DrawingRow
+        self.assertIsInstance(ui.row(intro.children[1]), DrawingRow)
+
+    def test_a_drawing_copied_by_itself_goes_after_the_item(self):
+        doc = ui.open_chapter([h("Intro", b("first"), b("second"))])
+        first = doc.root.children[0].children[0]
+        self.put([editor_drawing(scene())], html="<p></p>", browser="firefox")
+        self.paste(ui.focus(first, 2), lambda: self.drawings())
+        self.assertEqual(self.kinds(), ["bullet", "drawing", "bullet"])
+        self.assertEqual(first.text, "first")
+        self.assertIs(self.ed.current, first, "the cursor stays in the item")
+        self.assertEqual(self.toasts, [])
+        ui.press(self.ed.cur_view, "z", ctrl=True)
+        self.assertEqual(self.kinds(), ["bullet", "bullet"], "one undo step")
+
+    def test_a_copy_without_a_drawing_is_pasted_from_its_html(self):
+        doc = ui.open_chapter([h("Intro", b(""))])
+        item = doc.root.children[0].children[0]
+        self.put([editor_paragraph(editor_text("from the JSON"))], html="<p>from the <b>HTML</b></p>")
+        self.paste(ui.focus(item, 0), lambda: item.text)
+        self.assertEqual([(r.text, r.bold) for r in item.runs], [("from the ", False), ("HTML", True)])
+
+    def test_copy_for_topcoding_pastes_back_with_its_drawing(self):
+        doc = ui.open_chapter([h("Intro", b("before"), block(), b("after")), h("")])
+        self.win.lookup_action("copy").activate(None)
+        from notterizmus import lexical
+        cb = self.win.get_clipboard()
+        ui.wait_for(lambda: cb.get_formats().contain_mime_type(lexical.CHROME_CUSTOM_MIME), "the copy")
+        self.paste(ui.focus(doc.root.children[1], 0), lambda: len(self.drawings()) == 2)
+        pasted = self.win.doc.root.children[1]
+        self.assertEqual((pasted.text, [n.kind for n in pasted.children]), ("Intro", ["bullet", "drawing", "bullet"]))
+        self.assertEqual(drawing.scene(pasted.children[1].data), scene())
 
 
 class RealDrawingWindowTest(ui.UITestCase):
