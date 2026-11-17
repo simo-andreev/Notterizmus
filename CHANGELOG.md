@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2 — 2026-11-17
+
+- **Ctrl+A** selects all items again while the Bulgarian (or another non-Latin) keyboard layout is on; before, it selected only the current item's text. The editor's other Ctrl and Alt shortcuts (Ctrl+B, Ctrl+I, Ctrl+W, Ctrl+Z and the rest) work on such layouts too.
+
 ## 1.4.1 — 2026-11-17
 
 - **Copy for TopCoding** takes drawings along when TopCoding is open in Firefox too; before, only the text and tables arrived there.
