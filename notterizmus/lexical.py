@@ -6,8 +6,9 @@ JSON is on the clipboard Lexical uses it for everything and ignores the HTML, so
 text and tables are written here too, as the nodes Lexical itself makes from the HTML
 of export.py (checked against TopCoding's editor, 2026-11-17).
 
-Chrome hands a web page only the clipboard formats it knows, plus the ones packed in
-its own "web custom data" format; web_custom_data() packs the JSON that way.
+Browsers hand a web page only the clipboard formats they know, plus the ones packed in
+their own custom-data format, which each browser has its own of: web_custom_data() packs
+the JSON the Chrome way, moz_custom_data() the Firefox way, and both are offered.
 
 No GTK here.
 """
@@ -20,6 +21,7 @@ from . import drawing
 
 LEXICAL_MIME = "application/x-lexical-editor"
 CHROME_CUSTOM_MIME = "chromium/x-web-custom-data"
+FIREFOX_CUSTOM_MIME = "application/x-moz-custom-clipdata"
 NAMESPACE = "SummaryEditor"  # TopCoding's editor; Lexical refuses JSON from another one
 
 BOLD, ITALIC, CODE = 1, 2, 16
@@ -152,10 +154,51 @@ def read_web_custom_data(data):
     return out
 
 
+_MOZ_STRING, _MOZ_END = 1, 0  # Firefox's eCustomClipboardTypeId_String / _None
+
+
+def moz_custom_data(items):
+    """Firefox's custom clipboard data (DataTransfer.cpp): for each item a big-endian 1,
+    then its MIME type and its text, both as UTF-16LE with their length in bytes in
+    front (big-endian); a big-endian 0 ends it."""
+    def string16(s):
+        data = s.encode("utf-16-le")
+        return struct.pack(">I", len(data)) + data
+    return b"".join(struct.pack(">I", _MOZ_STRING) + string16(k) + string16(v) for k, v in items.items()) \
+        + struct.pack(">I", _MOZ_END)
+
+
+def read_moz_custom_data(data):
+    """The inverse of moz_custom_data (for tests)."""
+    out, pos = {}, 0
+
+    def string16():
+        nonlocal pos
+        (n,) = struct.unpack_from(">I", data, pos)
+        text = data[pos + 4:pos + 4 + n].decode("utf-16-le")
+        pos += 4 + n
+        return text
+
+    while True:
+        (kind,) = struct.unpack_from(">I", data, pos)
+        pos += 4
+        if kind == _MOZ_END:
+            break
+        if kind != _MOZ_STRING:
+            raise ValueError(f"unknown item kind {kind}")
+        key = string16()
+        out[key] = string16()
+    if pos != len(data):
+        raise ValueError("data after the end")
+    return out
+
+
 def clipboard_data(lines, code_prefix=False):
-    """What to offer as CHROME_CUSTOM_MIME beside the HTML and plain text, or None when
-    the HTML already says everything (no drawing): then Lexical keeps reading the HTML,
-    whose result in TopCoding is the long-proven one."""
+    """(MIME type, data) pairs to offer beside the HTML and plain text: the editor's JSON
+    in Chrome's and in Firefox's custom format. None when the HTML already says everything
+    (no drawing): then Lexical keeps reading the HTML, whose result in TopCoding is the
+    long-proven one."""
     if not has_drawing(lines):
         return None
-    return web_custom_data({LEXICAL_MIME: clipboard_json(lines, code_prefix)})
+    items = {LEXICAL_MIME: clipboard_json(lines, code_prefix)}
+    return [(CHROME_CUSTOM_MIME, web_custom_data(items)), (FIREFOX_CUSTOM_MIME, moz_custom_data(items))]

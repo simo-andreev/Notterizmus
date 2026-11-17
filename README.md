@@ -105,9 +105,9 @@ then the dictionary; on a misspelled word it lists fixes.
 - Drawings are made in [Excalidraw](https://excalidraw.com), which runs inside the app
   (offline) and needs WebKitGTK (`gir1.2-webkit-6.0`, installed with the package).
   **Copy for TopCoding** sends a chapter that has a drawing as the editor's own
-  clipboard format (TopCoding takes drawings in no other); TopCoding's editor was
-  checked to accept it, but a real Ctrl+V from the app into Chrome has not been
-  confirmed yet. If the drawing doesn't arrive, the text and tables still do.
+  clipboard format (TopCoding takes drawings in no other), packed both the way
+  Chrome and the way Firefox read it; TopCoding's editor was checked to accept it,
+  but a real Ctrl+V from the app into TopCoding has not been confirmed yet. If the drawing doesn't arrive, the text and tables still do.
   Excalidraw's shape library, Mermaid import and CJK hand-drawn font are left out.
 - Undo history lasts until the chapter is closed. For older states, **Earlier
   Versions** in the menu has copies kept when the chapter was opened and every

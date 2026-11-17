@@ -83,4 +83,5 @@
 
 ## Open questions
 - Whether to support Ubuntu releases other than `resolute`.
+- Drawings: Firefox ignores `chromium/x-web-custom-data`; it reads its own `application/x-moz-custom-clipdata` (`lexical.moz_custom_data`), confirmed on Firefox 160 by a WebDriver Ctrl+V (geckodriver, Firefox and the clipboard owner both on X11: under Wayland an unfocused owner can't take the clipboard) whose paste event got `application/x-lexical-editor` intact.
 - Drawings: does a real Ctrl+V in Chrome hand TopCoding the `application/x-lexical-editor` data the app offers inside `chromium/x-web-custom-data`? Not testable through the Chrome extension (its Ctrl+V delivered only `text/plain`, even with HTML on the clipboard) or from an X11 clipboard owner; needs the user's own paste from the running app.

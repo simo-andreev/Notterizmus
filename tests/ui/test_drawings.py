@@ -301,6 +301,7 @@ class DrawingRowTest(DrawingTestCase):
         from notterizmus import lexical
         cb = self.win.get_clipboard()
         ui.wait_for(lambda: cb.get_formats().contain_mime_type(lexical.CHROME_CUSTOM_MIME), "the copy")
+        self.assertTrue(cb.get_formats().contain_mime_type(lexical.FIREFOX_CUSTOM_MIME))
         self.assertIn("before", ui.clipboard("text/html"))
         self.assertIn("[Drawing]", ui.clipboard("text/plain"))
 
@@ -309,7 +310,9 @@ class DrawingRowTest(DrawingTestCase):
         ui.open_chapter([h("Intro", b("before"))])
         self.win.lookup_action("copy").activate(None)
         self.assertIn("before", ui.clipboard("text/html"))
-        self.assertFalse(self.win.get_clipboard().get_formats().contain_mime_type(lexical.CHROME_CUSTOM_MIME))
+        formats = self.win.get_clipboard().get_formats()
+        self.assertFalse(formats.contain_mime_type(lexical.CHROME_CUSTOM_MIME))
+        self.assertFalse(formats.contain_mime_type(lexical.FIREFOX_CUSTOM_MIME))
 
     def copied(self):
         said = []

@@ -29,7 +29,7 @@ def export_formats(lines, rules):
     code_prefix = rules["export"]["code_prefix"]
     plain = to_plain(lines)
     custom = lexical.clipboard_data(lines, code_prefix)
-    return ([(lexical.CHROME_CUSTOM_MIME, custom)] if custom else []) \
+    return (custom or []) \
         + [("text/html", to_html(lines, code_prefix=code_prefix))] + [(m, plain) for m in TEXT_MIMES]
 
 

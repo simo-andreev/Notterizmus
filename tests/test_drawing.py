@@ -161,8 +161,10 @@ class LexicalClipboardTest(unittest.TestCase):
 
     def test_the_clipboard_data_is_chromes_custom_format_holding_the_editors_json(self):
         lines = self.lines(heading("Intro", bullet("Здравей 😀"), drawing_json()))
-        data = lexical.clipboard_data(lines)
-        items = lexical.read_web_custom_data(data)
+        offered = dict(lexical.clipboard_data(lines))
+        self.assertEqual(list(offered), ["chromium/x-web-custom-data", "application/x-moz-custom-clipdata"])
+        items = lexical.read_web_custom_data(offered["chromium/x-web-custom-data"])
+        self.assertEqual(lexical.read_moz_custom_data(offered["application/x-moz-custom-clipdata"]), items)
         self.assertEqual(list(items), ["application/x-lexical-editor"])
         payload = json.loads(items["application/x-lexical-editor"])
         self.assertEqual(payload["namespace"], "SummaryEditor")
@@ -173,6 +175,11 @@ class LexicalClipboardTest(unittest.TestCase):
         # one item, "a/b" -> "xyz": sizes are little-endian, text is UTF-16 padded to 4 bytes
         self.assertEqual(lexical.web_custom_data({"a/b": "xyz"}).hex(),
                          "1c000000" "01000000" "03000000" "61002f006200" "0000" "03000000" "780079007a00" "0000")
+
+    def test_the_custom_format_is_packed_as_firefox_reads_it(self):
+        # one item, "a/b" -> "xyz": kind and byte lengths are big-endian, text is UTF-16LE unpadded, 0 ends it
+        self.assertEqual(lexical.moz_custom_data({"a/b": "xyz"}).hex(),
+                         "00000001" "00000006" "61002f006200" "00000006" "780079007a00" "00000000")
 
 
 class PreviewCacheTest(unittest.TestCase):
