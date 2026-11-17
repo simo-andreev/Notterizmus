@@ -1,4 +1,6 @@
 """Selecting whole items with the keyboard (Ctrl+A, Ctrl+W, Shift+arrows) and acting on them."""
+from gi.repository import Gdk
+
 from notterizmus.guide import b, h, table
 
 from . import support as ui
@@ -27,6 +29,19 @@ class SelectionTest(ui.UITestCase):
         self.assertEqual(self.marked(), ["Intro", "alpha beta", "gamma", "delta", "Other", "omega"])
         ui.press(r.view, "Escape")
         self.assertEqual((self.selected(), self.marked()), ([], []))
+
+    def test_ctrl_a_selects_every_item_on_a_cyrillic_layout(self):
+        self.chapter()
+        r = ui.focus(self.g)
+        ok, keys = Gdk.Display.get_default().map_keyval(Gdk.KEY_a)
+        if not ok:
+            self.skipTest("this display's keymap has no 'a' key")
+        handled = ui.key_controller(r.view).emit("key-pressed", Gdk.KEY_Cyrillic_a, keys[0].keycode,
+                                                  Gdk.ModifierType.CONTROL_MASK)
+        ui.wait_editor(0.12)
+        self.assertTrue(handled, "Ctrl+A on the Bulgarian layout arrives as Ctrl+Cyrillic_a")
+        self.assertEqual(self.selected(), ["Intro", "Other"])
+        self.assertIsNone(r.view.selection_offsets(), "not just the item's text")
 
     def test_ctrl_w_selects_a_little_more_each_time_and_ctrl_shift_w_goes_back(self):
         self.chapter()

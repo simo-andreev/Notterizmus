@@ -29,11 +29,31 @@ def _mods(state):
             bool(state & Gdk.ModifierType.ALT_MASK))
 
 
+def shortcut_keyval(keyval, keycode, state):
+    """The keyval a Ctrl/Alt shortcut means. On a non-Latin layout (Bulgarian) Ctrl+A
+    arrives as Ctrl+Cyrillic_a; like GTK's own shortcuts, fall back to the Latin letter
+    on the same key of the first layout, so the editor's shortcuts work there too
+    (otherwise GtkTextView's would run instead: Ctrl+A selected one item's text)."""
+    if not state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK):
+        return keyval
+    ch = chr(Gdk.keyval_to_unicode(keyval) or 0)
+    if not ch.isalpha() or ch.isascii():
+        return keyval
+    display = Gdk.Display.get_default()
+    ok, keys, keyvals = display.map_keycode(keycode) if display and keycode else (False, [], [])
+    if not ok:
+        return keyval
+    level = 1 if state & Gdk.ModifierType.SHIFT_MASK else 0
+    latin = [(k.group, k.level != level, kv) for k, kv in zip(keys, keyvals)
+             if 0 < Gdk.keyval_to_unicode(kv) < 0x80 and chr(Gdk.keyval_to_unicode(kv)).isalpha()]
+    return min(latin)[2] if latin else keyval
+
+
 def wire_view(editor, row, view):
     """Shared input handling for every RichText that belongs to a row."""
     keys = Gtk.EventControllerKey()
     keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-    keys.connect("key-pressed", lambda _c, kv, _kc, st: editor.on_key(row, view, kv, st))
+    keys.connect("key-pressed", lambda _c, kv, kc, st: editor.on_key(row, view, shortcut_keyval(kv, kc, st), st))
     keys.connect("key-released", lambda _c, kv, _kc, st: editor.on_key_released(kv))
     view.add_controller(keys)
     focus = Gtk.EventControllerFocus()
@@ -213,8 +233,8 @@ class TableRow(_PrefixRow):
         self.rows[r][c] = rt.get_runs()
         self.editor.mark_changed(self.node)
 
-    def _cell_key(self, _ctl, keyval, _kc, state, rt, r, c):
-        name = Gdk.keyval_name(keyval)
+    def _cell_key(self, _ctl, keyval, keycode, state, rt, r, c):
+        name = Gdk.keyval_name(shortcut_keyval(keyval, keycode, state))
         ctrl, shift, alt = _mods(state)
         nrows, ncols = len(self.rows), len(self.rows[0]) if self.rows else 0
         if self.editor.common_key(rt, name, ctrl, shift, alt):
