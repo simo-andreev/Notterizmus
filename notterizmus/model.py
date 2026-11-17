@@ -5,8 +5,9 @@ Node kinds:
   heading  - numbered item (Ⅰ), Ⅰ.1), Ⅰ.1.a) ...)
   bullet   - leaf note with a marker (•, +, -, ... see rules.markers)
   table    - table block; rows live in node.data["rows"]
-Future kinds (e.g. "drawing") only need a data codec here, a layout rule
-in layout.py, an exporter in export.py and a row widget in ui/rows.py.
+  drawing  - Excalidraw scene in node.data (see drawing.py)
+A new kind only needs a data codec here, a layout rule in layout.py, an
+exporter in export.py and a row widget in ui/rows.py.
 
 Kinds and fields this version doesn't know (written by a newer one) are kept
 unchanged when the file is saved; the editor shows such blocks read-only. That goes for
@@ -20,6 +21,8 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+from . import drawing
 
 FORMAT = "notterizmus/1"
 
@@ -87,10 +90,10 @@ def _table_dec(d):
     }
 
 
-DATA_CODECS = {"table": (_table_enc, _table_dec)}
+DATA_CODECS = {"table": (_table_enc, _table_dec), "drawing": (drawing.encode, drawing.decode)}
 
 TEXT_KINDS = ("heading", "bullet")
-BLOCK_KINDS = ("heading", "bullet", "table")  # any other kind comes from a newer version
+BLOCK_KINDS = ("heading", "bullet", "table", "drawing")  # any other kind comes from a newer version
 _KNOWN_FIELDS = ("kind", "id", "runs", "marker", "data", "children")
 
 

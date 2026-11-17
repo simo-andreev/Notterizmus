@@ -88,6 +88,12 @@ popover.ntz-menu .menu-num {
   box-shadow: inset 0 -2px @accent_bg_color;
 }
 
+/* drawings: the picture has its own (light) background */
+.ntz-drawing {
+  border: 1px solid alpha(currentColor, 0.25);
+  border-radius: 6px;
+}
+
 /* a block type from a newer version: read-only note */
 .ntz-unknown {
   border: 1px dashed alpha(currentColor, 0.35);

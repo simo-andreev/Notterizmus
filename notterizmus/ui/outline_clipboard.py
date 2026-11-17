@@ -5,6 +5,7 @@ import json
 
 from gi.repository import Gdk, Gio, GLib
 
+from .. import lexical
 from ..export import runs_html, to_html, to_plain
 from ..importer import html_items, join_lines, parse, table_nodes, text_items
 from ..layout import layout
@@ -19,7 +20,17 @@ TEXT_MIMES = ["text/plain;charset=utf-8", "text/plain"]
 
 
 def _bytes(s):
-    return GLib.Bytes.new(s.encode("utf-8"))
+    return GLib.Bytes.new(s if isinstance(s, bytes) else s.encode("utf-8"))
+
+
+def export_formats(lines, rules):
+    """(MIME type, data) pairs of an export for the clipboard: HTML and plain text, and,
+    when there is a drawing, the form TopCoding's editor takes drawings in."""
+    code_prefix = rules["export"]["code_prefix"]
+    plain = to_plain(lines)
+    custom = lexical.clipboard_data(lines, code_prefix)
+    return ([(lexical.CHROME_CUSTOM_MIME, custom)] if custom else []) \
+        + [("text/html", to_html(lines, code_prefix=code_prefix))] + [(m, plain) for m in TEXT_MIMES]
 
 
 def _decode(raw):
@@ -54,9 +65,7 @@ class ClipboardMixin:
             if before is not None and after is not None and before.id in ids and after.id in ids:
                 keep.append(ln)
         data = json.dumps({"nodes": [n.to_json() for n in nodes]}, ensure_ascii=False)
-        self._set_clipboard([(NODES_MIME, data),
-                             ("text/html", to_html(keep, code_prefix=self.rules["export"]["code_prefix"])),
-                             *[(m, to_plain(keep)) for m in TEXT_MIMES]])
+        self._set_clipboard([(NODES_MIME, data), *export_formats(keep, self.rules)])
         if cut:
             self.delete_items(nodes)
         self.emit("message", f"{'Cut' if cut else 'Copied'} {len(ids)} item{'s' if len(ids) != 1 else ''}")

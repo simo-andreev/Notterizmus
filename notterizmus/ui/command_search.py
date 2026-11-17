@@ -99,6 +99,8 @@ def build(win):
             act(f"Add {label} {m['symbol']}", "ed.add", GLib.Variant.new_string(f"bullet:{name}"),
                 section="Add", shown="", keywords="bullet")
         act("Insert Table", "win.insert-table", section="Add")
+        act("Insert Drawing", "win.insert-drawing", section="Add", shown="<Control>d",
+            keywords="excalidraw graph diagram sketch picture")
         for kind, marker, label, _trig in ed.kind_options():
             target = "heading" if kind == "heading" else f"bullet:{marker}"
             act(f"Make It {' '.join(label.split())}", "ed.set-kind", GLib.Variant.new_string(target),

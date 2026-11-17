@@ -13,6 +13,7 @@ Depends: ${misc:Depends},
          python3-gi,
          gir1.2-gtk-4.0,
          gir1.2-adw-1 (>= 1.8),
+         gir1.2-webkit-6.0,
          libenchant-2-2
 Recommends: hunspell-en-us | hunspell-dictionary
 Description: outline editor for book chapter notes
@@ -21,5 +22,5 @@ Description: outline editor for book chapter notes
  the result is copied as formatted HTML that pastes cleanly into TopCoding.
  .
  It supports bullets for notes, pros and cons, bold and italic text, tables,
- structure-aware paste, document-wide undo, selection scopes, multiple
+ Excalidraw drawings, structure-aware paste, document-wide undo, selection scopes, multiple
  cursors and spell checking.

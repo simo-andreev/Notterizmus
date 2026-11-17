@@ -82,7 +82,7 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R12 | **Excalidraw block**. Spike first: can a native app put Lexical's clipboard JSON (`application/x-lexical-editor`) on the clipboard so that Chrome on Linux passes it to TopCoding? Then choose how to edit drawings: an embedded Excalidraw (adds a WebKitGTK dependency) or opening excalidraw.com and pasting the drawing back | The planned block type; TopCoding has a native Excalidraw node | L (needs R6 shipped and in use first) |
+| R12 | **Excalidraw block**. Spike first: can a native app put Lexical's clipboard JSON (`application/x-lexical-editor`) on the clipboard so that Chrome on Linux passes it to TopCoding? Then choose how to edit drawings: an embedded Excalidraw (adds a WebKitGTK dependency) or opening excalidraw.com and pasting the drawing back | The planned block type; TopCoding has a native Excalidraw node | L. **Built, not released** (2026-11-17): embedded Excalidraw in WebKitGTK, bundled for offline use; Ctrl+D. Paste spike (2026-11-17): TopCoding's Excalidraw node has no HTML import, so a chapter with a drawing is copied as Lexical clipboard JSON inside Chrome's `chromium/x-web-custom-data` (`lexical.py`); the editor accepts that JSON (synthetic paste, same text and tables as the HTML path). Still to confirm: a real Ctrl+V from the app |
 
 ## Foundations (alongside 1.2)
 

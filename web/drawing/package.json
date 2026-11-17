@@ -1,0 +1,14 @@
+{
+  "name": "notterizmus-drawing-editor",
+  "private": true,
+  "description": "Source of the Excalidraw page that Notterizmus embeds (built into notterizmus/drawing_web by scripts/build-drawing-editor.sh)",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

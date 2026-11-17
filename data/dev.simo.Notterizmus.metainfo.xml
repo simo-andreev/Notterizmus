@@ -16,7 +16,7 @@
     </p>
     <ul>
       <li>Automatic numbering with Unicode Roman numerals and tree connectors</li>
-      <li>Bullets for notes, pros and cons; bold, italic and tables</li>
+      <li>Bullets for notes, pros and cons; bold, italic, tables and Excalidraw drawings</li>
       <li>Paste that recognises outline structure and renumbers it</li>
       <li>Undo and redo for text and structure, selection scopes and multiple cursors</li>
       <li>Spell checking in English and Bulgarian, chosen per chapter</li>

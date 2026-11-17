@@ -126,6 +126,8 @@ def build(rules=None):
              " moves to the next cell and adds a row at the end.")),
           b("The buttons above a table add and remove rows and columns, turn the header row on or off, "
             "and delete the table."),
+          b((key("Ctrl+D"), " opens a drawing: boxes, arrows, text and freehand lines. Done puts it under the "
+             "item as a picture; double-click the picture to change it. Copy above the picture copies only the drawing.")),
           b("Six keys worth remembering:",
             table([
                 ["Key", "What it does"],

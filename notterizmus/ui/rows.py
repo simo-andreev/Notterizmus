@@ -1,9 +1,14 @@
-"""Row widgets, one per node kind. Register new kinds (e.g. "drawing") in ROW_TYPES."""
+"""Row widgets, one per node kind. Register new kinds in ROW_TYPES."""
 from __future__ import annotations
 
-from gi.repository import Gdk, GLib, Gtk
+from gi.repository import Gdk, GLib, GObject, Gtk
 
+from .. import drawing
+from . import drawing_web
 from .richtext import RichText
+
+
+PREVIEW_MAX = (760, 600)
 
 
 def _prefix_markup(segs):
@@ -299,6 +304,126 @@ class TableRow(_PrefixRow):
         self._changed_struct(None)
 
 
+class _Preview(GObject.Object, Gdk.Paintable):
+    """A drawing's PNG at the size of the drawing (the PNG has more pixels than that, so
+    it stays sharp on dense screens), or smaller for a drawing larger than PREVIEW_MAX."""
+
+    def __init__(self, texture):
+        super().__init__()
+        self.texture = texture
+        w, h = texture.get_width() / drawing.PREVIEW_SCALE, texture.get_height() / drawing.PREVIEW_SCALE
+        fit = min(1.0, PREVIEW_MAX[0] / max(w, 1), PREVIEW_MAX[1] / max(h, 1))
+        self.width, self.height = max(1, round(w * fit)), max(1, round(h * fit))
+
+    def do_snapshot(self, snapshot, width, height):
+        self.texture.snapshot(snapshot, width, height)
+
+    def do_get_intrinsic_width(self):
+        return self.width
+
+    def do_get_intrinsic_height(self):
+        return self.height
+
+    def do_get_intrinsic_aspect_ratio(self):
+        return self.texture.get_width() / max(1, self.texture.get_height())
+
+    def do_get_flags(self):
+        return Gdk.PaintableFlags.SIZE | Gdk.PaintableFlags.CONTENTS
+
+
+class DrawingRow(_PrefixRow):
+    """An Excalidraw drawing: its picture, with buttons to edit and delete it. The picture
+    comes from the preview cache (drawing.py), or is made again when it isn't there."""
+
+    def __init__(self, editor, node):
+        super().__init__(editor, node)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True)
+        bar = Gtk.Box(spacing=2)
+        bar.add_css_class("table-bar")
+        edit = Gtk.Button(label="Edit Drawing", tooltip_text="Open the drawing in Excalidraw (or double-click it)")
+        # (a single click on the picture selects it)
+        edit.add_css_class("flat")
+        edit.connect("clicked", lambda _b: editor.edit_drawing(self.node))
+        bar.append(edit)
+        copy = Gtk.Button(label="Copy", tooltip_text="Copy only this drawing, to paste it into TopCoding or here")
+        copy.add_css_class("flat")
+        copy.connect("clicked", lambda _b: editor.copy_drawing(self.node))
+        bar.append(copy)
+        rm = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete drawing")
+        rm.add_css_class("flat")
+        rm.connect("clicked", lambda _b: editor.delete_items([self.node]))
+        bar.append(rm)
+        self.picture = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.SCALE_DOWN,
+                                   halign=Gtk.Align.START, visible=False)
+        self.picture.add_css_class("ntz-drawing")
+        self.picture.set_cursor_from_name("pointer")
+        click = Gtk.GestureClick(button=1)
+        click.connect("pressed", self._clicked)
+        self.picture.add_controller(click)
+        self.note = Gtk.Label(xalign=0, wrap=True)
+        self.note.add_css_class("dim-label")
+        box.append(bar)
+        box.append(self.picture)
+        box.append(self.note)
+        self.append(box)
+        self._key = None
+        self.reload()
+
+    def _clicked(self, _gesture, n_press, _x, _y):
+        """A click selects the drawing (then Ctrl+C, Ctrl+X and Delete act on it alone); a
+        double-click opens it."""
+        if n_press == 2:
+            self.editor.edit_drawing(self.node)
+        else:
+            self.editor.set_selection([self.node])
+
+    def reload(self):
+        key = drawing.preview_key(self.node.data)
+        if key == self._key:
+            return
+        self._key = key
+        if drawing.is_empty(self.node.data):
+            self._say("An empty drawing.")
+        elif not self._show():
+            self._say("Making the picture of this drawing…")
+            drawing_web.render(self.node.data, lambda _png, key=key: self._rendered(key))
+
+    def _show(self):
+        try:
+            texture = Gdk.Texture.new_from_filename(str(drawing.preview_path(self.node.data)))
+        except GLib.Error:
+            return False
+        preview = _Preview(texture)
+        self.picture.set_paintable(preview)
+        # Its full height is its minimum too. A picture that may shrink is the first thing
+        # the outline squeezes when it is a little short of room (text rows never give
+        # way), and in a long chapter it was squeezed to nothing.
+        self.picture.set_size_request(-1, preview.height + 2)  # + the frame's border (style.css)
+        self.picture.set_visible(True)
+        self.note.set_visible(False)
+        return True
+
+    def _say(self, text):
+        self.picture.set_visible(False)
+        self.picture.set_paintable(None)
+        self.picture.set_size_request(-1, -1)
+        self.note.set_text(text)
+        self.note.set_visible(True)
+
+    def _rendered(self, key):
+        if key != self._key or self._show():  # edited again meanwhile: that picture is on its way
+            return
+        n = sum(1 for e in self.node.data.get("elements", []) if not e.get("isDeleted"))
+        why = "" if drawing_web.available() else f" {drawing_web.MISSING}."
+        self._say(f"A drawing with {n} element{'s' if n != 1 else ''}; its picture can't be shown.{why}")
+
+    def focus(self, offset=0):
+        pass
+
+    def cursor_offset(self):
+        return None
+
+
 class UnknownRow(_PrefixRow):
     """A block type this version doesn't know, written by a newer Notterizmus. Its data is
     saved back unchanged; here it's a read-only note, left out of Copy for TopCoding."""
@@ -331,7 +456,7 @@ class UnknownRow(_PrefixRow):
         return None
 
 
-ROW_TYPES = {"heading": TextRow, "bullet": TextRow, "table": TableRow}
+ROW_TYPES = {"heading": TextRow, "bullet": TextRow, "table": TableRow, "drawing": DrawingRow}
 
 
 def row_type(kind):

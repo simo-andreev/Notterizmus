@@ -90,6 +90,7 @@ class MenusMixin:
         m.append_section(None, s2)
         s3 = Gio.Menu()
         s3.append_item(_mi("Table", "ed.add", "table", "<Control>t"))
+        s3.append_item(_mi("Drawing", "ed.add", "drawing", "<Control>d"))
         m.append_section(None, s3)
         return m
 
@@ -226,7 +227,11 @@ class MenusMixin:
             m.append_section(None, d)
         else:
             d = Gio.Menu()
-            d.append_item(_mi("Delete Table" if node.kind == "table" else "Delete Block", "ed.delete-item"))
+            if node.kind == "drawing":
+                d.append_item(_mi("Edit Drawing", "ed.edit-drawing"))
+                d.append_item(_mi("Copy Drawing", "ed.copy-drawing"))
+            d.append_item(_mi({"table": "Delete Table", "drawing": "Delete Drawing"}.get(node.kind, "Delete Block"),
+                              "ed.delete-item"))
             m.append_section(None, d)
         self._popup(m, row.prefix, node=node)
 

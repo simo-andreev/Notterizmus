@@ -10,6 +10,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Typing triggers at the start of an item: `# ` numbered, `* ` bullet, `+ ` pro, `- ` con. Ctrl+Shift+Space cycles the type.
 - Bold and italic (Ctrl+B / Ctrl+I), on a selection or for text you are about to type.
 - Tables with row and column controls, an optional header row, and Tab to move between cells.
+- Drawings (Ctrl+D, the menu or Alt+Insert): [Excalidraw](https://excalidraw.com) opens inside the app, offline. **Done** puts the drawing under the item as a picture; **Edit Drawing** or a double-click opens it again. **Copy** above a drawing (or a click on it and Ctrl+C) copies that drawing alone, for TopCoding or another chapter. Adding, changing and deleting a drawing are undo steps. The drawing itself (not the picture) is saved in the chapter file.
 - Configurable rules in `~/.config/notterizmus/rules.toml`:
   - numbering format per level
   - connector characters and spacing
@@ -23,7 +24,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 ## Editing
 - Enter adds an item. Tab / Shift+Tab indent and outdent. Alt+↑/↓ moves an item.
 - Enter on an empty bullet under `Ⅰ.1.a)` turns it into `Ⅰ.1.b)`. Ctrl+Enter adds the next numbered item at the current level.
-- Alt+Insert opens an "add" menu that previews the labels new items will get: next, sub-level, parent-level, bullets, table.
+- Alt+Insert opens an "add" menu that previews the labels new items will get: next, sub-level, parent-level, bullets, table, drawing.
 - The Alt+Insert, item-prefix and Ctrl+Space popups number their first ten choices 1–9, 0; pressing the digit (top row or keypad) picks it.
 - Clicking an item's prefix opens a menu to change its type, add items next to it, or delete it.
 - Right-click menu: spelling suggestions, formatting, item type, add, selection, plain paste, undo/redo.
@@ -36,7 +37,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Multiple cursors: tap Ctrl twice, keep it held, then press ↑/↓. Typing, Backspace, Delete and cursor keys apply at every cursor.
 
 ## Clipboard
-- **Copy for TopCoding** (Ctrl+Shift+C) copies HTML that TopCoding's editor keeps as-is: spacing, bold, italic and real tables, with plain text as a fallback.
+- **Copy for TopCoding** (Ctrl+Shift+C) copies HTML that TopCoding's editor keeps as-is: spacing, bold, italic and real tables, with plain text as a fallback. A chapter with drawings is also offered in the editor's own clipboard format, which carries them as Excalidraw scenes (`[Drawing]` in the plain text).
 - Ctrl+V works out the outline structure when pasting:
   - from the app's own output
   - from TopCoding's HTML
@@ -72,4 +73,4 @@ TopCoding (`app.topcoding.bg/assignments`).
 - `install.sh` adds the app and its icon to the GNOME app grid. No root needed.
 
 ## Planned
-- Excalidraw drawings as a block type. The block-type extension points are in place (see README → Adding a block type).
+- Confirming a real paste of a drawing from the app into TopCoding in Chrome (see README → Known limits).

@@ -77,11 +77,11 @@ else
     exit 2
 fi
 
-mkdir -p "$tmp/config" "$tmp/data" "$tmp/Documents"
+mkdir -p "$tmp/config" "$tmp/data" "$tmp/cache" "$tmp/Documents"
 printf 'XDG_DOCUMENTS_DIR="%s/Documents"\n' "$tmp" >"$tmp/config/user-dirs.dirs"
 
 status=0
-GSETTINGS_BACKEND=memory XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data" \
+GSETTINGS_BACKEND=memory XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$tmp/cache" \
     NOTTERIZMUS_UI_TESTS=1 NOTTERIZMUS_UI_FRAMES=1 NOTTERIZMUS_UI_SCRATCH="$tmp" \
     timeout "${NOTTERIZMUS_UI_TIMEOUT:-900}" python3 -W default -W ignore::DeprecationWarning:gi.events \
     -W 'ignore:GLib.unix_signal_add_full:DeprecationWarning' \
@@ -97,7 +97,9 @@ fi
 
 # Warnings don't fail a test by themselves, so the run fails for them here: GLib's
 # ("Gtk-WARNING **: ...") and Python's ("file.py:12: ResourceWarning: ...").
-if grep -E -- '-(WARNING|CRITICAL) \*\*' "$tmp/out.log" >"$tmp/warnings.log"; then
+# (Not those of WebKit's helper processes, which the drawing tests start: they complain
+# about the session bus when their web view goes away.)
+if grep -E -- '-(WARNING|CRITICAL) \*\*' "$tmp/out.log" | grep -v '^(WebKit[A-Za-z]*Process:' >"$tmp/warnings.log"; then
     echo "" >&2
     echo "GTK printed $(wc -l <"$tmp/warnings.log") warning(s) during the UI tests:" >&2
     sed -E 's/^\([^)]*\): //; s/[0-9]{2}:[0-9]{2}:[0-9.]+: //; s/0x[0-9a-f]+/0x…/g' "$tmp/warnings.log" \

@@ -43,7 +43,7 @@ walks through the controls; each time you open it, it starts fresh.
 |---|---|
 | New item (splits at the cursor) | Enter |
 | Next numbered item at this level (e.g. Ⅰ.1.b after Ⅰ.1.a and its bullets) | Ctrl+Enter, or Enter on an empty bullet |
-| Add-component menu (next / sub / parent item, bullets, table) | Alt+Insert |
+| Add-component menu (next / sub / parent item, bullets, table, drawing) | Alt+Insert |
 | Context menu (spelling, formatting, item type, add, selection, undo) | right-click |
 | Make it a sub-item / move it back out | Tab / Shift+Tab |
 | Move the item up or down | Alt+↑ / Alt+↓ |
@@ -64,6 +64,8 @@ walks through the controls; each time you open it, it starts fresh.
 | Paste, detecting outline structure | Ctrl+V |
 | Paste as plain text, joined into the current item | Ctrl+Shift+V |
 | Insert table | Ctrl+T (in a cell: Tab moves to the next one and adds a row at the end) |
+| Insert drawing (Excalidraw; **Done** keeps it, double-click its picture to edit it again) | Ctrl+D |
+| Copy one drawing by itself | **Copy** above it, or click it and press Ctrl+C |
 | Delete an empty item / join with the line above | Backspace at the start |
 | New chapter / open a chapter | Ctrl+N / Ctrl+O |
 | Previous / next chapter of the book | Ctrl+PgUp / Ctrl+PgDn |
@@ -100,7 +102,13 @@ then the dictionary; on a misspelled word it lists fixes.
   pixels there. Rule `export.code_prefix = true` aligns them perfectly but
   TopCoding then draws a code background behind them.
 - An item is one paragraph; line breaks inside an item are not supported.
-- No drawings yet (TopCoding supports Excalidraw; see "Adding a block type").
+- Drawings are made in [Excalidraw](https://excalidraw.com), which runs inside the app
+  (offline) and needs WebKitGTK (`gir1.2-webkit-6.0`, installed with the package).
+  **Copy for TopCoding** sends a chapter that has a drawing as the editor's own
+  clipboard format (TopCoding takes drawings in no other); TopCoding's editor was
+  checked to accept it, but a real Ctrl+V from the app into Chrome has not been
+  confirmed yet. If the drawing doesn't arrive, the text and tables still do.
+  Excalidraw's shape library, Mermaid import and CJK hand-drawn font are left out.
 - Undo history lasts until the chapter is closed. For older states, **Earlier
   Versions** in the menu has copies kept when the chapter was opened and every
   10 minutes while it was edited: all from the last day, then one per hour for a
@@ -154,7 +162,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/model.py` | Node tree, tree operations, `.notz` load/save (no GTK) |
 | `notterizmus/rules.py` | Formatting defaults, user overrides, numbering formats |
 | `notterizmus/layout.py` | Tree → lines with labels and connectors |
-| `notterizmus/export.py` | Lines → HTML for TopCoding, and plain text |
+| `notterizmus/export.py`, `notterizmus/lexical.py` | Lines → HTML for TopCoding, and plain text; lines → the editor's own clipboard nodes (used when there is a drawing) |
 | `notterizmus/importer.py` | Pasted HTML/text → outline nodes |
 | `notterizmus/spell.py` | Enchant spell checker (ctypes) |
 | `notterizmus/completion.py` | Ctrl+Space word completion (chapter, book, dictionary) |
@@ -167,16 +175,18 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `notterizmus/ui/outline.py` | Editor widget: building and refreshing rows, focus, scrolling |
 | `notterizmus/ui/outline_*.py` | The editor's mixins, one theme each: `undo`, `keys`, `items`, `selection`, `clipboard`, `menus`, `assist` (spelling, Ctrl+Space), `carets` (multi-cursor) |
-| `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table) and the rich-text view |
+| `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table, drawing) and the rich-text view |
+| `notterizmus/drawing.py`, `notterizmus/ui/drawing_web.py` | Drawing blocks: the scene, its export and the preview cache (no GTK); the Excalidraw window and preview renderer (WebKitGTK) |
+| `web/drawing/`, `scripts/build-drawing-editor.sh`, `notterizmus/drawing_web/` | Source of the embedded Excalidraw page, its build script (Node.js), and the built page that ships with the app |
 | `notterizmus/ui/window.py`, `app.py` | Window, header bar, dialogs, file handling, spelling menu |
 | `data/` | Icons, desktop entry, AppStream metadata, `.notz` MIME type |
 | `debian/`, `scripts/release.sh` | Ubuntu packaging and the PPA release script |
 
-### Adding a block type (e.g. Excalidraw drawings, planned)
+### Adding a block type (as tables and drawings are)
 
 1. `model.py`: add a codec to `DATA_CODECS` for the node's `data`.
-2. `layout.py`: emit a `Line` for it (like `table`).
-3. `export.py`: HTML and plain-text output for that line kind.
+2. `layout.py`: emit a `Line` for it (like `table` and `drawing`).
+3. `export.py`: HTML and plain-text output for that line kind (`lexical.py` too, if TopCoding's editor has a node for it).
 4. `ui/rows.py`: a row widget, registered in `ROW_TYPES`.
 
 ## Releasing to the PPA

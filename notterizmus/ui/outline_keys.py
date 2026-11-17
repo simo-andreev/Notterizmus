@@ -91,6 +91,9 @@ class KeysMixin:
             if name == "t":
                 self.add_component(node, "table")
                 return True
+            if name == "d":
+                self.insert_drawing(node)
+                return True
             if name in ("Return", "KP_Enter"):
                 self.add_component(node, "next")
                 return True

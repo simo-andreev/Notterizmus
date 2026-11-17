@@ -1,8 +1,10 @@
-"""OutlineEditor, part: item types, and adding and deleting items and tables."""
+"""OutlineEditor, part: item types, and adding and deleting items, tables and drawings."""
 from __future__ import annotations
 
+from .. import drawing
 from ..model import (Node, enclosing_heading, is_text, leaf_insert_index, new_table_data, remove_promote,
                      set_kind)
+from . import drawing_web
 from .outline_selection import _top_level
 
 
@@ -49,8 +51,11 @@ class ItemsMixin:
             node.parent.insert(node.index() + 1, new)
 
     def add_component(self, node, what):
-        """what: next | child | parent | bullet:<marker> | table"""
+        """what: next | child | parent | bullet:<marker> | table | drawing"""
         if node is None or self.doc is None:
+            return
+        if what == "drawing":
+            self.insert_drawing(node)
             return
         root = self.doc.root
         h = enclosing_heading(node)
@@ -85,6 +90,60 @@ class ItemsMixin:
 
     def insert_table(self, node=None):
         self.add_component(node or self.current, "table")
+
+    # -- drawings ---------------------------------------------------------------------
+
+    def _node_by_id(self, nid):
+        return next((n for n in self.doc.root.walk() if n.id == nid), None) if self.doc else None
+
+    def _open_drawing(self, data, done):
+        if drawing_web.edit(self.get_root(), data, done) is None:
+            self.emit("message", drawing_web.MISSING)
+
+    def insert_drawing(self, node=None):
+        """Open the drawing window on an empty drawing; it becomes a block after `node`
+        (where a table would go) once the user keeps it with something in it."""
+        node = node or self.current
+        if node is None or self.doc is None:
+            return
+        anchor = node.id
+
+        def done(data):
+            target = self._node_by_id(anchor) or self.current
+            if target is None or drawing.is_empty(data):
+                return
+            with self._op():
+                self._insert_leaf(target, Node("drawing", data=data))
+                self.refresh()
+
+        self._open_drawing(drawing.new_data(), done)
+
+    def copy_drawing(self, node):
+        """Copy one drawing by itself: it is selected, as a click on it would, and copied."""
+        if node is None or node.kind != "drawing":
+            return
+        self.set_selection([node])
+        self.copy_items()
+
+    def edit_drawing(self, node):
+        if node is None or node.kind != "drawing":
+            return
+        nid = node.id
+
+        def done(data):
+            n = self._node_by_id(nid)
+            if n is None or drawing.scene(data) == drawing.scene(n.data):
+                return
+            if drawing.is_empty(data):  # everything erased: no block left to show
+                self.delete_items([n])
+                return
+            with self._op():
+                n.data = {**n.data, **drawing.scene(data)}
+                row = self.rows.get(n.id)
+                if row is not None:
+                    row.reload()
+
+        self._open_drawing(node.data, done)
 
     def delete_node(self, node):
         """Delete one item; its sub-items move up into its place."""

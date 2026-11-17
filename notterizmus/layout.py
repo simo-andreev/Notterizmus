@@ -30,7 +30,7 @@ class Seg:
 
 @dataclass
 class Line:
-    kind: str  # item | spacer | blank | table | unknown (a block from a newer version)
+    kind: str  # item | spacer | blank | table | drawing | unknown (a block from a newer version)
     prefix: list = field(default_factory=list)  # list[Seg]
     node: object = None
 
@@ -108,8 +108,8 @@ class _Layout:
         elif base and not base.endswith(" "):
             base += " "
         prefix = [self.conn(base)] if base else []
-        if c.kind == "table":
-            self.out.append(Line("table", prefix, c))
+        if c.kind in ("table", "drawing"):
+            self.out.append(Line(c.kind, prefix, c))
             return
         if c.kind not in BLOCK_KINDS:  # shown in the editor, left out of exports
             self.out.append(Line("unknown", prefix, c))

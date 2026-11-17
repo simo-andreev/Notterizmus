@@ -108,7 +108,8 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         add("spell-replace", self._spell_replace, "s")
         add("spell-add", self._spell_add, "s")
         add("spell-ignore", self._spell_ignore, "s")
-        add("drawing", lambda _: None, enabled=False)
+        add("edit-drawing", lambda _: self.edit_drawing(self._menu_node or self.current))
+        add("copy-drawing", lambda _: self.copy_drawing(self._menu_node or self.current))
         add("noop", lambda _: None, enabled=False)
         kind = Gio.SimpleAction.new_stateful("set-kind", GLib.VariantType.new("s"), GLib.Variant.new_string(""))
         kind.connect("activate", lambda a, p: self._set_kind_cmd(p.unpack()))
@@ -189,7 +190,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         wanted = []
         nlabels = 0
         for ln in layout(self.doc.root, self.rules):
-            if ln.kind in ("item", "table", "unknown"):
+            if ln.kind in ("item", "table", "drawing", "unknown"):
                 row = self._row(ln.node)
                 row.set_prefix(ln.prefix)
                 for k in ("heading", "bullet"):

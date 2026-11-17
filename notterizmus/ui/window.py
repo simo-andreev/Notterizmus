@@ -6,7 +6,7 @@ from pathlib import Path
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from .. import APP_ID, APP_NAME, VERSION, backups, guide, library, paths
-from ..export import to_html, to_plain
+from ..export import to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
 from ..rules import Rules, config_dir, user_rules_path
@@ -14,13 +14,14 @@ from ..spell import Speller, guess_language
 from . import command_search
 from .findbar import FindBar
 from .outline import OutlineEditor
+from .outline_clipboard import export_formats
 from .sidebar import ChapterSidebar
 
 RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
 SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX = 260, 180, 520  # chapter list width, px
 TEXT_ROOM = 20  # spare px beside the text column's minimum width
 ZOOM_MIN, ZOOM_MAX, ZOOM_STEP, TEXT_PT = 60, 250, 10, 11  # chapter text zoom, % and base size
-DOC_ACTIONS = ("copy", "insert-table", "show-plain", "save", "find", "replace", "find-next", "find-prev")
+DOC_ACTIONS = ("copy", "insert-table", "insert-drawing", "show-plain", "save", "find", "replace", "find-next", "find-prev")
 
 
 def notes_root():
@@ -70,6 +71,7 @@ class Window(Adw.ApplicationWindow):
         menu = Gio.Menu()
         s1 = Gio.Menu()
         s1.append("Insert Table", "win.insert-table")
+        s1.append("Insert Drawing", "win.insert-drawing")
         s1.append("Show Plain Text", "win.show-plain")
         s2 = Gio.Menu()
         s2.append("Edit Formatting Rules", "win.edit-rules")
@@ -196,6 +198,7 @@ class Window(Adw.ApplicationWindow):
 
         for name, cb in (("new", self.on_new), ("open", self.on_open), ("save", lambda *_: self.save()),
                          ("copy", self.on_copy), ("insert-table", lambda *_: self.editor.insert_table()),
+                         ("insert-drawing", lambda *_: self.editor.insert_drawing()),
                          ("show-plain", self.on_show_plain), ("edit-rules", self.on_edit_rules),
                          ("reload-rules", self.on_reload_rules), ("open-folder", self.on_open_folder),
                          ("guide", self.on_guide), ("shortcuts", self.on_shortcuts), ("about", self.on_about),
@@ -725,13 +728,10 @@ class Window(Adw.ApplicationWindow):
 
     def on_copy(self, *_):
         lines = layout(self.doc.root, self.rules)
-        html = to_html(lines, code_prefix=self.rules["export"]["code_prefix"])
-        plain = to_plain(lines)
         provider = Gdk.ContentProvider.new_union([
-            Gdk.ContentProvider.new_for_bytes("text/html", GLib.Bytes.new(html.encode("utf-8"))),
-            Gdk.ContentProvider.new_for_bytes("text/plain;charset=utf-8", GLib.Bytes.new(plain.encode("utf-8"))),
-            Gdk.ContentProvider.new_for_bytes("text/plain", GLib.Bytes.new(plain.encode("utf-8"))),
-        ])
+            Gdk.ContentProvider.new_for_bytes(mime, GLib.Bytes.new(data if isinstance(data, bytes)
+                                                                   else data.encode("utf-8")))
+            for mime, data in export_formats(lines, self.rules)])
         self.get_clipboard().set_content(provider)
         self.save(quiet=True)
         self.toast("Copied — paste into TopCoding with Ctrl+V")
@@ -1046,6 +1046,7 @@ class Window(Adw.ApplicationWindow):
                       ("Paste (detects outline structure)", "<Ctrl>v"),
                       ("Paste as plain text", "<Ctrl><Shift>v")]),
             ("Tables", [("Insert table", "<Ctrl>t"), ("Next / previous cell", "Tab <Shift>Tab")]),
+            ("Drawings", [("Insert drawing (Excalidraw)", "<Ctrl>d")]),
             ("File", [("New chapter", "<Ctrl>n"), ("Open chapter", "<Ctrl>o"), ("Save", "<Ctrl>s"),
                       ("Previous / next chapter of the book", "<Ctrl>Page_Up <Ctrl>Page_Down"),
                       ("Chapter properties: rename, number, book (on a book: rename it)", "F2"),

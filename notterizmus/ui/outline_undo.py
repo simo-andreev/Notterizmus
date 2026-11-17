@@ -6,7 +6,7 @@ import time
 from contextlib import contextmanager
 
 from ..model import Node, display_order, is_text
-from .rows import TableRow, TextRow, row_type
+from .rows import DrawingRow, TableRow, TextRow, row_type
 COALESCE = 1.5     # seconds: typing in one item within this gap is one undo step
 
 class UndoMixin:
@@ -100,6 +100,8 @@ class UndoMixin:
                 elif isinstance(r, TableRow):
                     r.header_btn.set_active(bool(n.data.get("header")))
                     r.build()
+                elif isinstance(r, DrawingRow):
+                    r.reload()
             self.rows[n.id] = r
         self.sel = []
         self.current = self.cur_view = None

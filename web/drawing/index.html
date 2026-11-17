@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- Nothing here may reach the network: the page is served from the app's own files. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:">
+<title>Drawing</title>
+<link rel="stylesheet" href="main.css">
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body { overflow: hidden; }
+  /* Excalidraw's shape library keeps its items in the browser's storage, which this page
+     doesn't have: without this it would forget them each time. */
+  .default-sidebar-trigger { display: none !important; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="env.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>

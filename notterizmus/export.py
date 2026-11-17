@@ -1,8 +1,11 @@
-"""Exporters: HTML for pasting into TopCoding (Lexical editor) and plain text."""
+"""Exporters: HTML for pasting into TopCoding (Lexical editor) and plain text.
+
+Drawings are not in the HTML; they travel as Lexical's own clipboard JSON (lexical.py)."""
 from __future__ import annotations
 
 from html import escape
 
+from . import drawing
 from .model import runs_text
 
 # Lexical collapses whitespace on paste unless the parent element is white-space: pre*.
@@ -67,6 +70,8 @@ def to_html(lines, code_prefix=False):
             flush()
             parts.append(_table_html(ln.node))
             continue
+        if ln.kind == "drawing":  # no HTML form in TopCoding's editor: see lexical.py
+            continue
         para.append(_line_html(ln, code_prefix))
     flush()
     return "".join(parts)
@@ -96,6 +101,9 @@ def to_plain(lines):
             continue
         if ln.kind == "table":
             out += _table_plain(ln.prefix_text(), ln.node)
+        elif ln.kind == "drawing":
+            if not drawing.is_empty(ln.node.data):
+                out.append(ln.prefix_text() + drawing.PLAIN_TEXT)
         else:
             out.append("".join(s.text for s in ln.segs()).rstrip())
     return "\n".join(out) + "\n"

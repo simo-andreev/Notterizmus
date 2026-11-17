@@ -11,8 +11,8 @@ from notterizmus.layout import layout
 from notterizmus.model import Document, Node
 from notterizmus.rules import Rules
 
-DRAWING = {
-    "kind": "drawing", "id": "d1",
+MINDMAP = {
+    "kind": "mindmap", "id": "d1",
     "runs": [{"t": "SECRET caption", "b": True}],
     "marker": "plus",
     "data": {"elements": [{"type": "rect", "x": 1}], "rows": "not a table"},
@@ -43,7 +43,7 @@ class UnknownBlocksTest(unittest.TestCase):
             return json.loads(path.read_text(encoding="utf-8"))
 
     def test_an_unknown_block_is_saved_back_unchanged(self):
-        d = chapter(heading("Intro", bullet("before"), copy.deepcopy(DRAWING), bullet("after")))
+        d = chapter(heading("Intro", bullet("before"), copy.deepcopy(MINDMAP), bullet("after")))
         self.assertEqual(self.roundtrip(d)["content"], d["content"])
 
     def test_unknown_fields_on_known_items_are_kept(self):
@@ -61,7 +61,7 @@ class UnknownBlocksTest(unittest.TestCase):
             lambda dr: [heading("Intro", heading("One", bullet("a"), dr))],
         ]
         for make in cases:
-            with_block = Document.from_json(chapter(*make(copy.deepcopy(DRAWING)))).root
+            with_block = Document.from_json(chapter(*make(copy.deepcopy(MINDMAP)))).root
             without = Document.from_json(chapter(*_drop_none(make(None)))).root
             lines = layout(with_block, rules)
             self.assertIn("unknown", [ln.kind for ln in lines])
@@ -71,12 +71,12 @@ class UnknownBlocksTest(unittest.TestCase):
             self.assertNotIn("SECRET", html)
 
     def test_its_children_are_not_laid_out(self):
-        root = Document.from_json(chapter(heading("Intro", copy.deepcopy(DRAWING)))).root
+        root = Document.from_json(chapter(heading("Intro", copy.deepcopy(MINDMAP)))).root
         laid = [ln.node.kind for ln in layout(root, Rules()) if ln.node is not None]
-        self.assertEqual(laid, ["heading", "drawing"])
+        self.assertEqual(laid, ["heading", "mindmap"])
 
     def test_it_holds_no_text_of_its_own(self):
-        node = Node.from_json(copy.deepcopy(DRAWING))
+        node = Node.from_json(copy.deepcopy(MINDMAP))
         self.assertEqual(node.text, "")
         self.assertEqual(node.children[0].text, "SECRET child")
 
