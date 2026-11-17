@@ -14,6 +14,9 @@ import tempfile
 from pathlib import Path
 
 SCENE_KEYS = ("elements", "appState", "files")
+# What a drawing keeps of Excalidraw's view state: only what changes how it looks
+# (APP_STATE_KEYS in web/drawing/main.jsx, which saves the drawing window's scenes).
+APP_STATE_KEYS = ("viewBackgroundColor", "gridSize", "gridStep", "gridModeEnabled")
 PREVIEW_SCALE = 2      # the PNG has this many pixels per unit of the drawing
 CACHE_KEEP = 300       # previews kept in the cache folder; the oldest go first
 PLAIN_TEXT = "[Drawing]"
@@ -43,6 +46,26 @@ def scene(data):
     """Only the scene itself, in the order Excalidraw writes it."""
     return {"elements": data.get("elements") or [], "appState": data.get("appState") or {},
             "files": data.get("files") or {}}
+
+
+def from_scene(value):
+    """A drawing's data from a scene made elsewhere (in TopCoding's editor), as the
+    drawing window would save it: erased elements, pictures no element shows and view
+    state left out. `value` is the scene or its JSON text; None if it isn't a scene."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    if not isinstance(value, dict) or not isinstance(value.get("elements"), list):
+        return None
+    elements = [e for e in value["elements"] if isinstance(e, dict) and not e.get("isDeleted")]
+    app_state = value.get("appState") if isinstance(value.get("appState"), dict) else {}
+    files = value.get("files") if isinstance(value.get("files"), dict) else {}
+    shown = {e.get("fileId") for e in elements if e.get("type") == "image"}
+    return {"elements": elements,
+            "appState": {k: app_state[k] for k in APP_STATE_KEYS if app_state.get(k) is not None},
+            "files": {k: v for k, v in files.items() if k in shown}}
 
 
 def is_empty(data):

@@ -9,8 +9,9 @@ from pathlib import Path
 
 from notterizmus import drawing, lexical
 from notterizmus.export import to_html, to_plain
+from notterizmus.importer import parse
 from notterizmus.layout import layout
-from notterizmus.model import Document, Node, can_contain
+from notterizmus.model import Document, Node, Run, can_contain
 from notterizmus.rules import Rules
 
 SCENE = {
@@ -180,6 +181,146 @@ class LexicalClipboardTest(unittest.TestCase):
         # one item, "a/b" -> "xyz": kind and byte lengths are big-endian, text is UTF-16LE unpadded, 0 ends it
         self.assertEqual(lexical.moz_custom_data({"a/b": "xyz"}).hex(),
                          "00000001" "00000006" "61002f006200" "00000006" "780079007a00" "00000000")
+
+
+class SceneFromElsewhereTest(unittest.TestCase):
+    """A scene made in TopCoding's editor, as a drawing of this app keeps it."""
+
+    def test_it_keeps_what_the_drawing_window_would_save(self):
+        image = {"type": "image", "id": "i1", "fileId": "f1", "x": 0, "y": 0, "width": 10, "height": 10}
+        made = {"elements": SCENE["elements"] + [image, {"type": "line", "id": "gone", "isDeleted": True}],
+                "appState": {"viewBackgroundColor": "#fafafa", "gridSize": None, "zoom": {"value": 2},
+                             "scrollX": 40, "selectedElementIds": {"r1": True}},
+                "files": {"f1": {"id": "f1", "dataURL": "data:image/png;base64,AA"}, "unused": {"id": "unused"}}}
+        data = drawing.from_scene(json.dumps(made))
+        self.assertEqual([e["id"] for e in data["elements"]], ["r1", "t1", "i1"], "erased elements are left out")
+        self.assertEqual(data["appState"], {"viewBackgroundColor": "#fafafa"}, "and the view: zoom, scroll, selection")
+        self.assertEqual(list(data["files"]), ["f1"], "and pictures nothing shows")
+        self.assertEqual(drawing.from_scene(made), data, "the scene itself or its JSON text")
+
+    def test_anything_else_is_not_a_scene(self):
+        for value in (None, "", "not json", "[]", "{}", {"elements": "x"}, 3):
+            self.assertIsNone(drawing.from_scene(value), value)
+        self.assertEqual(drawing.from_scene({"elements": [1, "x"], "appState": [], "files": None}),
+                         {"elements": [], "appState": {}, "files": {}})
+
+
+def editor_text(text, fmt=0):
+    return {"detail": 0, "format": fmt, "mode": "normal", "style": "", "text": text, "type": "text", "version": 1}
+
+
+def editor_paragraph(*children):
+    return {"children": list(children), "direction": "ltr", "format": "", "indent": 0, "type": "paragraph",
+            "version": 1, "textFormat": 0, "textStyle": ""}
+
+
+def editor_drawing(scene=None):
+    return {"data": json.dumps(scene or SCENE), "type": "excalidraw", "version": 1}
+
+
+def editor_cell(text, header=0):
+    return {"children": [editor_paragraph(editor_text(text))], "type": "tablecell", "headerState": header,
+            "colSpan": 1, "rowSpan": 1, "backgroundColor": None, "version": 1}
+
+
+BR = {"type": "linebreak", "version": 1}
+BOLD, ITALIC = lexical.BOLD, lexical.ITALIC
+
+
+def editor_copy(nodes, browser="chrome"):
+    """A copy from TopCoding's editor as the browser leaves it on the clipboard."""
+    items = {"text/html": "<p>ignored</p>",
+             lexical.LEXICAL_MIME: json.dumps({"namespace": "SummaryEditor", "nodes": nodes})}
+    if browser == "chrome":
+        return lexical.CHROME_CUSTOM_MIME, lexical.web_custom_data(items)
+    return lexical.FIREFOX_CUSTOM_MIME, lexical.moz_custom_data(items)
+
+
+class LexicalPasteTest(unittest.TestCase):
+    """Ctrl+V of a copy from TopCoding's editor: its drawings are only in the editor's
+    JSON, so a copy that has one is read from there."""
+
+    def items(self, nodes, browser="chrome"):
+        return lexical.pasted_items(*editor_copy(nodes, browser))
+
+    def outline(self, items):
+        def show(n):
+            if n.kind == "drawing":
+                return ("drawing", [e["id"] for e in n.data["elements"]])
+            return (n.kind, n.text, [show(c) for c in n.children])
+        return [show(n) for n in parse(items, Rules())]
+
+    def test_text_tables_and_drawings_arrive_in_order_as_the_html_would_give_them(self):
+        nodes = [editor_paragraph(editor_text("Ⅰ) "), editor_text("Intro", BOLD), BR,
+                                  editor_text("├ • "), editor_text("before", ITALIC)),
+                 editor_drawing(),
+                 editor_paragraph(editor_text("└ • after")),
+                 {"type": "table", "version": 1, "children": [
+                     {"type": "tablerow", "version": 1, "children": [editor_cell("k", 3), editor_cell("v", 1)]},
+                     {"type": "tablerow", "version": 1, "children": [editor_cell("1"), {
+                         "type": "tablecell", "headerState": 0, "children": [
+                             editor_paragraph(editor_text("two ")), editor_paragraph(editor_text("lines", BOLD))]}]}]}]
+        for browser in ("chrome", "firefox"):
+            items = self.items(nodes, browser)
+            self.assertEqual([it[0] for it in items], ["line", "line", "drawing", "line", "table"], browser)
+            self.assertEqual(items[0][1], [Run("Ⅰ) "), Run("Intro", bold=True)])
+            self.assertEqual(items[1][1], [Run("├ • "), Run("before", italic=True)])
+            self.assertEqual(items[2][1], drawing.from_scene(SCENE))
+            _kind, rows, header = items[4]
+            self.assertTrue(header)
+            self.assertEqual(rows, [[[Run("k")], [Run("v")]], [[Run("1")], [Run("two "), Run("lines", bold=True)]]],
+                             "a cell's paragraphs are joined, as in the HTML")
+
+    def test_the_outline_is_worked_out_with_the_drawing_in_its_place(self):
+        nodes = [editor_paragraph(editor_text("Ⅰ) Intro"), BR, editor_text("├ • before")), editor_drawing(),
+                 editor_paragraph(editor_text("└ • after"), BR, editor_text("Ⅱ) Next"))]
+        self.assertEqual(self.outline(self.items(nodes)),
+                         [("heading", "Intro", [("bullet", "before", []), ("drawing", ["r1", "t1"]),
+                                                ("bullet", "after", [])]),
+                          ("heading", "Next", [])])
+
+    def test_copy_for_topcoding_pastes_back_with_its_drawing(self):
+        doc = Document.from_json(chapter(heading("Intro", bullet("before"), drawing_json(), bullet("after")),
+                                         heading("Next")))
+        offered = dict(lexical.clipboard_data(layout(doc.root, Rules())))
+        for mime in (lexical.CHROME_CUSTOM_MIME, lexical.FIREFOX_CUSTOM_MIME):
+            self.assertEqual(self.outline(lexical.pasted_items(mime, offered[mime])),
+                             [("heading", "Intro", [("bullet", "before", []), ("drawing", ["r1", "t1"]),
+                                                    ("bullet", "after", [])]),
+                              ("heading", "Next", [])], mime)
+
+    def test_a_drawing_copied_by_itself(self):
+        self.assertEqual(self.items([editor_drawing()]), [("drawing", drawing.from_scene(SCENE))])
+
+    def test_text_copied_from_inside_a_paragraph_is_one_line(self):
+        items = self.items([editor_text("half "), editor_text("bold", BOLD), editor_drawing()])
+        self.assertEqual(items[0], ("line", [Run("half "), Run("bold", bold=True)]))
+
+    def test_without_a_drawing_the_html_is_used(self):
+        self.assertIsNone(self.items([editor_paragraph(editor_text("Ⅰ) Intro"))]))
+        self.assertIsNone(self.items([editor_paragraph(editor_text("x")), editor_drawing({"elements": []})]),
+                          "an empty drawing")
+
+    def test_an_unreadable_drawing_is_left_out(self):
+        broken = {"type": "excalidraw", "data": "{broken"}
+        items = self.items([editor_paragraph(editor_text("text")), broken, editor_drawing()])
+        self.assertEqual([it[0] for it in items], ["line", "drawing"])
+        self.assertIsNone(self.items([editor_paragraph(editor_text("text")), broken]), "with no other: the HTML")
+
+    def test_data_that_cannot_be_read_gives_nothing(self):
+        chrome = editor_copy([editor_drawing()])[1]
+        firefox = editor_copy([editor_drawing()], "firefox")[1]
+        for mime, data in ((lexical.CHROME_CUSTOM_MIME, chrome[:-10]), (lexical.CHROME_CUSTOM_MIME, b"\1\2"),
+                           (lexical.FIREFOX_CUSTOM_MIME, firefox[:30]), (lexical.FIREFOX_CUSTOM_MIME, b""),
+                           (lexical.CHROME_CUSTOM_MIME, lexical.web_custom_data({lexical.LEXICAL_MIME: "{no"})),
+                           (lexical.CHROME_CUSTOM_MIME, lexical.web_custom_data({"text/uri-list": "x"}))):
+            self.assertIsNone(lexical.pasted_items(mime, data), data[:20])
+
+    def test_padding_after_the_data_is_allowed(self):
+        mime, data = editor_copy([editor_drawing()])
+        self.assertIsNotNone(lexical.pasted_items(mime, data + b"\0\0\0\0"))
+        mime, data = editor_copy([editor_drawing()], "firefox")
+        self.assertIsNotNone(lexical.pasted_items(mime, data + b"\0\0"))
 
 
 class PreviewCacheTest(unittest.TestCase):

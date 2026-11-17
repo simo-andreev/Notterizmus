@@ -40,12 +40,12 @@ TopCoding (`app.topcoding.bg/assignments`).
 - **Copy for TopCoding** (Ctrl+Shift+C) copies HTML that TopCoding's editor keeps as-is: spacing, bold, italic and real tables, with plain text as a fallback. A chapter with drawings is also offered in the editor's own clipboard format, which carries them as Excalidraw scenes (`[Drawing]` in the plain text).
 - Ctrl+V works out the outline structure when pasting:
   - from the app's own output
-  - from TopCoding's HTML
+  - from TopCoding's HTML; a copy there that has a drawing is read from the editor's own clipboard format instead, so the drawings arrive too (Chrome and Firefox)
   - from hand-written notes (`Ⅱ.1)`, `II.1)`, `2.1)`, bullets)
 
   Pasted items are renumbered to fit where they land.
 - Text with no outline markers, such as paragraphs from a PDF, goes into the current item as one paragraph. Words hyphenated across lines are re-joined. A notification offers **One Item per Paragraph**.
-- A table copied on its own (from a web page, say), or together with such text, is added after the current item.
+- A table copied on its own (from a web page, say), or together with such text, is added after the current item. So is a drawing copied by itself in TopCoding.
 - Ctrl+Shift+V pastes as plain text, joined into the current item.
 - Items copied inside the app paste back with their exact structure.
 

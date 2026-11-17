@@ -1,4 +1,5 @@
-"""OutlineEditor, part: copy, cut and paste of items and text (the app's own JSON, HTML, plain text)."""
+"""OutlineEditor, part: copy, cut and paste of items and text (the app's own JSON, TopCoding's editor's
+JSON, HTML, plain text)."""
 from __future__ import annotations
 
 import json
@@ -7,7 +8,7 @@ from gi.repository import Gdk, Gio, GLib
 
 from .. import lexical
 from ..export import runs_html, to_html, to_plain
-from ..importer import html_items, join_lines, parse, table_nodes, text_items
+from ..importer import block_nodes, html_items, join_lines, parse, text_items
 from ..layout import layout
 from ..model import (Node, Run, can_contain, enclosing_heading, fresh_ids, leaf_insert_index, runs_from_json,
                      runs_text, runs_to_json)
@@ -17,6 +18,8 @@ from .outline_selection import _top_level
 NODES_MIME = "application/x-notterizmus-nodes+json"
 RUNS_MIME = "application/x-notterizmus-runs+json"
 TEXT_MIMES = ["text/plain;charset=utf-8", "text/plain"]
+# A copy from TopCoding's editor: read first, and used only when it has a drawing.
+EDITOR_MIMES = [lexical.CHROME_CUSTOM_MIME, lexical.FIREFOX_CUSTOM_MIME]
 
 
 def _bytes(s):
@@ -94,13 +97,21 @@ class ClipboardMixin:
         self.clear_selection()
         cb = self.get_clipboard()
         formats = cb.get_formats()
-        order = TEXT_MIMES if plain else [NODES_MIME, RUNS_MIME, "text/html"] + TEXT_MIMES
-        mime = next((m for m in order if formats.contain_mime_type(m)), None)
+        order = TEXT_MIMES if plain else [NODES_MIME, RUNS_MIME, *EDITOR_MIMES, "text/html"] + TEXT_MIMES
         ctx = (row.node.id, view.cursor_offset(), view.selection_offsets())
-        if mime is None:
+        self._read_clip(cb, [m for m in order if formats.contain_mime_type(m)], ctx, plain)
+
+    def _read_clip(self, cb, mimes, ctx, plain):
+        """Read the first of `mimes` (the clipboard's formats, best first) and paste it."""
+        if not mimes:
             cb.read_text_async(None, self._on_clip_text, (ctx, plain))
             return
-        cb.read_async([mime], GLib.PRIORITY_DEFAULT, None, self._on_clip_stream, (ctx, plain))
+        cb.read_async(mimes[:1], GLib.PRIORITY_DEFAULT, None, self._on_clip_stream, (ctx, plain, mimes))
+
+    def _without_editor_json(self, cb, mimes, ctx, plain):
+        """Go on to the HTML and text after a copy from TopCoding's editor that holds no
+        drawing, or can't be read."""
+        self._read_clip(cb, [m for m in mimes if m not in EDITOR_MIMES], ctx, plain)
 
     def _on_clip_text(self, cb, res, data):
         ctx, plain = data
@@ -112,26 +123,43 @@ class ClipboardMixin:
             self._pasted(ctx, "text/plain", text, plain)
 
     def _on_clip_stream(self, cb, res, data):
-        ctx, plain = data
+        ctx, plain, mimes = data
         try:
-            stream, mime = cb.read_finish(res)
+            stream, _mime = cb.read_finish(res)
         except GLib.Error as e:
-            self.emit("message", f"Paste failed: {e.message}")
+            if mimes[0] in EDITOR_MIMES:
+                self._without_editor_json(cb, mimes, ctx, plain)
+            else:
+                self.emit("message", f"Paste failed: {e.message}")
             return
         out = Gio.MemoryOutputStream.new_resizable()
         out.splice_async(stream, Gio.OutputStreamSpliceFlags.CLOSE_SOURCE | Gio.OutputStreamSpliceFlags.CLOSE_TARGET,
-                         GLib.PRIORITY_DEFAULT, None, self._on_clip_data, (ctx, plain, mime))
+                         GLib.PRIORITY_DEFAULT, None, self._on_clip_data, (cb, ctx, plain, mimes))
 
     def _on_clip_data(self, out, res, data):
-        ctx, plain, mime = data
+        cb, ctx, plain, mimes = data
+        mime = mimes[0]
         try:
             out.splice_finish(res)
         except GLib.Error as e:
-            self.emit("message", f"Paste failed: {e.message}")
+            if mime in EDITOR_MIMES:
+                self._without_editor_json(cb, mimes, ctx, plain)
+            else:
+                self.emit("message", f"Paste failed: {e.message}")
             return
-        self._pasted(ctx, mime, _decode(out.steal_as_bytes().get_data() or b""), plain)
+        raw = out.steal_as_bytes().get_data() or b""
+        if mime in EDITOR_MIMES:
+            items = lexical.pasted_items(mime, raw)
+            if items is None:
+                self._without_editor_json(cb, mimes, ctx, plain)
+            else:
+                self._pasted(ctx, mime, None, plain, items)
+            return
+        self._pasted(ctx, mime, _decode(raw), plain)
 
-    def _pasted(self, ctx, mime, text, plain):
+    def _pasted(self, ctx, mime, text, plain, items=None):
+        """Paste clipboard content of type `mime`: its text, or for a copy from
+        TopCoding's editor, the items read from it."""
         fid, off, selo = ctx
         row = self.rows.get(fid)
         if not isinstance(row, TextRow):
@@ -150,7 +178,8 @@ class ClipboardMixin:
             with self._op():
                 v.insert_runs(runs_from_json(json.loads(text)))
             return
-        items = html_items(text) if mime == "text/html" else text_items(text)
+        if items is None:
+            items = html_items(text) if mime == "text/html" else text_items(text)
         lines = [it[1] for it in items if it[0] == "line"]
         while lines and not runs_text(lines[-1]).strip():
             lines.pop()
@@ -160,19 +189,19 @@ class ClipboardMixin:
             with self._op():
                 v.insert_runs([Run(runs_text(join_lines(lines)))])
             return
-        has_table = any(it[0] == "table" for it in items)
-        if len(lines) <= 1 and not has_table:
+        has_block = any(it[0] in ("table", "drawing") for it in items)
+        if len(lines) <= 1 and not has_block:
             with self._op():
                 v.insert_runs(lines[0] if lines else [])
             return
         forest = parse(items, self.rules)
         if forest is None:
             # plain paragraphs: keep them together in this item (formatting kept); a table
-            # copied on its own or with such text goes after the item
+            # or drawing copied on its own or with such text goes after the item
             with self._op():
                 if lines:
                     v.insert_runs(join_lines(lines))
-                self._insert_tables(node, table_nodes(items))
+                self._insert_blocks(node, block_nodes(items))
             paras, cur = [], []
             for l in lines + [[]]:
                 if runs_text(l).strip():
@@ -182,7 +211,7 @@ class ClipboardMixin:
                     cur = []
             if len(paras) > 1:
                 self.emit("toast", f"Pasted {len(paras)} paragraphs into one item", "One Item per Paragraph",
-                          lambda: self._resplit(ctx, paras, table_nodes(items)))
+                          lambda: self._resplit(ctx, paras, block_nodes(items)))
             return
         count = sum(1 for top in forest for _ in top.walk())
         self.insert_forest(node, forest)
@@ -190,30 +219,34 @@ class ClipboardMixin:
         self.emit("toast", f"Pasted {count} items as an outline", "Paste as Plain Text",
                   lambda: self._replace_with_plain(ctx, plain_text))
 
-    def _resplit(self, ctx, lines, tables=()):
+    def _resplit(self, ctx, lines, blocks=()):
         self.undo()
         row = self.rows.get(ctx[0])
         if isinstance(row, TextRow):
             row.view.set_cursor(ctx[1])
-            self._paste_lines(row.node, row.view, lines, tables)
+            self._paste_lines(row.node, row.view, lines, blocks)
 
-    def _insert_tables(self, node, tables):
-        """Put pasted tables after node, where Ctrl+T would put one, and the cursor in the
-        last; False if there are none. Call inside _op()."""
+    def _insert_blocks(self, node, blocks, focus=None):
+        """Put pasted tables and drawings after node, where Ctrl+T and Ctrl+D put one.
+        The cursor goes into the last table; when a drawing comes last (no cursor can be
+        in one), to the end of `focus`, or it stays where it is. Call inside _op()."""
         after = node
-        for t in tables:
-            self._insert_leaf(after, t)
+        for blk in blocks:
+            self._insert_leaf(after, blk)
             if node.kind != "heading":  # under a numbered item they line up by themselves
-                after = t
-        if tables:
-            self.refresh(focus=tables[-1], offset=0)
-        return bool(tables)
+                after = blk
+        if blocks and blocks[-1].kind == "table":
+            self.refresh(focus=blocks[-1], offset=0)
+        elif focus is not None:
+            self.refresh(focus=focus, offset=-1)
+        elif blocks:
+            self.refresh()
 
     def _replace_with_plain(self, ctx, text):
         self.undo()
         self._pasted(ctx, "text/plain", text, True)
 
-    def _paste_lines(self, node, v, lines, tables=()):
+    def _paste_lines(self, node, v, lines, blocks=()):
         if not lines:
             return
         with self._op():
@@ -225,8 +258,7 @@ class ClipboardMixin:
                            marker=node.marker)
                 prev.parent.insert(prev.index() + 1, new)
                 prev = new
-            if not self._insert_tables(prev, tables):
-                self.refresh(focus=prev, offset=-1)
+            self._insert_blocks(prev, blocks, focus=prev)
 
     def insert_forest(self, anchor, forest):
         if not forest:

@@ -87,7 +87,8 @@ indentation) and renumbers everything; the notification offers **Paste as Plain
 Text** to undo that. Text without outline markers, such as paragraphs from a PDF,
 goes into the current item as one paragraph with line-break hyphenation removed;
 the notification offers **One Item per Paragraph**. A table copied on its own, or
-with such text, is added after the item.
+with such text, is added after the item. A copy from TopCoding's notes brings its
+drawings along, in their places; a drawing copied by itself is added after the item.
 
 **Spelling.** The language button in the header bar (e.g. `EN-US`) switches
 language or turns checking off. A new chapter picks its language from its text,
@@ -162,7 +163,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/model.py` | Node tree, tree operations, `.notz` load/save (no GTK) |
 | `notterizmus/rules.py` | Formatting defaults, user overrides, numbering formats |
 | `notterizmus/layout.py` | Tree → lines with labels and connectors |
-| `notterizmus/export.py`, `notterizmus/lexical.py` | Lines → HTML for TopCoding, and plain text; lines → the editor's own clipboard nodes (used when there is a drawing) |
+| `notterizmus/export.py`, `notterizmus/lexical.py` | Lines → HTML for TopCoding, and plain text; lines → the editor's own clipboard nodes (used when there is a drawing), and those nodes back into pasted items |
 | `notterizmus/importer.py` | Pasted HTML/text → outline nodes |
 | `notterizmus/spell.py` | Enchant spell checker (ctypes) |
 | `notterizmus/completion.py` | Ctrl+Space word completion (chapter, book, dictionary) |

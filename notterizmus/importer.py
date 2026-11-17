@@ -7,6 +7,7 @@ by indentation. Numbering is regenerated, so pasted labels never go stale.
 """
 from __future__ import annotations
 
+import copy
 import re
 from html.parser import HTMLParser
 
@@ -206,8 +207,8 @@ def parse(items, rules):
     markers = sorted(_marker_map(rules).items(), key=lambda kv: -len(kv[0]))
     parsed = []
     for it in items:
-        if it[0] == "table":
-            parsed.append(("table", it[1], it[2]))
+        if it[0] in ("table", "drawing"):
+            parsed.append(it)
             continue
         runs = it[1]
         text = runs_text(runs)
@@ -252,8 +253,8 @@ def parse(items, rules):
             n = Node("bullet", p[2], marker=p[3])
             attach(parent, n)
             bstack.append((ind, n))
-        else:
-            attach(hstack[-1] if hstack else None, table_node(p[1], p[2]))
+        else:  # a table or a drawing: under the numbered item, where Ctrl+T or Ctrl+D puts one
+            attach(hstack[-1] if hstack else None, block_node(p))
     return forest
 
 
@@ -262,9 +263,14 @@ def table_node(rows, header=False):
     return Node("table", data={"header": bool(header), "rows": _square(rows)})
 
 
-def table_nodes(items):
-    """The tables among pasted items, as nodes."""
-    return [table_node(it[1], it[2]) for it in items if it[0] == "table"]
+def block_node(item):
+    """A table or drawing node from a pasted ("table", rows, header) or ("drawing", data) item."""
+    return table_node(item[1], item[2]) if item[0] == "table" else Node("drawing", data=copy.deepcopy(item[1]))
+
+
+def block_nodes(items):
+    """The tables and drawings among pasted items, as nodes, in order."""
+    return [block_node(it) for it in items if it[0] in ("table", "drawing")]
 
 
 def _square(rows):
