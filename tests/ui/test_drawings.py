@@ -34,6 +34,12 @@ def png(width, height):
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
+def png_size(data):
+    """(width, height) of a PNG, from its header."""
+    import struct
+    return struct.unpack(">II", data[16:24])
+
+
 def scene(text="one", x=10):
     return {"elements": [{"type": "rectangle", "id": "r1", "x": x, "y": 10, "width": 200, "height": 80},
                          {"type": "text", "id": "t1", "x": 30, "y": 35, "width": 160, "height": 25, "fontSize": 20,
@@ -196,12 +202,11 @@ class DrawingRowTest(DrawingTestCase):
         doc = ui.open_chapter([h("Intro", block(data), b("after"))])
         pic = ui.row(doc.root.children[0].children[0]).picture
         ui.settle()
-        from notterizmus.ui.rows import PREVIEW_MAX
-        self.assertLessEqual(pic.get_width(), PREVIEW_MAX[0])
+        self.assertLessEqual(pic.get_width(), drawing.PREVIEW_MAX[0])
         paintable = pic.get_paintable()
         self.assertEqual((paintable.get_intrinsic_width(), paintable.get_intrinsic_height()),
-                         (PREVIEW_MAX[0], round(PREVIEW_MAX[0] / 3)))
-        self.assertEqual(pic.get_height(), round(PREVIEW_MAX[0] / 3))
+                         (drawing.PREVIEW_MAX[0], round(drawing.PREVIEW_MAX[0] / 3)))
+        self.assertEqual(pic.get_height(), round(drawing.PREVIEW_MAX[0] / 3))
 
     def test_a_missing_picture_is_made_from_the_scene(self):
         _doc, _before, node, _after = self.open(scene("uncached"), cached=False)
@@ -491,6 +496,30 @@ class RealDrawingWindowTest(ui.UITestCase):
         self.assertEqual(kept["elements"][1]["text"], "edited in Excalidraw")
         self.assertTrue(drawing.preview_path(kept).read_bytes().startswith(b"\x89PNG"))
         ui.wait_for(lambda: not win.get_visible(), "the drawing window to close")
+
+    def test_a_preview_is_made_at_twice_the_size_it_is_shown_at(self):
+        """Twice the drawing's own size made PNGs of 5000 px and more for large drawings,
+        slow to export and to decode (R29b). Both the preview page and Done cap it."""
+        wide = {"elements": [{"type": "rectangle", "id": "w1", "x": 0, "y": 0, "width": 3000, "height": 400}],
+                "appState": {"viewBackgroundColor": "#ffffff"}, "files": {}}
+        for data in (scene("small"), wide):
+            drawing.preview_path(data).unlink(missing_ok=True)
+        got = []
+        self.web.render(scene("small"), got.append)
+        self.web.render(wide, got.append)
+        ui.wait_for(lambda: len(got) == 2, "the previews", timeout=60)
+        self.assertGreaterEqual(png_size(got[0])[0], 2 * 200, "a small drawing has 2 pixels per unit")
+        width, height = png_size(got[1])
+        self.assertEqual(width, 1520)  # drawing.PREVIEW_PIXELS
+        self.assertAlmostEqual(height, 1520 * (400 + 24) / (3000 + 24), delta=3)  # 12 px of padding around it
+
+        done = []
+        win = self.web.edit(self.win, wide, done.append)
+        self.addCleanup(lambda: win.destroy())
+        ui.wait_for(lambda: win.done_btn.get_sensitive(), "Excalidraw to start", timeout=60)
+        win.finish()
+        ui.wait_for(lambda: done, "the scene", timeout=60)
+        self.assertEqual(png_size(drawing.preview_path(done[0]).read_bytes())[0], 1520)
 
 
 if __name__ == "__main__":

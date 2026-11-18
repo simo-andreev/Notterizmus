@@ -1,6 +1,7 @@
 """Drawing blocks without GTK: the file format, the outline's lines, the exports and the
 preview cache."""
 import copy
+import hashlib
 import json
 import os
 import tempfile
@@ -332,6 +333,15 @@ class PreviewCacheTest(unittest.TestCase):
         moved = copy.deepcopy(SCENE)
         moved["elements"][0]["x"] = 11
         self.assertNotEqual(drawing.preview_key(moved), key)
+
+    def test_previews_made_before_they_were_capped_are_not_used(self):
+        """Version 1 keys hashed the scene alone; those PNGs were made at twice the drawing's
+        size, however large (R29b), so they are made again."""
+        canonical = json.dumps(drawing.scene(SCENE), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        self.assertNotEqual(drawing.preview_key(SCENE), hashlib.sha1(canonical.encode("utf-8")).hexdigest())
+
+    def test_the_largest_preview_is_twice_the_largest_shown_size(self):
+        self.assertEqual(drawing.PREVIEW_PIXELS, (1520, 1200))
 
     def test_a_stored_preview_is_found_again(self):
         with tempfile.TemporaryDirectory() as tmp:
