@@ -1,6 +1,8 @@
 """A small GtkTextView with bold/italic runs, spell-check underlines and extra carets."""
 from __future__ import annotations
 
+import weakref
+
 from gi.repository import Gdk, GLib, GObject, Graphene, Gtk, Pango
 
 from ..model import Run, normalize_runs
@@ -8,6 +10,16 @@ from ..spell import WORD_RE, should_check
 
 # Shared spell-check state, set by the editor: {"speller": Speller|None, "enabled": bool}
 SPELL = {"speller": None, "enabled": False}
+
+
+def _weak(method):
+    """A handler that calls `method` while its object lives, without keeping it alive."""
+    ref = weakref.WeakMethod(method)
+
+    def handler(*args):
+        m = ref()
+        return None if m is None else m(*args)
+    return handler
 
 
 class RichText(Gtk.TextView):
@@ -40,12 +52,14 @@ class RichText(Gtk.TextView):
         self.last_edit = None  # ("ins"|"del", text, start offset) for undo grouping
         self._size_fix = None
         self._expect_w = None  # the width the next allocation brings (expect_width_change)
-        buf.connect("insert-text", self._before_insert)
-        buf.connect_after("insert-text", self._after_insert)
-        buf.connect("changed", self._on_changed)
-        buf.connect("mark-set", self._on_mark_set)
-        buf.connect_after("apply-tag", self._on_tag)
-        buf.connect_after("remove-tag", self._on_tag)
+        # The view owns its buffer, so these handlers hold the view only weakly: holding
+        # it would make a cycle Python's garbage collector can't see (rows.row_of).
+        buf.connect("insert-text", _weak(self._before_insert))
+        buf.connect_after("insert-text", _weak(self._after_insert))
+        buf.connect("changed", _weak(self._on_changed))
+        buf.connect("mark-set", _weak(self._on_mark_set))
+        buf.connect_after("apply-tag", _weak(self._on_tag))
+        buf.connect_after("remove-tag", _weak(self._on_tag))
 
     # -- content -------------------------------------------------------------
 

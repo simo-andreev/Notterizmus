@@ -1,6 +1,8 @@
 """Row widgets, one per node kind. Register new kinds in ROW_TYPES."""
 from __future__ import annotations
 
+import weakref
+
 from gi.repository import Gdk, GLib, GObject, Gtk
 
 from .. import drawing
@@ -49,22 +51,45 @@ def shortcut_keyval(keyval, keycode, state):
     return min(latin)[2] if latin else keyval
 
 
-def wire_view(editor, row, view):
+def row_of(widget):
+    """The row a widget is in, or None.
+
+    Handlers on a row's widgets look their row up this way when the event comes; they must
+    not hold it, nor the widget they are on. Such a handler belongs to a widget the row
+    owns, so holding the row makes a cycle through GTK, where Python's garbage collector
+    can't see it, and the row would never be freed (R29c): every row of every chapter
+    opened, with its text and a drawing's picture. Holding the editor is fine."""
+    return widget.get_ancestor(_PrefixRow)
+
+
+def _in_row(f):
+    """A signal handler that calls f(row, widget, source, *args): `widget` is the one the
+    signal came from (the controller's widget for a controller) and `row` the row it is
+    in, both found when the signal comes (see row_of). Outside a row it does nothing."""
+    def handler(source, *args):
+        widget = source.get_widget() if isinstance(source, Gtk.EventController) else source
+        row = row_of(widget) if widget is not None else None
+        return False if row is None else f(row, widget, source, *args)
+    return handler
+
+
+def wire_view(editor, view):
     """Shared input handling for every RichText that belongs to a row."""
     keys = Gtk.EventControllerKey()
     keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-    keys.connect("key-pressed", lambda _c, kv, kc, st: editor.on_key(row, view, shortcut_keyval(kv, kc, st), st))
+    keys.connect("key-pressed", _in_row(lambda row, v, _c, kv, kc, st:
+                                        editor.on_key(row, v, shortcut_keyval(kv, kc, st), st)))
     keys.connect("key-released", lambda _c, kv, _kc, st: editor.on_key_released(kv))
     view.add_controller(keys)
     focus = Gtk.EventControllerFocus()
-    focus.connect("enter", lambda *_: editor.set_current(row.node, view))
+    focus.connect("enter", _in_row(lambda row, v, _c: editor.set_current(row.node, v)))
     view.add_controller(focus)
     click = Gtk.GestureClick(button=0)
     click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-    click.connect("pressed", lambda g, _n, x, y: editor.on_click(row, view, g, x, y))
+    click.connect("pressed", _in_row(lambda row, v, g, _n, x, y: editor.on_click(row, v, g, x, y)))
     view.add_controller(click)
-    view.connect("paste-clipboard", lambda v: (v.stop_emission_by_name("paste-clipboard"),
-                                               editor.paste(row, v)))
+    view.connect("paste-clipboard", _in_row(lambda row, v, _v: (v.stop_emission_by_name("paste-clipboard"),
+                                                                editor.paste(row, v))))
     view.connect("copy-clipboard", lambda v: editor.copy_text(v, cut=False) and v.stop_emission_by_name("copy-clipboard"))
     view.connect("cut-clipboard", lambda v: editor.copy_text(v, cut=True) and v.stop_emission_by_name("cut-clipboard"))
     editor.track_cursor(view)
@@ -81,7 +106,7 @@ class _PrefixRow(Gtk.Box):
         self.prefix.set_cursor_from_name("pointer")
         self.prefix.set_tooltip_text("Item menu")
         click = Gtk.GestureClick(button=0)
-        click.connect("released", lambda *_: editor.show_item_menu(self))
+        click.connect("released", _in_row(lambda row, *_: editor.show_item_menu(row)))
         self.prefix.add_controller(click)
         self.append(self.prefix)
 
@@ -99,11 +124,11 @@ class TextRow(_PrefixRow):
         super().__init__(editor, node)
         self.view = RichText()
         self.view.set_runs(node.runs)
-        self.view.connect("content-changed", self._on_changed)
-        wire_view(editor, self, self.view)
+        self.view.connect("content-changed", _in_row(lambda row, v, _v: row._on_changed(v)))
+        wire_view(editor, self.view)
         self.append(self.view)
         self._markup = None
-        self.connect("map", lambda *_: GLib.timeout_add(20, lambda: (self.view.queue_resize(), False)[1]))
+        self.connect("map", lambda r: GLib.timeout_add(20, lambda: (r.view.queue_resize(), False)[1]))
 
     def set_prefix(self, segs):
         """The text takes the row's width beside the prefix, so a wider prefix (Tab adds a
@@ -144,21 +169,21 @@ class TableRow(_PrefixRow):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True)
         bar = Gtk.Box(spacing=2)
         bar.add_css_class("table-bar")
-        for label, tip, cb in (("+ Row", "Add row below", self.add_row),
-                               ("+ Column", "Add column right", self.add_col),
-                               ("− Row", "Remove row", self.del_row),
-                               ("− Column", "Remove column", self.del_col)):
+        for label, tip, name in (("+ Row", "Add row below", "add_row"),
+                                 ("+ Column", "Add column right", "add_col"),
+                                 ("− Row", "Remove row", "del_row"),
+                                 ("− Column", "Remove column", "del_col")):
             b = Gtk.Button(label=label, tooltip_text=tip)
             b.add_css_class("flat")
-            b.connect("clicked", lambda _b, f=cb: f())
+            b.connect("clicked", _in_row(lambda row, *_, name=name: getattr(row, name)()))
             bar.append(b)
         self.header_btn = Gtk.ToggleButton(label="Header row", active=bool(node.data.get("header")))
         self.header_btn.add_css_class("flat")
-        self.header_btn.connect("toggled", self._toggle_header)
+        self.header_btn.connect("toggled", _in_row(lambda row, btn, _b: row._toggle_header(btn)))
         bar.append(self.header_btn)
         rm = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete table")
         rm.add_css_class("flat")
-        rm.connect("clicked", lambda _b: editor.delete_items([self.node]))
+        rm.connect("clicked", _in_row(lambda row, *_: editor.delete_items([row.node])))
         bar.append(rm)
         self.grid = Gtk.Grid(halign=Gtk.Align.START)
         self.grid.add_css_class("ntz-table")
@@ -167,7 +192,7 @@ class TableRow(_PrefixRow):
         self.append(box)
         # Text views inside a Grid finish their layout after the first measure;
         # re-queue so the grid picks up the real cell heights.
-        self.connect("map", lambda *_: GLib.timeout_add(30, self._requeue))
+        self.connect("map", lambda r: GLib.timeout_add(30, r._requeue))
         self.build()
 
     def _requeue(self):
@@ -196,13 +221,14 @@ class TableRow(_PrefixRow):
                 rt.add_css_class("cell")
                 if header and r == 0:
                     rt.add_css_class("header-cell")
-                rt.connect("content-changed", self._cell_changed, r, c)
+                rt.connect("content-changed", _in_row(lambda row, v, _v, r=r, c=c: row._cell_changed(v, r, c)))
                 keys = Gtk.EventControllerKey()
                 keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-                keys.connect("key-pressed", self._cell_key, rt, r, c)
+                keys.connect("key-pressed", _in_row(lambda row, v, k, kv, kc, st, r=r, c=c:
+                                                    row._cell_key(k, kv, kc, st, v, r, c)))
                 rt.add_controller(keys)
                 fc = Gtk.EventControllerFocus()
-                fc.connect("enter", self._cell_focus, rt, r, c)
+                fc.connect("enter", _in_row(lambda row, v, fc, r=r, c=c: row._cell_focus(fc, v, r, c)))
                 rt.add_controller(fc)
                 self.editor.track_cursor(rt)
                 self.grid.attach(rt, c, r, 1, 1)
@@ -363,22 +389,22 @@ class DrawingRow(_PrefixRow):
         edit = Gtk.Button(label="Edit Drawing", tooltip_text="Open the drawing in Excalidraw (or double-click it)")
         # (a single click on the picture selects it)
         edit.add_css_class("flat")
-        edit.connect("clicked", lambda _b: editor.edit_drawing(self.node))
+        edit.connect("clicked", _in_row(lambda row, *_: editor.edit_drawing(row.node)))
         bar.append(edit)
         copy = Gtk.Button(label="Copy", tooltip_text="Copy only this drawing, to paste it into TopCoding or here")
         copy.add_css_class("flat")
-        copy.connect("clicked", lambda _b: editor.copy_drawing(self.node))
+        copy.connect("clicked", _in_row(lambda row, *_: editor.copy_drawing(row.node)))
         bar.append(copy)
         rm = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete drawing")
         rm.add_css_class("flat")
-        rm.connect("clicked", lambda _b: editor.delete_items([self.node]))
+        rm.connect("clicked", _in_row(lambda row, *_: editor.delete_items([row.node])))
         bar.append(rm)
         self.picture = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.SCALE_DOWN,
                                    halign=Gtk.Align.START, visible=False)
         self.picture.add_css_class("ntz-drawing")
         self.picture.set_cursor_from_name("pointer")
         click = Gtk.GestureClick(button=1)
-        click.connect("pressed", self._clicked)
+        click.connect("pressed", _in_row(lambda row, _p, g, n, x, y: row._clicked(g, n, x, y)))
         self.picture.add_controller(click)
         self.note = Gtk.Label(xalign=0, wrap=True)
         self.note.add_css_class("dim-label")
@@ -406,7 +432,8 @@ class DrawingRow(_PrefixRow):
             self._say("An empty drawing.")
         elif not self._show():
             self._say("Making the picture of this drawing…")
-            drawing_web.render(self.node.data, lambda _png, key=key: self._rendered(key))
+            me = weakref.ref(self)  # a row gone meanwhile needs no picture
+            drawing_web.render(self.node.data, lambda _png, key=key: (r := me()) is not None and r._rendered(key))
 
     def _show(self):
         try:
@@ -459,7 +486,7 @@ class UnknownRow(_PrefixRow):
         rm = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete this block",
                         valign=Gtk.Align.START)
         rm.add_css_class("flat")
-        rm.connect("clicked", lambda _b: editor.delete_items([self.node]))
+        rm.connect("clicked", _in_row(lambda row, *_: editor.delete_items([row.node])))
         box.append(rm)
         self.append(box)
         self.reload()

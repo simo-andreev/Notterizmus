@@ -8,6 +8,7 @@ outline_carets. They share this object's state (rows, current, sel, doc, ...).""
 from __future__ import annotations
 
 import time
+import weakref
 
 from gi.repository import Adw, Gio, GLib, GObject, Graphene, Gtk
 
@@ -290,9 +291,15 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
     def track_cursor(self, view):
         """Scroll to the cursor whenever it moves or the text changes in a focused view."""
         buf = view.get_buffer()
-        buf.connect_after("mark-set", lambda b, _it, m: m == b.get_insert() and view.has_focus()
-                          and self.ensure_visible(view))
-        buf.connect_after("changed", lambda b: view.has_focus() and self.ensure_visible(view))
+        ref = weakref.ref(view)  # the view owns the buffer: holding it would keep it forever (rows.row_of)
+
+        def scroll(buf, mark=None):
+            v = ref()
+            if v is not None and v.has_focus() and (mark is None or mark == buf.get_insert()):
+                self.ensure_visible(v)
+
+        buf.connect_after("mark-set", lambda b, _it, m: scroll(b, m))
+        buf.connect_after("changed", lambda b: scroll(b))
 
     def ensure_visible(self, view):
         """Scroll so `view`'s cursor is on screen. Runs on the coming frames, once pending
