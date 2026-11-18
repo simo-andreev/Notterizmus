@@ -27,10 +27,12 @@ ROADMAP's R-numbers, e.g. "Save the open chapter before switching (CR4)".
   4 test problems, 2 security, 2 leftover stubs, 2 verbose or unreadable code.
 - The biggest risks:
   - The package build runs tests that need GTK, which the build doesn't install (CR1).
+    It has already failed on Launchpad for 1.4.2 and 1.5.0, so the PPA still serves 1.4.0.
   - Four ways to lose, duplicate or hide notes (CR3–CR6).
   - A common Shift+click that raises an exception (CR2).
 - Baseline: the unit suite passes (367 tests, 31 skipped). The full UI suite wasn't run
-  during the review.
+  during the review; in phase 0 it passed (248 tests in 194 s), with and without the real
+  Excalidraw.
 - No exploitable security issue was found. The drawing page is well contained: its own URI
   scheme, a file server that checks paths, an ephemeral session, a CSP that blocks the
   network, and navigation blocked.
@@ -39,7 +41,7 @@ ROADMAP's R-numbers, e.g. "Save the open chapter before switching (CR4)".
 
 | ID | Category | Description | Location | Severity | Fix | Phase |
 |---|---|---|---|---|---|---|
-| CR1 | Flawed or partial tests | ✔ The package build (`override_dh_auto_test`) runs `unittest discover -s tests`, which also imports `tests/ui`. `test_selection.py` imports `gi.repository.Gdk` at module level, and `PreferGpuTest` (a plain `TestCase`, new since 1.5.0) imports `ui/drawing_web.py`, which loads GTK and libadwaita. Neither PyGObject nor those typelibs are Build-Depends. With PyGObject hidden, the unit run ends with 5 errors. Unless Launchpad's builders happen to have PyGObject and gir1.2-adw-1, the next upload fails to build. It also contradicts PROJECT_CONTEXT ("the UI suites skip themselves"). | [rules:10](debian/rules#L10), [control:4](debian/control#L4), [test_selection.py:2](tests/ui/test_selection.py#L2), [test_drawings.py:479](tests/ui/test_drawings.py#L479) | High | Easy | 1 |
+| CR1 | Flawed or partial tests | ✔ The package build (`override_dh_auto_test`) runs `unittest discover -s tests`, which also imports `tests/ui`. `test_selection.py` imports `gi.repository.Gdk` at module level, and `PreferGpuTest` (a plain `TestCase`, new since 1.5.0) imports `ui/drawing_web.py`, which loads GTK and libadwaita. Neither PyGObject nor those typelibs are Build-Depends. With PyGObject hidden, the unit run ends with 5 errors. Launchpad's builders don't have PyGObject (found in phase 0): 1.4.2 and 1.5.0 failed to build on `test_selection`'s import, so the PPA still serves 1.4.0. It also contradicts PROJECT_CONTEXT ("the UI suites skip themselves"). | [rules:10](debian/rules#L10), [control:4](debian/control#L4), [test_selection.py:2](tests/ui/test_selection.py#L2), [test_drawings.py:479](tests/ui/test_drawings.py#L479) | High | Easy | 1 |
 | CR2 | Probable bug | ✔ Shift+click on another item raises `ValueError` when items are selected without an anchor. Ctrl+W up to item level, and a click on a drawing, set `sel` but not `sel_anchor` (left None, or pointing at a deleted node), and `on_click` calls `order.index(self.sel_anchor)`. The click does nothing. | [outline_menus.py:252](notterizmus/ui/outline_menus.py#L252), [outline_selection.py:249](notterizmus/ui/outline_selection.py#L249), [rows.py:423](notterizmus/ui/rows.py#L423) | Medium | Easy | 3 |
 | CR3 | Probable bug | ✔ The paste toasts' buttons (Paste as Plain Text, One Item per Paragraph) call `undo()` without checking that the paste is still the last step. After a word was typed within the toast's 6 seconds, the button undid the word, kept the pasted items and added the same text again as plain text. | [outline_clipboard.py:223](notterizmus/ui/outline_clipboard.py#L223), [:246](notterizmus/ui/outline_clipboard.py#L246) | Medium | Moderate | 2 |
 | CR4 | Probable bug | ✔ `set_doc` doesn't save the open chapter first, and its pending 800 ms autosave then saves the newly opened chapter instead. `App.do_open` (a file opened from Files) and the Trash toast's Undo open a chapter without saving, so the previous chapter's last edits are lost. The trigger is narrow, but the loss is silent. | [window.py:327](notterizmus/ui/window.py#L327), [app.py:75](notterizmus/ui/app.py#L75), [window.py:609](notterizmus/ui/window.py#L609) | Medium | Easy | 2 |
@@ -139,17 +141,86 @@ with CR13 (blocks from a newer version), CR22 with CR25 (one atomic-write helper
 
 Know the starting point, and find out whether the bugs already touched your notes.
 
-- [ ] Record the baseline: the unit suite's result; the full `scripts/ui-tests.sh` result
+- [x] Record the baseline: the unit suite's result; the full `scripts/ui-tests.sh` result
   and how long it takes; the drawing measurements for phase 5
   (`NOTTERIZMUS_UI_WEBKIT=1 NOTTERIZMUS_UI_TEST_TIMEOUT=900 scripts/ui-tests.sh -p 'measure_*.py'`).
-- [ ] Read the 1.5.0 build log on Launchpad: did `dh_auto_test` import
+- [x] Read the 1.5.0 build log on Launchpad: did `dh_auto_test` import
   `tests.ui.test_selection` and run it? That shows whether the builders have PyGObject,
   and so how urgent CR1 is.
-- [ ] Check your notes with the read-only commands under
+- [x] Check your notes with the read-only commands under
   [Checks of your notes](#checks-of-your-notes): chapters stranded by a failed reorder
   (CR6), hidden book folders and chapters saved in the wrong place (CR7), top-level bullets
   (CR11), and backup folders with copies of more than one chapter (CR5). Repair what they
   find before phase 2 changes the code around it.
+
+#### Phase 0 results
+
+Done 2026-11-19 at `23307f2`, on this machine (16 cores, NVIDIA's driver loaded).
+
+**Baseline.**
+
+| Run | Result | Time |
+|---|---|---|
+| Unit suite | 367 tests pass, 31 skipped; two PyGIWarnings (CR42) | 2.1 s |
+| Unit suite with PyGObject hidden | 5 errors, as CR1 says: `test_selection`'s import and the four `PreferGpuTest` tests | 2.1 s |
+| CR42's check command | Fails on the Gdk PyGIWarning, as CR42 says | |
+| `scripts/ui-tests.sh` | 248 tests pass, 4 skipped (the real-Excalidraw tests); no warnings. A second run took the same time; no test takes more than 2.6 s | 194 s |
+| `NOTTERIZMUS_UI_WEBKIT=1 scripts/ui-tests.sh` | 248 tests pass, none skipped | 199 s |
+| The load check ([Commands](#commands)): the suite on one CPU beside two busy loops | 248 tests pass, 4 skipped; no test takes more than 4.4 s | 243 s |
+| Drawing measurements | Ran twice; the runs agree within a few percent. The numbers below are the first run's | 74 s |
+
+The drawing measurements, for phase 5 (medians, or median / max):
+
+| What | Measured |
+|---|---|
+| Drawing window, until Excalidraw is ready | 1,262 ms the first time, then 868–974 ms |
+| Inside Excalidraw, an input until it is drawn | 38–64 ms; moving all 440 elements with the arrow keys 80 / 112 ms, 23 ms of it in Excalidraw's handler |
+| Done, until back in the chapter (110 elements / 440 / a 1 MB picture) | 136 / 180 / 157 ms, frozen at most 41 / 48 / 51 ms |
+| Opening a chapter with 8 drawings, previews cached | Blocked 288 ms, all pictures shown at 407 ms, 31 MB of textures |
+| The same with a new preview page | Blocked 234 ms, all pictures shown at 1,189 ms |
+| Undo | 28–32 KB a step (14–16 MB for 500); a keystroke 0.4 ms; undo and redo about 2 ms |
+| Autosave (text only / 8 drawings / 3 pictures / chapter 10) | 1.2 / 30 / 22 / 7.1 ms |
+| Loading the same chapters | 0.4 / 7.9 / 15 / 1.8 ms |
+| Earlier Versions, at most: making a copy / restoring one | 2.8 / 17 ms |
+
+They match R29's numbers after its fixes, with one exception: R29 measured 12 ms for
+Excalidraw to move all 440 elements, and both runs here 23 ms. These runs aren't quite
+R29's, though. Since R29f, `_prefer_gpu` runs in the tests too, and on this machine it
+gives WebKit `WEBKIT_FORCE_DMABUF_RENDERER=1` there (the runner names GTK's renderer, not
+WebKit's). Phase 5 must measure with the same setting, and CR1 and CR41 move that call:
+check that it still happens in the tests, or set the variable for the run. CR33, CR34 and
+CR36 need their own measurements, taken before each fix.
+
+**Launchpad.** The builders don't have PyGObject, and the last two uploads failed to
+build. For 1.4.2 (2026-11-17) and 1.5.0 (2026-11-18), `dh_auto_test` couldn't import
+`tests.ui.test_selection` (`ModuleNotFoundError: No module named 'gi'`; 1 error in 363
+tests for 1.5.0). The import came in with 52dd9ad ("Make editor shortcuts work on
+non-Latin keyboard layouts"), after 1.4.0, the last good build (343 tests, OK). So the PPA
+publishes the 1.5.0 source, but anyone installing from it still gets 1.4.0; this machine
+runs 1.5.0 from a local `.deb`. The next upload would also fail on the four
+`PreferGpuTest` tests. CR1 is urgent.
+
+**Your notes.** Read-only checks of the one book (7 chapters) and its 119 Earlier
+Versions copies:
+
+- CR6: no `.moving-*` files. CR7: no hidden book folders, and no chapters outside a book
+  folder or loose in Documents. CR11: no top-level bullets; every top-level item is
+  numbered. Each chapter's book, number and title match its file name.
+- CR5: one folder is flagged, `09 Design a web cralwer`, with copies numbered 8 and 9.
+  It's a renumber, not a merge: the chapter was number 8 until 2026-11-11 18:38 and 9 from
+  20:08 that day, with the same title and text, growing steadily.
+- `state.json` and `rules.toml` load cleanly and hit none of the cases in CR22 or CR23.
+- All 7 chapter files are 0600, as CR25 predicts. CR25's fix keeps a file's mode, so they
+  will stay that way unless you change them.
+
+Nothing the bugs did needs repairing. One thing they didn't cause: chapter 10's oldest
+copy (2026-11-17 16:50, untitled then) holds 33 items of general SDI notes ("Goal of the
+SDI…", "4-step framework", steps 3 and 4, "Other notes") that are in no chapter and not in
+the Trash. The next copy, at 17:28, is a single empty item, so the chapter was most likely
+cleared on purpose before the notification-system notes began. Earlier Versions deletes
+that copy with the first new copy of chapter 10 made after 2026-11-24 17:28. Restoring it
+would replace chapter 10, so to keep those notes, copy them out before then (see
+[With you](#with-you)).
 
 ### Phase 1: Unblock the package build (S)
 
@@ -495,7 +566,10 @@ verification, plus the checks named.
   test for the header cells in `lexical.to_nodes`, and manual pastes in Chrome and Firefox.
 - [ ] Top-level bullets: are they allowed at all? The answer decides the CR11 fix in
   phase 3.
-- [ ] The version numbers of the two releases.
+- [ ] The version numbers of the releases, and whether one should follow phase 1 at once:
+  the PPA still serves 1.4.0 (phase 0).
+- [ ] The SDI notes in chapter 10's oldest copy (phase 0): copy them out before
+  2026-11-24, or let them go.
 
 ## Verification
 

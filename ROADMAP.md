@@ -34,8 +34,10 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 As of 2026-11-18:
 
-- 1.5.0 was uploaded to the PPA, for Ubuntu 26.04 only. Users on 26.10 get
-  nothing from it yet (R19), and 24.04 and older need the snap (R17).
+- 1.5.0 was uploaded to the PPA, for Ubuntu 26.04 only, but it failed to build,
+  as 1.4.2 did, so the PPA still serves 1.4.0 (CR1 in CODE_REVIEW.md, found
+  2026-11-19). Users on 26.10 get nothing from it yet (R19), and 24.04 and older
+  need the snap (R17).
 - One user so far; one book, six chapters, the largest with 192 items. One
   chapter has three drawings and is the largest file: 257 KB, 137 KB of it the
   drawings' scenes.
