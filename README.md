@@ -1,6 +1,6 @@
 <img src="data/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png" width="96" align="right" alt="">
 
-# Notterizmus 1.4
+# Notterizmus 1.5
 
 A GNOME outline editor for book chapter notes. Numbering (`Ⅱ.1.a)`) and tree
 connectors (`├ └ │`) are generated as you type, and **Copy for TopCoding** puts

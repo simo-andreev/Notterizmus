@@ -36,6 +36,17 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.5.0" date="2026-11-18">
+      <description>
+        <p>Drawings pasted from TopCoding, deleting only what is selected, and drawings that use far less memory.</p>
+        <ul>
+          <li>A copy of TopCoding's notes that includes a drawing pastes with the drawing, in Chrome and Firefox.</li>
+          <li>Delete and Ctrl+X remove only the selected items, not the rest of a heading's section.</li>
+          <li>Closed drawing windows, chapters no longer shown and undo steps give their memory back, and previews are no larger than they are shown.</li>
+          <li>Quitting no longer crashes after drawing previews were made.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.2" date="2026-11-17">
       <description>
         <p>Ctrl+A and the editor's other shortcuts work on non-Latin keyboard layouts, such as Bulgarian.</p>

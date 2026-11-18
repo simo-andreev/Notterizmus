@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 — 2026-11-18
+
+- **Paste** a copy of TopCoding's notes that includes a drawing, and the drawing arrives too, where it was among the items (Chrome and Firefox); before, only the text and tables did. Built from TopCoding's clipboard format and not yet tried with a real copy from TopCoding.
+- **Delete** and **Ctrl+X** remove only the items selected. A selection that ended on a section heading used to take the items under that heading along, though it never reached them. Sub-items that weren't selected move up into the deleted item's place, and Copy takes only the selected items. Ctrl+W gains a step: the item, then the item with its sub-items, then the section.
+- Drawings use far less memory: a closed drawing window ends its web process (about 85 MB each), a chapter's rows are freed when another chapter opens, previews are made no larger than they are shown (31 MB instead of 237 MB for 8 drawings), and undo steps share drawings instead of copying them (about 32 KB a step instead of up to 8 MB).
+- **Done** in the drawing window takes about 0.15 s instead of 0.9–3.2 s, and a chapter with drawings opens faster.
+- Quitting no longer crashes when drawing previews were made and no drawing window was opened; 1.4.0 to 1.4.2 did.
+- Development: `tests/ui/measure_drawings.py` measures how fast drawings are; UI tests check that drawing windows and rows are freed.
+
 ## 1.4.2 — 2026-11-17
 
 - **Ctrl+A** selects all items again while the Bulgarian (or another non-Latin) keyboard layout is on; before, it selected only the current item's text. The editor's other Ctrl and Alt shortcuts (Ctrl+B, Ctrl+I, Ctrl+W, Ctrl+Z and the rest) work on such layouts too.

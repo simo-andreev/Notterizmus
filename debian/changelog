@@ -1,3 +1,14 @@
+notterizmus (1.5.0) resolute; urgency=medium
+
+  * Paste drawings copied from TopCoding's notes editor.
+  * Delete and cut only the selected items, not the rest of a heading's
+    section.
+  * Free closed drawing windows, rows no longer shown and drawings kept
+    by undo; make previews no larger than they are shown.
+  * Fix a crash on quitting after drawing previews were made.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Wed, 18 Nov 2026 18:34:39 +0200
+
 notterizmus (1.4.2) resolute; urgency=medium
 
   * Make Ctrl+A and the editor's other shortcuts work on non-Latin
