@@ -105,8 +105,40 @@ Added 2026-11-17, after drawings shipped in 1.4.0.
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R29 | **Excalidraw performance**. Measure first, as in R15: time to open the drawing window, typing and drawing delay inside it, time to Done, preview rendering when a chapter with several drawings opens, and the effect of large scenes (pasted images) on autosave, undo and Earlier Versions. Then fix what is slow. Candidates: keep one warm, hidden web view instead of starting a new one (and a new web process loading the 5.6 MB bundle) for every Ctrl+D or Edit Drawing; render previews in parallel or ahead of time; keep scene data out of the undo snapshots. Undo turns the whole chapter into JSON after every edit, drawings included, and keeps up to 500 such snapshots | Drawings are new and untested at the scale of a real chapter; each one adds a WebKit page and its scene to every save and undo step. The one real chapter with drawings is 257 KB, 137 KB of it the scenes of its three drawings | S to measure, then M |
+| R29 | **Excalidraw performance**. Measure first, as in R15: time to open the drawing window, typing and drawing delay inside it, time to Done, preview rendering when a chapter with several drawings opens, and the effect of large scenes (pasted images) on autosave, undo and Earlier Versions. Then fix what is slow. Candidates: keep one warm, hidden web view instead of starting a new one (and a new web process loading the 5.6 MB bundle) for every Ctrl+D or Edit Drawing; render previews in parallel or ahead of time; keep scene data out of the undo snapshots. Undo turns the whole chapter into JSON after every edit, drawings included, and keeps up to 500 such snapshots | Drawings are new and untested at the scale of a real chapter; each one adds a WebKit page and its scene to every save and undo step. The one real chapter with drawings is 257 KB, 137 KB of it the scenes of its three drawings | S to measure, then M. **Measured** 2026-11-18, see [R29 measurements](#r29-measurements); fixes R29a–R29e not started |
 | R30 | **Excalidraw copy and paste polish**. First confirm the two untried real pastes: the app → TopCoding in Chrome (Ctrl+V into the notes editor), and TopCoding → the app (a real Ctrl+C there, read by `lexical.pasted_items`; built after 1.4.2, not released yet). Fix what they turn up. Then, to be agreed: paste a selection copied in Excalidraw itself (excalidraw.com or the drawing window) as a new drawing; offer a copied drawing as a PNG too, for apps that don't take Excalidraw scenes; and match the header cells TopCoding makes from HTML (we write `headerState` 1 everywhere, it uses 3 in the first column) | Copy and paste is how drawings reach TopCoding, and both directions are built only from synthetic pastes and checked node shapes | M |
+
+#### R29 measurements
+
+Measured 2026-11-18 with `tests/ui/measure_drawings.py` (how to run it is at its
+top), on the UI tests' private display. That display draws without a GPU, so times
+inside Excalidraw are upper bounds; the Python side is the same as on the desktop.
+The chapters have about 100 items of notes and either 3 or 8 drawings of 110 elements
+(like the larger drawing in your chapter 10), or 3 drawings with a pasted 1 MB picture
+each. A copy of chapter 10 itself (180 KB, 2 drawings) was measured as well.
+
+Fine as it is:
+- Inside the drawing window, an input is drawn 40–65 ms later whatever the scene (110
+  or 440 elements, or a 1 MB picture). Excalidraw's own handling takes 0–2 ms (12 ms
+  to move all 440 elements); most of the rest is the test display's frame pacing.
+- Autosave takes at most 30 ms (21 ms for the 4 MB chapter with pictures), loading a
+  chapter at most 15 ms, an Earlier Versions copy at most 3 ms, restoring one at most
+  40 ms, and undo or redo at most 10 ms.
+- Previews that aren't in the cache take 0.6–1.2 s for the first and about 0.35 s for
+  each further one. That happens only when a chapter changed elsewhere, on a new
+  machine, or after 300 newer previews, so rendering them in parallel isn't needed.
+- Earlier Versions keeps about 54 copies of a chapter edited 2 hours a day for 30 days:
+  9.5 MB for chapter 10, 215 MB for the chapter with 3 pictures.
+
+To fix, in the order R29a, R29c, R29b, R29d, then R29e:
+
+| ID | Finding | Fix | Size |
+|---|---|---|---|
+| R29a | Every drawing window leaves its web process running after it closes: about 85 MB each until the app quits (12 opens: 1 GB). Closing only hides the window. The lambdas on its buttons hold it in a reference cycle that runs through GTK, where Python's garbage collector can't see it, so the window, its web view and the process stay | End the web process when the window closes (`terminate_web_process()`; checked, the process goes) and break the cycle so the window is freed. A UI test that counts web processes | S |
+| R29b | Previews are made at twice the drawing's size, not twice the size they're shown at (at most 760×600): chapter 10's are 5150×1467 px, 30 MB each as a texture. Decoding them blocks the window for about 80 ms per drawing when a chapter opens (0.9 s for 8 drawings). Done takes 0.9 s for 110 elements, 0.4 s of it frozen, and 3.1 s for 440 elements, 1.3 s frozen; the page's PNG export is about half of that, and decoding the new preview is part of the frozen time | Export the PNG at no more than 1520×1200 px (twice the shown size) in `web/drawing/main.jsx`, rebuild the page, and change the preview key so the old large previews are replaced. Chapter 10's become 1520×433, about 11× fewer pixels | S, plus the page rebuild |
+| R29c | The rows of a chapter are never freed when another chapter opens (every kind of row; the same kind of cycle as R29a). A text row costs about 40 KB, but a drawing row keeps its preview texture: each reopening of the chapter with 8 drawings added 240 MB | Break the rows' cycles, or release a row when the editor drops it. A UI test that counts live rows | S–M |
+| R29d | Undo keeps the whole chapter as text, drawings included, for each of up to 500 steps. One step is 244 KB for chapter 10 (119 MB at 500 steps), 1.1 MB with 8 drawings (536 MB) and 8 MB with the 3 pictures (3.9 GB; the Cyrillic makes Python store 2 bytes per character). Every keystroke writes that text: 1.5 ms for chapter 10, 19 ms with the pictures | Keep the scenes out of the snapshot text: a snapshot refers to each drawing's scene, shared between steps until the drawing changes | M |
+| R29e | Opening the drawing window takes 0.9 s (1.25 s the first time): 0.25 s to load the page and 0.65 s for Excalidraw to start, about the same for 2 elements as for a picture | Keep one hidden page with Excalidraw already started and hand it the scene; that keeps one web process (about 85 MB) while the app runs. Measure on the desktop first: the 0.65 s may be shorter there | M |
 
 ### Review assistant
 
@@ -195,7 +227,8 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 6. Drawings (R12). **Done** in 1.4.0, ahead of steps 4 and 5.
 7. Added 2026-11-17 and not yet placed against steps 4 and 5: R30's two
    real-paste checks, which are quick; then R29's measurements, R30's fixes and
-   R31's spike.
+   R31's spike. R29's measurements are done (2026-11-18); its fixes go in the
+   order R29a, R29c, R29b, R29d, then R29e.
 8. Added 2026-11-18: the R32 fix, at any time; R33 with the richer notes in
    step 5.
 
