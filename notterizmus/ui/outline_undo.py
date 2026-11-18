@@ -1,4 +1,10 @@
-"""OutlineEditor, part: undo and redo: whole-chapter snapshots. Every change goes through _op() or _commit()."""
+"""OutlineEditor, part: undo and redo: whole-chapter snapshots. Every change goes through _op() or _commit().
+
+A snapshot is (content, focus id, offset, scenes). `content` is the chapter as JSON text,
+except that each drawing's data is {"$scene": i}, an index into `scenes`, which holds that
+drawing's data dict itself. A drawing's data is never changed in place: an edit gives the
+node a new dict. So the snapshots share each scene instead of each holding a copy of every
+one, which was up to 8 MB per step with pasted pictures, at up to 500 steps (R29d)."""
 from __future__ import annotations
 
 import json
@@ -8,6 +14,40 @@ from contextlib import contextmanager
 from ..model import Node, display_order, is_text
 from .rows import DrawingRow, TableRow, TextRow, row_type
 COALESCE = 1.5     # seconds: typing in one item within this gap is one undo step
+SCENE = "$scene"   # stands for a drawing's data in a snapshot's text
+
+
+def _content(nodes):
+    """(the JSON text of these nodes without their drawings' data, that data) for a snapshot."""
+    tree = [n.to_json() for n in nodes]
+    scenes = []
+
+    def strip(ds, ns):
+        for d, n in zip(ds, ns):
+            if n.kind == "drawing":
+                d["data"] = {SCENE: len(scenes)}
+                scenes.append(n.data)
+            if n.children:
+                strip(d.get("children", []), n.children)
+
+    strip(tree, nodes)
+    return json.dumps(tree, ensure_ascii=False), tuple(scenes)
+
+
+def _nodes(content, scenes):
+    """The nodes a snapshot's text and scenes stand for; drawings get the shared data back."""
+    nodes = [Node.from_json(c) for c in json.loads(content)]
+    for top in nodes:
+        for n in top.walk():
+            if n.kind == "drawing" and SCENE in n.data:
+                n.data = scenes[n.data[SCENE]]
+    return nodes
+
+
+def _same(a, b):
+    """Whether two snapshots hold the same chapter (where the cursor is aside)."""
+    return a[0] == b[0] and len(a[3]) == len(b[3]) and all(x is y or x == y for x, y in zip(a[3], b[3]))
+
 
 class UndoMixin:
     """Mixed into OutlineEditor (outline.py); uses its state."""
@@ -15,7 +55,7 @@ class UndoMixin:
     # -- history ---------------------------------------------------------------------
 
     def _snapshot(self):
-        content = json.dumps([c.to_json() for c in self.doc.root.children], ensure_ascii=False)
+        content, scenes = _content(self.doc.root.children)
         if self._focus_hint:
             fid, off = self._focus_hint
         elif self.current is not None:
@@ -24,13 +64,13 @@ class UndoMixin:
             off = row.cursor_offset() if row else None
         else:
             fid = off = None
-        return content, fid, off
+        return content, fid, off, scenes
 
     def _commit(self, group=None):
         if self._suspend or self.doc is None:
             return
         snap = self._snapshot()
-        if self._cur and snap[0] == self._cur[0]:
+        if self._cur and _same(snap, self._cur):
             self._cur = snap
             return
         now = time.monotonic()
@@ -60,9 +100,9 @@ class UndoMixin:
         """Replace the whole chapter (e.g. with an earlier version) as one undoable step."""
         self._undo.append(self._cur)
         self._redo.clear()
-        content = json.dumps([c.to_json() for c in root.children], ensure_ascii=False)
+        content, scenes = _content(root.children)
         first = next((n for n in display_order(root) if is_text(n)), None)
-        self._restore((content, first.id if first else None, -1))
+        self._restore((content, first.id if first else None, -1, scenes))
 
     def undo(self):
         if not self._undo:
@@ -79,11 +119,11 @@ class UndoMixin:
         self._restore(self._redo.pop())
 
     def _restore(self, snap):
-        content, fid, off = snap
+        content, fid, off, scenes = snap
         self._cur = snap
         self._last_group = None
         self._tg = None
-        self.doc.root = Node("root", children=[Node.from_json(c) for c in json.loads(content)])
+        self.doc.root = Node("root", children=_nodes(content, scenes))
         self._ensure_nonempty()
         self.mc_views = []
         # keep the existing row widgets (same node ids); only reload what changed
@@ -92,7 +132,7 @@ class UndoMixin:
             r = old_rows.get(n.id)
             if r is None or type(r) is not row_type(n.kind):
                 continue
-            same = (r.node.runs == n.runs) if isinstance(r, TextRow) else (r.node.data == n.data)
+            same = (r.node.runs == n.runs) if isinstance(r, TextRow) else (r.node.data is n.data or r.node.data == n.data)
             r.node = n
             if not same:
                 if isinstance(r, TextRow):

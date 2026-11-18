@@ -266,6 +266,39 @@ class DrawingRowTest(DrawingTestCase):
         ui.press(view, "z", ctrl=True)
         self.assertEqual(self.win.doc.root.children[0].children[0].text, "before", "one undo takes the typing back")
 
+    def test_undo_steps_share_the_scene_instead_of_copying_it(self):
+        """Every undo step held the whole chapter as text, scenes and all: up to 8 MB a step
+        with pasted pictures, at up to 500 steps (R29d)."""
+        _doc, before, node, _after = self.open()
+        data = node.data
+        view = ui.focus(before).view
+        for word in (" one", " two", " three"):
+            ui.type_text(view, word)
+        steps = [*self.ed._undo, self.ed._cur]
+        self.assertGreaterEqual(len(steps), 4)
+        for content, _fid, _off, scenes in steps:
+            self.assertNotIn('"elements"', content)
+            self.assertEqual(len(scenes), 1)
+            self.assertIs(scenes[0], data)
+        for _ in range(3):
+            ui.press(self.ed.cur_view or view, "z", ctrl=True)
+        self.assertEqual(self.win.doc.root.children[0].children[0].text, "before")
+        self.assertIs(self.drawings()[0].data, data, "the undone chapter has the same scene back")
+        self.assertEqual(drawing.scene(data), scene())
+
+    def test_an_earlier_version_brings_its_drawing_back_and_undo_returns(self):
+        _doc, before, _node, _after = self.open()
+        view = ui.focus(before).view
+        earlier = scene("earlier")
+        drawing.store_preview(earlier, PNG)
+        self.ed.replace_content(Node("root", children=[h("Intro", b("before"), block(earlier), b("after"))]))
+        ui.settle()
+        self.assertEqual(drawing.scene(self.drawings()[0].data), earlier)
+        ui.press(self.ed.cur_view or view, "z", ctrl=True)
+        self.assertEqual(drawing.scene(self.drawings()[0].data), scene())
+        ui.press(self.ed.cur_view or view, "z", ctrl=True, shift=True)
+        self.assertEqual(drawing.scene(self.drawings()[0].data), earlier)
+
     def test_erasing_everything_removes_the_block(self):
         _doc, before, node, _after = self.open()
         ui.focus(before)
