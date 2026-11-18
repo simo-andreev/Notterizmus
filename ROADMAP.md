@@ -55,6 +55,12 @@ As of 2026-11-17:
   - The app doesn't show up in App Center search (R17).
   - The GitHub repository has no CI (R22).
 
+## Bugs to fix
+
+| ID | Bug | Why | Size |
+|---|---|---|---|
+| R32 | **Ctrl+I with nothing selected doesn't toggle italic** for the text typed next (reported 2026-11-18). The Getting Started chapter says it should (`guide.py`, "Formatting and undo"). Check Ctrl+B in the same state too | Italic has to be typed first and selected afterwards | S |
+
 ## Proposed releases
 
 The groups were first planned as 1.2, 1.3 and 2.0. The daily-use items shipped
@@ -85,6 +91,7 @@ and get a version number when they ship.
 | R9 | **Search the book** (or all books); results open the chapter at the match | Builds on how completion already reads the other chapters | M |
 | R10 | **Drag to reorder**: drag an item by its prefix to move it or change its level | Alt+↑/↓ is the only way to move items | M |
 | R11 | **Connectors that line up in TopCoding**: pad with Unicode spaces sized to Roboto's character widths so the `│` columns align | Listed known limit. `export.code_prefix` aligns them but adds a code background | L (spike: measure in the browser and confirm TopCoding keeps those spaces) |
+| R33 | **`!` and `?` bullet types** for important points and for uncertain ones (added 2026-11-18): built-in markers next to `•`, `+` and `-`, typed as `! ` and `? ` at the start of an item and reached by Ctrl+Shift+Space. Today they can only be added by hand in Edit Formatting Rules | Marks what to remember and what to check later, and the marks travel with the notes to TopCoding | S |
 
 ### Drawings — done in 1.4.0
 
@@ -189,6 +196,8 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 7. Added 2026-11-17 and not yet placed against steps 4 and 5: R30's two
    real-paste checks, which are quick; then R29's measurements, R30's fixes and
    R31's spike.
+8. Added 2026-11-18: the R32 fix, at any time; R33 with the richer notes in
+   step 5.
 
 ## Open questions
 
