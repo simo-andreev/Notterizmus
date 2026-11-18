@@ -91,7 +91,7 @@ and get a version number when they ship.
 | R9 | **Search the book** (or all books); results open the chapter at the match | Builds on how completion already reads the other chapters | M |
 | R10 | **Drag to reorder**: drag an item by its prefix to move it or change its level | Alt+↑/↓ is the only way to move items | M |
 | R11 | **Connectors that line up in TopCoding**: pad with Unicode spaces sized to Roboto's character widths so the `│` columns align | Listed known limit. `export.code_prefix` aligns them but adds a code background | L (spike: measure in the browser and confirm TopCoding keeps those spaces) |
-| R33 | **`!` and `?` bullet types** for important points and for uncertain ones (added 2026-11-18): built-in markers next to `•`, `+` and `-`, typed as `! ` and `? ` at the start of an item and reached by Ctrl+Shift+Space. Today they can only be added by hand in Edit Formatting Rules | Marks what to remember and what to check later, and the marks travel with the notes to TopCoding | S |
+| R33 | **`!` and `?` bullet types** for important points and for uncertain ones (added 2026-11-18): built-in markers next to `•`, `+` and `-`, typed as `! ` and `? ` at the start of an item and reached by Ctrl+Shift+Space. Today they can only be added by hand in Edit Formatting Rules | Marks what to remember and what to check later, and the marks travel with the notes to TopCoding | S. **Done** 2026-11-18, not released: `important` (`!`) and `question` (`?`) in `rules.DEFAULTS` and the rules template, after `-` in the menus and the Ctrl+Shift+Space cycle; pasted `! ` and `? ` lines become these bullets. A user's `[markers.question]`, which the template used to suggest, changes the built-in one instead of adding a second |
 
 ### Drawings — done in 1.4.0
 
@@ -230,7 +230,7 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
    R31's spike. R29 is done (2026-11-18): measured, fixes R29a–R29d made (released
    in 1.5.0), and R29e decided against.
 8. Added 2026-11-18: the R32 fix, at any time; R33 with the richer notes in
-   step 5.
+   step 5. R33 is **done** (2026-11-18, not released yet), ahead of step 5.
 
 ## Open questions
 

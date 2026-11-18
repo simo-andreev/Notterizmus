@@ -3,7 +3,7 @@
 Node kinds:
   root     - invisible container
   heading  - numbered item (Ⅰ), Ⅰ.1), Ⅰ.1.a) ...)
-  bullet   - leaf note with a marker (•, +, -, ... see rules.markers)
+  bullet   - leaf note with a marker (•, +, -, !, ?, ... see rules.markers)
   table    - table block; rows live in node.data["rows"]
   drawing  - Excalidraw scene in node.data (see drawing.py)
 A new kind only needs a data codec here, a layout rule in layout.py, an

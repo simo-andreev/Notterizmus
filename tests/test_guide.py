@@ -40,10 +40,10 @@ class GuideTest(unittest.TestCase):
 
     def test_uses_the_typing_triggers_from_the_rules(self):
         r = Rules()
-        r.data["heading"]["trigger"] = "!"
+        r.data["heading"]["trigger"] = "^"
         r.data["markers"]["minus"]["trigger"] = "~"
         keys = guide.keys(guide.build(r))
-        self.assertIn("!", keys)
+        self.assertIn("^", keys)
         self.assertIn("~", keys)
         self.assertNotIn("#", keys)
 

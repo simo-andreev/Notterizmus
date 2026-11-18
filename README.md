@@ -36,8 +36,8 @@ New here? Press F1 (or menu → **Getting Started**) for a practice chapter that
 walks through the controls; each time you open it, it starts fresh.
 
 1. **New Chapter** (Ctrl+N): enter book, chapter number and optional title.
-2. Type the outline. Start an item with `# ` for a numbered item, `* ` `+ ` `- `
-   for a note, pro or con bullet. Tab / Shift+Tab change the level.
+2. Type the outline. Start an item with `# ` for a numbered item, `* ` `+ ` `- ` `! ` `? `
+   for a note, pro, con, important or question bullet. Tab / Shift+Tab change the level.
 3. **Copy for TopCoding** (Ctrl+Shift+C), then Ctrl+V in TopCoding's notes editor.
    Bold, italic, spacing and tables come through; keep the app open while pasting.
 

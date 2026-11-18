@@ -48,9 +48,11 @@ class NumberingTest(unittest.TestCase):
 class MarkersTest(unittest.TestCase):
     def test_default_markers_and_their_typing_triggers(self):
         r = Rules()
-        self.assertEqual([r.marker_symbol(m) for m in ("dot", "plus", "minus")], ["•", "+", "-"])
+        self.assertEqual([r.marker_symbol(m) for m in ("dot", "plus", "minus", "important", "question")],
+                         ["•", "+", "-", "!", "?"])
         self.assertEqual(r.triggers(), {"#": ("heading", None), "*": ("bullet", "dot"),
-                                        "+": ("bullet", "plus"), "-": ("bullet", "minus")})
+                                        "+": ("bullet", "plus"), "-": ("bullet", "minus"),
+                                        "!": ("bullet", "important"), "?": ("bullet", "question")})
 
     def test_an_unknown_marker_is_shown_as_a_plain_bullet(self):
         self.assertEqual(Rules().marker_symbol("from-a-newer-version"), "•")
@@ -59,7 +61,7 @@ class MarkersTest(unittest.TestCase):
         r = Rules()
         r.data["markers"]["idea"] = {"symbol": "→", "label": "Idea"}
         r.data["markers"]["plus"]["trigger"] = ""
-        self.assertEqual(set(r.triggers()), {"#", "*", "-"})
+        self.assertEqual(set(r.triggers()), {"#", "*", "-", "!", "?"})
         self.assertEqual(r.marker_symbol("idea"), "→")
 
     def test_each_rules_object_has_its_own_copy_of_the_defaults(self):
@@ -97,10 +99,16 @@ class LoadTest(unittest.TestCase):
         self.assertEqual(r["markers"], DEFAULTS["markers"])
 
     def test_your_own_marker_is_added_to_the_built_in_ones(self):
+        r = self.load('[markers.idea]\nsymbol = "→"\ntrigger = ">"\nlabel = "Idea"\n')
+        self.assertEqual(list(r["markers"]), ["dot", "plus", "minus", "important", "question", "idea"])
+        self.assertEqual(r.triggers()[">"], ("bullet", "idea"))
+        self.assertEqual(r.marker_symbol("idea"), "→")
+
+    def test_a_question_marker_from_an_older_rules_file_changes_the_built_in_one(self):
+        # Before 1.6 the template suggested [markers.question]; it is now built in.
         r = self.load('[markers.question]\nsymbol = "?"\ntrigger = "?"\nlabel = "Open question"\n')
-        self.assertEqual(list(r["markers"]), ["dot", "plus", "minus", "question"])
-        self.assertEqual(r.triggers()["?"], ("bullet", "question"))
-        self.assertEqual(r.marker_symbol("question"), "?")
+        self.assertEqual(list(r["markers"]), ["dot", "plus", "minus", "important", "question"])
+        self.assertEqual(r["markers"]["question"], {"symbol": "?", "trigger": "?", "label": "Open question"})
 
     def test_changing_one_field_of_a_built_in_marker_keeps_the_others(self):
         r = self.load('[markers.dot]\nsymbol = "→"\n')

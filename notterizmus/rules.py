@@ -41,6 +41,8 @@ DEFAULTS = {
         "dot": {"symbol": "•", "trigger": "*", "label": "Bullet"},
         "plus": {"symbol": "+", "trigger": "+", "label": "Pro"},
         "minus": {"symbol": "-", "trigger": "-", "label": "Con"},
+        "important": {"symbol": "!", "trigger": "!", "label": "Important"},
+        "question": {"symbol": "?", "trigger": "?", "label": "Question"},
     },
 }
 

@@ -2,7 +2,7 @@
 
 Recognises the app's own output (and hand-written notes in the same style):
 tree connectors are dropped, labels like "Ⅱ.1.a)" / "II.1.a)" / "2.1)" give the
-depth of numbered items, and leading markers (•, +, -, *) give bullets, nested
+depth of numbered items, and leading markers (•, +, -, !, ?, *) give bullets, nested
 by indentation. Numbering is regenerated, so pasted labels never go stale.
 """
 from __future__ import annotations

@@ -20,6 +20,15 @@ class EditingTest(ui.UITestCase):
         ui.type_text(r.view, "+ ", wait=0.3)
         self.assertEqual((bullet.kind, bullet.marker, bullet.text), ("bullet", "plus", "text"))
 
+    def test_typing_an_exclamation_or_question_mark_makes_those_bullets(self):
+        doc = ui.open_chapter([h("Intro", b("remember"), b("check"))])
+        important, question = doc.root.children[0].children
+        ui.type_text(ui.focus(important, 0).view, "! ", wait=0.3)
+        ui.type_text(ui.focus(question, 0).view, "? ", wait=0.3)
+        self.assertEqual([(n.kind, n.marker, n.text) for n in (important, question)],
+                         [("bullet", "important", "remember"), ("bullet", "question", "check")])
+        self.assertEqual([ui.row(n).prefix.get_text() for n in (important, question)], ["     ! ", "     ? "])
+
     def test_ctrl_enter_adds_the_next_numbered_item(self):
         doc = ui.open_chapter([h("Intro", h("One", b("note")))])
         one = doc.root.children[0].children[0]
@@ -121,17 +130,19 @@ class EditingTest(ui.UITestCase):
         item = doc.root.children[0].children[0]
         seen = []
         ui.focus(item)
-        for _ in range(4):
+        for _ in range(6):
             self.assertTrue(ui.press(ui.row(item).view, "space", ctrl=True, shift=True))
             seen.append((item.kind, item.marker) if item.kind == "bullet" else item.kind)
-        self.assertEqual(seen, [("bullet", "plus"), ("bullet", "minus"), "heading", ("bullet", "dot")])
+        self.assertEqual(seen, [("bullet", "plus"), ("bullet", "minus"), ("bullet", "important"),
+                                ("bullet", "question"), "heading", ("bullet", "dot")])
         nested = item.children[0]
         seen = []
         ui.focus(nested)
-        for _ in range(3):
+        for _ in range(5):
             ui.press(ui.row(nested).view, "space", ctrl=True, shift=True)
             seen.append(nested.marker if nested.kind == "bullet" else nested.kind)
-        self.assertEqual(seen, ["plus", "minus", "dot"], "under a bullet, numbered is skipped")
+        self.assertEqual(seen, ["plus", "minus", "important", "question", "dot"],
+                         "under a bullet, numbered is skipped")
 
     def test_typing_the_number_trigger_under_a_bullet_is_refused_with_a_message(self):
         doc = ui.open_chapter([h("Intro", b("outer", b("inner")))])

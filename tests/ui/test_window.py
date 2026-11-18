@@ -309,17 +309,17 @@ class RulesFileTest(ui.UITestCase):
         self.assertEqual(to_plain(layout(doc.root, self.win.rules)).split("\n")[0], "1. Intro", "exports follow")
 
     def test_your_own_marker_can_be_typed_and_is_offered_in_the_menus(self):
-        self.reload('[markers.question]\nsymbol = "?"\ntrigger = "?"\nlabel = "Open question"\n')
+        self.reload('[markers.idea]\nsymbol = "→"\ntrigger = ">"\nlabel = "Idea"\n')
         doc = ui.open_chapter([h("Intro", b("why"))])
         item = doc.root.children[0].children[0]
-        ui.type_text(ui.focus(item, 0).view, "? ", wait=0.3)
-        self.assertEqual((item.kind, item.marker, item.text), ("bullet", "question", "why"))
-        self.assertEqual(ui.row(item).prefix.get_text(), "     ? ")
+        ui.type_text(ui.focus(item, 0).view, "> ", wait=0.3)
+        self.assertEqual((item.kind, item.marker, item.text), ("bullet", "idea", "why"))
+        self.assertEqual(ui.row(item).prefix.get_text(), "     → ")
         self.ed.show_item_menu(ui.row(item))
         ui.pump(0.2)
         labels = [text for _n, text, _r in ui.menu_choices(ui.open_popovers()[0])]
-        self.assertIn("?   Open question      ?␣", labels)
-        self.assertIn("?   Open question", labels, "under Add as well")
+        self.assertIn("→   Idea      >␣", labels)
+        self.assertIn("→   Idea", labels, "under Add as well")
 
     def test_a_rules_file_with_a_mistake_is_reported_and_the_defaults_stay(self):
         doc = ui.open_chapter([h("Intro", b("note"))])

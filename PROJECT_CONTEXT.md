@@ -27,7 +27,7 @@
 - Ask before pushing, uploading to the PPA, or publishing anything; commit only when asked.
 
 ## Facts and decisions
-- Tree: `Node` kinds `root`, `heading` (numbered), `bullet` (marker `dot`/`plus`/`minus` or user-defined), `table` (`data.rows` = rows × cells × runs, `data.header`). Text is a list of `Run(text, bold, italic)`.
+- Tree: `Node` kinds `root`, `heading` (numbered), `bullet` (marker `dot`/`plus`/`minus`/`important`/`question` or user-defined), `table` (`data.rows` = rows × cells × runs, `data.header`). Text is a list of `Run(text, bold, italic)`.
 - `can_contain`: headings only under root or headings; bullets/tables under headings or bullets. A bullet that reaches root becomes a heading, whether outdented there or promoted when its top-level parent is deleted (`outdent`, `remove_promote`): top-level items are always numbered.
 - Layout defaults reproduce the user's sample exactly for tree sections: bullet column = label column + 5; spacer `│` line before each numbered child unless the previous sibling is a bullet; blank line between top-level items.
 - File format: JSON `{"format": "notterizmus/1", book, chapter{number,title}, lang?, content[]}`, `.notz`, saved atomically (a save that fails removes its temporary file), autosaved 800 ms after changes. Path: `<XDG Documents>/Notterizmus/<Book>/<NN> <Title>.notz` (localized folder, e.g. `~/Документи`).

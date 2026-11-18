@@ -51,7 +51,17 @@ symbol = "-"
 trigger = "-"
 label = "Con"
 
-# [markers.question]
-# symbol = "?"
-# trigger = "?"
-# label = "Open question"
+[markers.important]
+symbol = "!"
+trigger = "!"
+label = "Important"
+
+[markers.question]
+symbol = "?"
+trigger = "?"
+label = "Question"
+
+# [markers.idea]
+# symbol = "→"
+# trigger = ">"
+# label = "Idea"

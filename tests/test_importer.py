@@ -79,22 +79,24 @@ class LabelsAndMarkersTest(unittest.TestCase):
         self.assertEqual(pasted("1)x\n- b"), [("dot", "1)x"), ("minus", "b")], "no space: ordinary text")
 
     def test_every_bullet_character_is_recognised(self):
-        self.assertEqual(pasted("• a\n· b\n▪ c\n◦ d\n‣ e\n* f\n+ g\n- h\n– i\n— j"),
+        self.assertEqual(pasted("• a\n· b\n▪ c\n◦ d\n‣ e\n* f\n+ g\n- h\n– i\n— j\n! k\n? l"),
                          [("dot", "a"), ("dot", "b"), ("dot", "c"), ("dot", "d"), ("dot", "e"), ("dot", "f"),
-                          ("plus", "g"), ("minus", "h"), ("minus", "i"), ("minus", "j")])
+                          ("plus", "g"), ("minus", "h"), ("minus", "i"), ("minus", "j"),
+                          ("important", "k"), ("question", "l")])
 
     def test_a_marker_needs_a_space_after_it(self):
-        self.assertEqual(pasted("- real\n-not a bullet\n+1 vote"),
-                         [("minus", "real"), ("dot", "-not a bullet"), ("dot", "+1 vote")])
+        self.assertEqual(pasted("- real\n-not a bullet\n+1 vote\n!!!\n?why"),
+                         [("minus", "real"), ("dot", "-not a bullet"), ("dot", "+1 vote"), ("dot", "!!!"),
+                          ("dot", "?why")])
 
     def test_a_marker_alone_is_an_empty_bullet(self):
         self.assertEqual(pasted("- a\n-\n- c"), [("minus", "a"), ("minus", ""), ("minus", "c")])
 
     def test_your_own_markers_are_recognised(self):
         rules = Rules()
-        rules.data["markers"]["question"] = {"symbol": "?", "trigger": "?", "label": "Open question"}
-        forest = parse(text_items("? why\n=> so"), rules)
-        self.assertEqual(shape(forest), [("question", "why"), ("dot", "=> so")])
+        rules.data["markers"]["idea"] = {"symbol": "→", "trigger": ">", "label": "Idea"}
+        forest = parse(text_items("→ why\n=> so"), rules)
+        self.assertEqual(shape(forest), [("idea", "why"), ("dot", "=> so")])
 
     def test_bullets_go_under_the_numbered_item_above_them(self):
         self.assertEqual(pasted("I) Head\n  - a\n      - a1\n  - b\nII) Next\n  - c"),
@@ -178,6 +180,8 @@ class HtmlTest(unittest.TestCase):
     def test_the_apps_own_html_comes_back_as_the_same_outline(self):
         root = sample()
         root.children[1].children[0].runs = [Run("plain "), Run("bold", bold=True), Run(" it", italic=True)]
+        root.children[0].append(Node("bullet", runs=[Run("remember this")], marker="important"))
+        root.children[0].append(Node("bullet", runs=[Run("check this")], marker="question"))
         root.children[0].append(Node("table", data={"header": True, "rows": [[[Run("k")], [Run("v", bold=True)]],
                                                                                [[Run("1")], []]]}))
         forest = parse(html_items(to_html(layout(root, Rules()))), Rules())
