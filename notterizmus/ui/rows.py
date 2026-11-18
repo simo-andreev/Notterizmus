@@ -10,8 +10,6 @@ from . import drawing_web
 from .richtext import RichText
 
 
-PREVIEW_MAX = (760, 600)
-
 
 def _prefix_markup(segs):
     out = []
@@ -352,13 +350,14 @@ class TableRow(_PrefixRow):
 
 class _Preview(GObject.Object, Gdk.Paintable):
     """A drawing's PNG at the size of the drawing (the PNG has more pixels than that, so
-    it stays sharp on dense screens), or smaller for a drawing larger than PREVIEW_MAX."""
+    it stays sharp on dense screens), or smaller for a drawing larger than PREVIEW_MAX
+    (its PNG is made at that smaller size)."""
 
     def __init__(self, texture):
         super().__init__()
         self.texture = texture
         w, h = texture.get_width() / drawing.PREVIEW_SCALE, texture.get_height() / drawing.PREVIEW_SCALE
-        fit = min(1.0, PREVIEW_MAX[0] / max(w, 1), PREVIEW_MAX[1] / max(h, 1))
+        fit = min(1.0, drawing.PREVIEW_MAX[0] / max(w, 1), drawing.PREVIEW_MAX[1] / max(h, 1))
         self.width, self.height = max(1, round(w * fit)), max(1, round(h * fit))
 
     def do_snapshot(self, snapshot, width, height):

@@ -1,8 +1,10 @@
 // The page Notterizmus shows in its drawing window. Python drives it through window.ntz:
-//   open(scene, options)  show the editor on a scene ({elements, appState, files} or null)
-//   save()                the edited scene plus a PNG preview, as a JSON string
-//   changed()             whether the scene differs from the one opened
-//   render(scene)         a PNG preview of a scene without showing the editor
+//   open(scene, options)    show the editor on a scene ({elements, appState, files} or null)
+//   save()                  the edited scene plus a PNG preview, as a JSON string
+//   changed()               whether the scene differs from the one opened
+//   render(scene, options)  a PNG preview of a scene without showing the editor
+// options.preview is the largest preview PNG, [width, height] (drawing.PREVIEW_PIXELS);
+// options.dark asks open() for the dark theme.
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { Excalidraw, exportToBlob, getSceneVersion, restore } from "@excalidraw/excalidraw";
@@ -15,6 +17,7 @@ const PREVIEW_PADDING = 12;
 
 let api = null;
 let openedVersion = 0;
+let previewMax = null;  // from open(): save() makes its preview no larger
 
 const live = (elements) => elements.filter((e) => !e.isDeleted);
 
@@ -47,7 +50,10 @@ function blobToBase64(blob) {
   });
 }
 
-async function preview(elements, appState, files) {
+// PREVIEW_SCALE pixels per unit of the drawing, so it stays sharp on dense screens, but
+// no larger than `max`: a large drawing is shown scaled down, so twice its own size would
+// only make a larger PNG to decode.
+async function preview(elements, appState, files, max) {
   if (!elements.length) {
     return { png: "", width: 0, height: 0 };
   }
@@ -60,7 +66,11 @@ async function preview(elements, appState, files) {
     exportPadding: PREVIEW_PADDING,
     getDimensions: (width, height) => {
       size = { width, height };
-      return { width: width * PREVIEW_SCALE, height: height * PREVIEW_SCALE, scale: PREVIEW_SCALE };
+      let scale = PREVIEW_SCALE;
+      if (max) {
+        scale = Math.min(scale, max[0] / width, max[1] / height);
+      }
+      return { width: Math.round(width * scale), height: Math.round(height * scale), scale };
     },
   });
   return { png: await blobToBase64(blob), width: size.width, height: size.height };
@@ -77,6 +87,7 @@ window.ntz = {
   // to save, and a save would hand back an empty drawing.
   async open(scene, options) {
     const opts = options || {};
+    previewMax = opts.preview || null;
     const data = restored(scene);
     const element = React.createElement(Excalidraw, {
       excalidrawAPI: (a) => { api = a; },
@@ -117,13 +128,14 @@ window.ntz = {
     const elements = live(api.getSceneElements());
     const appState = keptAppState(api.getAppState());
     const files = usedFiles(elements, api.getFiles());
-    const shot = await preview(elements, appState, files);
+    const shot = await preview(elements, appState, files, previewMax);
     return JSON.stringify({ scene: { elements, appState, files }, ...shot });
   },
 
-  async render(scene) {
+  async render(scene, options) {
     const data = restored(scene);
-    const shot = await preview(data.elements, data.appState, usedFiles(data.elements, data.files));
+    const max = (options || {}).preview || null;
+    const shot = await preview(data.elements, data.appState, usedFiles(data.elements, data.files), max);
     return JSON.stringify(shot);
   },
 };

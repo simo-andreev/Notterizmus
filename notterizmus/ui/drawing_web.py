@@ -38,7 +38,7 @@ _JS_READY = "while (!window.ntz) { await new Promise((r) => setTimeout(r, 20)); 
 _JS_OPEN = _JS_READY + "return await window.ntz.open(JSON.parse(scene), JSON.parse(options));"
 _JS_SAVE = _JS_READY + "return await window.ntz.save();"
 _JS_CHANGED = _JS_READY + "return window.ntz.changed();"
-_JS_RENDER = _JS_READY + "return await window.ntz.render(JSON.parse(scene));"
+_JS_RENDER = _JS_READY + "return await window.ntz.render(JSON.parse(scene), JSON.parse(options));"
 
 # The web context of every page here. It is the module's own, not WebKit's default: a C exit
 # handler frees the default one after Python has stopped, and that also frees the URI
@@ -137,6 +137,11 @@ def _load_failed(view, _event, _uri, error):
     return False
 
 
+def _page_options(**more):
+    """Options for the page's open() and render(): `preview` is the largest preview PNG."""
+    return json.dumps({"preview": list(drawing.PREVIEW_PIXELS), **more})
+
+
 def _shot(reply):
     """(png bytes, width, height) from the page's answer."""
     return base64.b64decode(reply.get("png") or ""), int(reply.get("width") or 0), int(reply.get("height") or 0)
@@ -170,7 +175,7 @@ class _Renderer:
         self.busy = True
         data, _done = self.jobs[0]
         self._timeout = GLib.timeout_add_seconds(RENDER_TIMEOUT, self._timed_out)
-        _call(self.view, _JS_RENDER, self._rendered, scene=drawing.scene_json(data))
+        _call(self.view, _JS_RENDER, self._rendered, scene=drawing.scene_json(data), options=_page_options())
 
     def _rendered(self, text, error):
         png = None
@@ -255,7 +260,7 @@ class DrawingWindow(Adw.Window):
         self.connect("close-request", self._close_request)
         dark = Adw.StyleManager.get_default().get_dark()
         _call(self.view, _JS_OPEN, self._opened, scene=drawing.scene_json(data),
-              options=json.dumps({"dark": dark}))
+              options=_page_options(dark=dark))
 
     def _opened(self, _text, error):
         if self.view is None:  # closed meanwhile

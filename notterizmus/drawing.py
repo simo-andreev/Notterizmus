@@ -17,7 +17,12 @@ SCENE_KEYS = ("elements", "appState", "files")
 # What a drawing keeps of Excalidraw's view state: only what changes how it looks
 # (APP_STATE_KEYS in web/drawing/main.jsx, which saves the drawing window's scenes).
 APP_STATE_KEYS = ("viewBackgroundColor", "gridSize", "gridStep", "gridModeEnabled")
-PREVIEW_SCALE = 2      # the PNG has this many pixels per unit of the drawing
+PREVIEW_SCALE = 2      # the PNG has this many pixels per unit of the drawing...
+PREVIEW_MAX = (760, 600)  # ...up to the largest size the outline shows one at (larger ones are scaled down)
+# The largest preview PNG. A larger drawing is exported smaller, at twice the size it is
+# shown at; at twice its own size it made PNGs of 5000 px and more (R29b).
+PREVIEW_PIXELS = (PREVIEW_MAX[0] * PREVIEW_SCALE, PREVIEW_MAX[1] * PREVIEW_SCALE)
+PREVIEW_VERSION = 2    # raise it when previews are made differently: the cached ones are then made again
 CACHE_KEEP = 300       # previews kept in the cache folder; the oldest go first
 PLAIN_TEXT = "[Drawing]"
 
@@ -77,8 +82,10 @@ def scene_json(data):
 
 
 def preview_key(data):
+    """The name of a scene's preview in the cache: a hash of the scene and PREVIEW_VERSION
+    (version 1, until R29b, hashed the scene alone)."""
     canonical = json.dumps(scene(data), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha1(canonical.encode("utf-8")).hexdigest()
+    return hashlib.sha1(f"{PREVIEW_VERSION}\n{canonical}".encode("utf-8")).hexdigest()
 
 
 # --- preview cache -------------------------------------------------------------
