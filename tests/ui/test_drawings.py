@@ -5,6 +5,7 @@ records what it was opened on and lets the test answer as the user would; the re
 is tried at the end, where WebKitGTK is installed and works on the test display."""
 import base64
 import copy
+import gc
 import json
 import os
 import unittest
@@ -457,6 +458,25 @@ class RealDrawingWindowTest(ui.UITestCase):
         ui.wait_for(lambda: got, "the preview", timeout=60)
         self.assertTrue(got[0] and got[0].startswith(b"\x89PNG"), "no PNG came back")
         self.assertEqual(drawing.preview_path(data).read_bytes(), got[0])
+
+    def test_a_closed_window_ends_its_web_process_and_is_freed(self):
+        self.web.shutdown()  # the preview page has its own process
+        ui.wait_for(lambda: ui.web_processes() == 0, "the preview page's process to end")
+        freed, refs = [], []  # a weak ref lasts only as long as its handle
+        for how in ("cancel", "done"):
+            win = self.web.edit(self.win, scene(how), lambda _data: None)
+            refs.append(win.weak_ref(lambda how=how: freed.append(how)))
+            ui.wait_for(lambda: win.done_btn.get_sensitive(), "Excalidraw to start", timeout=60)
+            self.assertEqual(ui.web_processes(), 1)
+            if how == "cancel":
+                win.close()  # nothing was changed, so it closes without asking
+            else:
+                win.finish()
+            ui.wait_for(lambda: not win.get_visible(), f"the window to close ({how})", timeout=60)
+            del win
+            ui.wait_for(lambda: ui.web_processes() == 0, f"the web process to end ({how})")
+            # Freed by Python's garbage collector: its own handlers on itself are a cycle too.
+            ui.wait_for(lambda: (gc.collect(), how in freed)[1], f"the window to be freed ({how})")
 
     def test_done_hands_back_the_scene_and_stores_its_picture(self):
         data = scene("edited in Excalidraw")

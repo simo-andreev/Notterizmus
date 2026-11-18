@@ -216,38 +216,10 @@ def _memory_kb(pid):
     return 0
 
 
-def _children():
-    """{pid: name} of the processes this one started, and theirs (WebKit's and its sandboxes)."""
-    procs = {}
-    for d in os.listdir("/proc"):
-        if d.isdigit():
-            try:
-                stat = Path(f"/proc/{d}/stat").read_text()
-            except OSError:
-                continue
-            procs[int(d)] = (int(stat[stat.rindex(")") + 2:].split()[1]), stat[stat.index("(") + 1:stat.rindex(")")])
-    me = os.getpid()
-
-    def ours(pid):
-        for _ in range(20):
-            pid = procs.get(pid, (0, ""))[0]
-            if pid == me:
-                return True
-            if pid <= 1:
-                return False
-        return False
-
-    return {pid: name for pid, (_parent, name) in procs.items() if pid != me and ours(pid)}
-
-
-def web_processes():
-    return sum(1 for name in _children().values() if name.startswith("WebKitWebProc"))
-
-
 def memory():
     """MB used by this process ("app") and by the processes it started ("web": WebKit's
     and their sandboxes), and how many web processes (one per page) there are."""
-    kids = _children()
+    kids = ui.child_processes()
     return {"app MB": _memory_kb(os.getpid()) / 1024, "web MB": sum(_memory_kb(p) for p in kids) / 1024,
             "web processes": sum(1 for name in kids.values() if name.startswith("WebKitWebProc")),
             "network processes": sum(1 for name in kids.values() if name.startswith("WebKitNetwork"))}
@@ -429,11 +401,11 @@ class MeasureDrawings(ui.UITestCase):
                 ui.wait_for(lambda: not win.get_visible(), "the drawing window to close")
                 del win
                 gc.collect()
-                ui.pump_until(lambda: web_processes() <= rows[0]["web processes"], 5)
+                ui.pump_until(lambda: ui.web_processes() <= rows[0]["web processes"], 5)
                 rows.append({"scene": name, "open": i + 1, "window shown": shown * 1000,
                              "page loaded": loaded * 1000, "Excalidraw ready": ready * 1000,
                              "start on loaded page": (ready - loaded) * 1000, "longest freeze": freeze.ms,
-                             **mem, "web processes after close": web_processes()})
+                             **mem, "web processes after close": ui.web_processes()})
         RESULTS["drawing window"] = rows
 
     # -- 2. inside Excalidraw, and Done ---------------------------------------------------------

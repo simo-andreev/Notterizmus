@@ -231,6 +231,35 @@ def wait_for(cond, what="the expected state", timeout=10.0):
         raise AssertionError(f"timed out after {timeout:g} s waiting for {what}")
 
 
+def child_processes():
+    """{pid: name} of the processes this one started, and theirs (WebKit's and its sandboxes)."""
+    procs = {}
+    for d in os.listdir("/proc"):
+        if d.isdigit():
+            try:
+                stat = Path(f"/proc/{d}/stat").read_text()
+            except OSError:
+                continue
+            procs[int(d)] = (int(stat[stat.rindex(")") + 2:].split()[1]), stat[stat.index("(") + 1:stat.rindex(")")])
+    me = os.getpid()
+
+    def ours(pid):
+        for _ in range(20):
+            pid = procs.get(pid, (0, ""))[0]
+            if pid == me:
+                return True
+            if pid <= 1:
+                return False
+        return False
+
+    return {pid: name for pid, (_parent, name) in procs.items() if pid != me and ours(pid)}
+
+
+def web_processes():
+    """How many WebKit web processes (one per page) the app has running."""
+    return sum(1 for name in child_processes().values() if name.startswith("WebKitWebProc"))
+
+
 def _editor_busy():
     """True while the editor still has the cursor to place or to scroll to."""
     ed = app().win.editor
