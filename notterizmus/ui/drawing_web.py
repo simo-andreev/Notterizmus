@@ -40,7 +40,10 @@ _JS_SAVE = _JS_READY + "return await window.ntz.save();"
 _JS_CHANGED = _JS_READY + "return window.ntz.changed();"
 _JS_RENDER = _JS_READY + "return await window.ntz.render(JSON.parse(scene));"
 
-_registered = False
+# The web context of every page here. It is the module's own, not WebKit's default: a C exit
+# handler frees the default one after Python has stopped, and that also frees the URI
+# scheme handler below, a Python function, so the app crashed as it quit.
+_context = None
 
 
 def available():
@@ -65,16 +68,15 @@ def _serve(request):
 
 
 def _new_view():
-    global _registered
-    ctx = WebKit.WebContext.get_default()
-    if not _registered:
-        _registered = True
-        ctx.register_uri_scheme(SCHEME, _serve)
-        security = ctx.get_security_manager()
+    global _context
+    if _context is None:
+        _context = WebKit.WebContext.new()
+        _context.register_uri_scheme(SCHEME, _serve)
+        security = _context.get_security_manager()
         security.register_uri_scheme_as_secure(SCHEME)
         security.register_uri_scheme_as_cors_enabled(SCHEME)
     # Ephemeral: the page keeps nothing on disk (the drawing lives in the chapter file).
-    view = WebKit.WebView(network_session=WebKit.NetworkSession.new_ephemeral())
+    view = WebKit.WebView(web_context=_context, network_session=WebKit.NetworkSession.new_ephemeral())
     settings = view.get_settings()
     settings.set_javascript_can_access_clipboard(True)
     debug = bool(os.environ.get("NOTTERIZMUS_WEB_DEBUG"))
@@ -236,7 +238,7 @@ class DrawingWindow(Adw.Window):
         self._ready = False
         self.view = _new_view()
         self.view.set_vexpand(True)
-        self.view.connect("web-process-terminated", self._crashed)
+        self._crash_handler = self.view.connect("web-process-terminated", self._crashed)
         header = Adw.HeaderBar(show_start_title_buttons=False, show_end_title_buttons=False)
         cancel = Gtk.Button(label="Cancel")
         cancel.connect("clicked", lambda _b: self.close())
@@ -256,6 +258,8 @@ class DrawingWindow(Adw.Window):
               options=json.dumps({"dark": dark}))
 
     def _opened(self, _text, error):
+        if self.view is None:  # closed meanwhile
+            return
         if error is not None:
             self.toasts.add_toast(Adw.Toast(title=f"The drawing editor didn't start: {error}", timeout=0))
             return
@@ -275,6 +279,8 @@ class DrawingWindow(Adw.Window):
         _call(self.view, _JS_SAVE, self._saved)
 
     def _saved(self, text, error):
+        if self.view is None:  # closed meanwhile
+            return
         try:
             if error is not None:
                 raise ValueError(error)
@@ -293,11 +299,31 @@ class DrawingWindow(Adw.Window):
 
     def _close_request(self, _w):
         if self._closing or not self._ready:  # nothing to lose before the editor is up
+            self._release()
             return False
         _call(self.view, _JS_CHANGED, self._ask_discard)
         return True
 
+    def _release(self):
+        """The window is going. End its web process now: WebKit keeps it until the view
+        is freed. Then drop the window's widgets. The handlers on its buttons hold the
+        window, and that cycle runs through GTK, where Python's garbage collector can't
+        see it. GTK hides a closed window without disposing of it, which would have
+        broken the cycle, so without this the window and everything in it would stay
+        until the app quits. The window also keeps its focus widget after the widget
+        is taken out, which would keep the content alive, so focus is cleared first."""
+        if self.view is None:
+            return
+        view, self.view = self.view, None
+        view.disconnect(self._crash_handler)  # ending it on purpose isn't a crash
+        view.terminate_web_process()
+        self.set_focus(None)
+        self.set_content(None)
+        self.toasts = self.done_btn = None
+
     def _ask_discard(self, text, error):
+        if self.view is None:  # closed meanwhile
+            return
         if error is not None or text != "true":
             self._closing = True
             self.close()
