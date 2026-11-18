@@ -33,7 +33,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Ctrl+W / Ctrl+Shift+W expands and shrinks the selection: word → item text → item → section → everything.
 - Ctrl+A selects all items. Shift+↑/↓ at the first or last line, or Shift+click, extends an item selection.
 - Dragging the mouse from one item to another selects whole items (within one item it selects text). Past the top or bottom of the window the outline scrolls and the selection keeps growing.
-- Selected items can be copied, cut, deleted, indented or formatted together.
+- Selected items can be copied, cut, deleted, indented or formatted together. Only the selected items are affected: delete or cut a numbered item without the items under it, and they move up into its place.
 - Multiple cursors: tap Ctrl twice, keep it held, then press ↑/↓. Typing, Backspace, Delete and cursor keys apply at every cursor.
 - The editor's Ctrl and Alt shortcuts (Ctrl+A, Ctrl+B, Ctrl+Z and the rest) work on non-Latin keyboard layouts too, such as Bulgarian.
 

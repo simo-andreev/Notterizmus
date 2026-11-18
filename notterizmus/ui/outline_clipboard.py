@@ -11,9 +11,8 @@ from ..export import runs_html, to_html, to_plain
 from ..importer import block_nodes, html_items, join_lines, parse, text_items
 from ..layout import layout
 from ..model import (Node, Run, can_contain, enclosing_heading, fresh_ids, leaf_insert_index, runs_from_json,
-                     runs_text, runs_to_json)
+                     runs_text, runs_to_json, selected_json)
 from .rows import TextRow
-from .outline_selection import _top_level
 
 NODES_MIME = "application/x-notterizmus-nodes+json"
 RUNS_MIME = "application/x-notterizmus-runs+json"
@@ -52,10 +51,12 @@ class ClipboardMixin:
         self.get_clipboard().set_content(provider)
 
     def copy_items(self, cut=False):
-        nodes = _top_level(self.sel or ([self.current] if self.current else []))
+        """Copy (or cut) the selected items, and only those; with none selected, the current
+        item with everything under it."""
+        nodes = list(self.sel) or (list(self.current.walk()) if self.current else [])
         if not nodes:
             return
-        ids = {n.id for top in nodes for n in top.walk()}
+        ids = {n.id for n in nodes}
         lines = layout(self.doc.root, self.rules)
         keep = []
         for i, ln in enumerate(lines):
@@ -67,7 +68,7 @@ class ClipboardMixin:
             after = next((l.node for l in lines[i + 1:] if l.node is not None), None)
             if before is not None and after is not None and before.id in ids and after.id in ids:
                 keep.append(ln)
-        data = json.dumps({"nodes": [n.to_json() for n in nodes]}, ensure_ascii=False)
+        data = json.dumps({"nodes": selected_json(nodes)}, ensure_ascii=False)
         self._set_clipboard([(NODES_MIME, data), *export_formats(keep, self.rules)])
         if cut:
             self.delete_items(nodes)

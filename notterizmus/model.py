@@ -268,6 +268,58 @@ def remove_promote(node):
     node.children = []
 
 
+def _removable(node):
+    """node is still in a chapter, and not inside a block from a newer version (whose
+    sub-items have no rows: they go, or stay, with that block)."""
+    p = node.parent
+    while p is not None and p.kind != "root":
+        if p.kind not in BLOCK_KINDS:
+            return False
+        p = p.parent
+    return p is not None
+
+
+def remove_items(nodes):
+    """Remove exactly these items. Sub-items that aren't among them move up into the place
+    of the nearest one removed, as with remove_promote; a block from a newer version goes
+    with everything under it."""
+    for n in nodes:
+        if not _removable(n):
+            continue
+        if n.kind in BLOCK_KINDS:
+            remove_promote(n)
+        else:
+            n.detach()
+
+
+def selected_json(nodes):
+    """JSON of exactly these items, in their outline shape: an item between them that isn't
+    among them gives way to its sub-items that are, as remove_items would. A block from a
+    newer version goes with everything under it."""
+    ids = {n.id for n in nodes}
+
+    def keep(n):
+        kids = [] if n.id in ids and n.kind not in BLOCK_KINDS else [j for c in n.children for j in keep(c)]
+        if n.id not in ids:
+            return kids
+        d = n.to_json()
+        if n.kind in BLOCK_KINDS:
+            d.pop("children", None)
+            if kids:
+                d["children"] = kids
+        return [d]
+
+    def outermost(n):
+        p = n.parent
+        while p is not None:
+            if p.id in ids:
+                return False
+            p = p.parent
+        return True
+
+    return [j for n in nodes if outermost(n) for j in keep(n)]
+
+
 def set_kind(node, kind, marker=None):
     """Change heading <-> bullet. Returns an error string or None."""
     if kind == "heading" and not can_contain(node.parent, Node("heading")):

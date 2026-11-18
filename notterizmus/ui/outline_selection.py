@@ -48,8 +48,11 @@ class SelectionMixin:
 
     # -- item selection (Ctrl+A, Ctrl+W, Shift+Up/Down) -------------------------------------
 
+    # self.sel holds exactly the items selected, in outline order. An item doesn't stand for
+    # the items under it: they are selected (and drawn as such) only when they are covered too.
+
     def _sel_ids(self):
-        return {n.id for top in self.sel for n in top.walk()}
+        return {n.id for n in self.sel}
 
     def _apply_sel_css(self):
         ids = self._sel_ids()
@@ -57,7 +60,7 @@ class SelectionMixin:
             (row.add_css_class if nid in ids else row.remove_css_class)("node-selected")
 
     def set_selection(self, nodes):
-        self.sel = _top_level(list(nodes))
+        self.sel = list(dict.fromkeys(nodes))
         if self.sel and self.cur_view is not None and self.cur_view.has_selection():
             self.cur_view.set_cursor(self.cur_view.cursor_offset())  # drop the text selection
         self._apply_sel_css()
@@ -71,7 +74,7 @@ class SelectionMixin:
     def select_all(self):
         order = self._order()
         self.sel_anchor, self.sel_head = order[0], order[-1]
-        self.set_selection(self.doc.root.children)
+        self.set_selection(order)
 
     def extend_selection(self, delta):
         order = self._order()
@@ -223,13 +226,9 @@ class SelectionMixin:
             return
         state = self._sel_state()
         if self.sel:
-            parent = self.sel[0].parent
-            if parent is None or parent.kind == "root":
-                if set(map(id, self.sel)) == set(map(id, self.doc.root.children)):
-                    return
-                new = list(self.doc.root.children)
-            else:
-                new = [parent]
+            new = self._scope_around(self.sel)
+            if new is None:
+                return
         else:
             row = self.rows.get(node.id)
             if isinstance(row, TextRow) and v is row.view:
@@ -248,6 +247,20 @@ class SelectionMixin:
             new = [node]
         self._wstack.append(state)
         self.set_selection(new)
+
+    def _scope_around(self, nodes):
+        """The smallest item with everything under it that holds more than nodes (an item
+        with sub-items holds more than itself), else the whole chapter; None when nodes are
+        the whole chapter already."""
+        ids = {n.id for n in nodes}
+        a = _top_level(nodes)[0]
+        while a is not None and a.kind != "root":
+            sub = list(a.walk())
+            if ids < {n.id for n in sub}:
+                return sub
+            a = a.parent
+        order = self._order()
+        return None if ids >= {n.id for n in order} else order
 
     def shrink_selection(self):
         if not self._wstack:
@@ -278,7 +291,7 @@ class SelectionMixin:
             self.format_items("bold" if name.lower() == "b" else "italic")
             return True
         if name in ("Tab", "ISO_Left_Tab"):
-            nodes = list(self.sel)
+            nodes = _top_level(self.sel)  # an item takes the items under it along
             with self._op():
                 for n in (nodes if name == "Tab" else reversed(nodes)):
                     (indent if name == "Tab" else outdent)(n)
@@ -304,7 +317,7 @@ class SelectionMixin:
         return None
 
     def format_items(self, attr):
-        nodes = [n for top in self.sel for n in top.walk()]
+        nodes = list(self.sel)
         runs = [r for n in nodes for r in n.runs]
         runs += [r for n in nodes if n.kind == "table" for row in n.data.get("rows", [])
                  for cell in row for r in cell]
