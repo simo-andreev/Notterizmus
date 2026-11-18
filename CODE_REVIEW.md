@@ -245,7 +245,7 @@ would replace chapter 10, so to keep those notes, copy them out before then (see
   - Verify: on the desktop with NVIDIA's driver, `scripts/measure-drawing-stroke.py` still
     shows about 60 frames a second, and `webkit://gpu` still reports the GPU (R29f
     unchanged).
-- [ ] **CR42. Declare GTK versions.**
+- [x] **CR42. Declare GTK versions.**
   - Fix: `gi.require_version(...)` before every `from gi.repository import …`, or one
     small module that every UI module imports first.
   - Verify: the unit run prints no PyGIWarning, and this command, which fails today,
@@ -253,6 +253,41 @@ would replace chapter 10, so to keep those notes, copy them out before then (see
     `python3 -c 'import warnings, gi; warnings.simplefilter("error", gi.PyGIWarning); import notterizmus.ui.rows'`
 
 Done when the clean build passes and the unit run is free of errors and warnings.
+
+#### Phase 1 results
+
+Worked on 2026-11-19. Both fixes are in and tested. CR1's box stays open for two checks
+that need things this session didn't have: a real clean build, and your desk.
+
+- CR1: `_prefer_gpu` is now `gpu.prefer_gpu` in `notterizmus/gpu.py`, with no GTK. It is
+  called at the top of `ui/app.py`, before GTK loads, and by
+  `scripts/measure-drawing-stroke.py`. Its tests moved to `tests/test_gpu.py`, which also
+  checks that order, and that no other module calls it when imported. That is CR41's GPU
+  half: importing `drawing_web` no longer changes `os.environ`. `test_selection.py`
+  imports Gdk inside the one test that uses it. The guard, `tests/test_without_gtk.py`,
+  failed before the fix with the 5 errors and passes now.
+- CR42: `notterizmus/ui/__init__.py` (the folder was a namespace package) declares Gtk,
+  Gdk, Adw, Pango and Graphene once, before any UI module loads; `app.py`'s own
+  declarations are gone. `tests/test_gi_versions.py` checks that every library a UI module
+  imports has a declared version, and imports each UI module on its own with
+  `PyGIWarning` as an error: 16 of the 17 warned before, none now. The review's command
+  succeeds.
+- Unit suite: 372 tests pass, 31 skipped, no warnings, in 5.0 s (2.1 s before; the guard
+  runs the suite a second time). With PyGObject hidden: 372 pass, no errors (5 before).
+- UI suite: 244 tests pass (the 4 GPU tests moved to the unit suite), 4 skipped, no
+  warnings, in 194 s; with the real Excalidraw all 244 pass, in 199 s. Both took as long
+  as in phase 0.
+- Package build: none of podman, docker, sbuild or mmdebstrap is installed, so the clean
+  26.04 build (see [Commands](#commands)) wasn't run. Instead the package was built from
+  the tree with PyGObject hidden by the shim. At `5c90436` that build failed in
+  `dh_auto_test` with the same 5 errors; with the fixes it builds (372 tests pass, 32
+  skipped), the `.deb` holds both new modules, and lintian reports nothing. The next PPA
+  upload is the real check (Release gate, step 6).
+- Left for your desk: R29f's check. The screen was locked and the monitor off, so the
+  drawing window got no frames and `scripts/measure-drawing-stroke.py` timed out on both
+  of WebKit's paths. It should still show about 60 frames a second, with
+  `WEBKIT_FORCE_DMABUF_RENDERER=1` and GTK's GL renderer (see
+  [Manual checks](#manual-checks-on-the-desktop)).
 
 ### Phase 2: Data safety (M)
 
@@ -547,7 +582,8 @@ verification, plus the checks named.
   `ChapterSidebar.focused_target()` instead of window.py reading `row._path`.
 - [ ] **CR41.** Spelling state owned by the editor and passed to the views; the GPU
   environment set explicitly when the app starts (done with CR1). A test checks that
-  importing `drawing_web` no longer changes `os.environ`.
+  importing `drawing_web` no longer changes `os.environ` (done with CR1:
+  `tests/test_gpu.py` checks that only `ui/app.py` calls `gpu.prefer_gpu()` when imported).
 - [ ] **CR39.** Kind changes and table edits happen inside `with self._op():`; the
   attributes the mixins share are listed at the top of `outline.py`. UI tests: each is one
   undo step.
@@ -610,6 +646,16 @@ command hasn't been run:
 git archive --prefix=notterizmus/ HEAD | podman run --rm -i ubuntu:26.04 sh -euc '
   apt-get update -qq && apt-get install -y -qq build-essential debhelper dh-python python3 >/dev/null
   mkdir /b && cd /b && tar -x && cd notterizmus && dpkg-buildpackage -b -us -uc'
+```
+
+Without a container, a local build with PyGObject hidden by the shim catches a GTK import
+in the tests (CR1), though not other missing Build-Depends. It reproduced Launchpad's
+failure before phase 1:
+
+```bash
+shim=$(mktemp -d) && mkdir "$shim/gi" && echo 'raise ImportError("no PyGObject")' >"$shim/gi/__init__.py"
+work=$(mktemp -d) && git archive --prefix=notterizmus/ HEAD | tar -x -C "$work"
+(cd "$work/notterizmus" && PYTHONPATH="$shim" dpkg-buildpackage -b -us -uc)
 ```
 
 ### Checks of your notes
@@ -694,7 +740,8 @@ For each release, the steps from README.md and PROJECT_CONTEXT.md, plus the chec
 2. Commit. `scripts/release.sh` builds from the last commit and refuses uncommitted or
    untracked files, this one included.
 3. `scripts/ui-tests.sh`, and the load check for phases that touched timing.
-4. Phase 1 onward: build once in a clean Ubuntu 26.04 (container or sbuild).
+4. Phase 1 onward: build once in a clean Ubuntu 26.04 (container or sbuild), or at least
+   with PyGObject hidden (see [Commands](#commands)).
 5. `scripts/release.sh deb`, install it, do the manual checks, and check that
    `lintian dist/*.deb` shows nothing above pedantic.
 6. When you say so, `scripts/release.sh ppa`. Then confirm on Launchpad that the build

@@ -64,7 +64,7 @@ if [ "${NOTTERIZMUS_UI_BACKEND:-}" = weston ]; then
     wait_for "$run/notterizmus-ui"
     # No GPU on a headless display: skip GTK's GL/Vulkan probing (and its libEGL noise).
     # The renderer is named too, or the app would ask for GL on a machine with NVIDIA's
-    # driver (drawing_web._prefer_gpu).
+    # driver (gpu.prefer_gpu).
     export GDK_BACKEND=wayland WAYLAND_DISPLAY=notterizmus-ui GDK_DISABLE=gl,vulkan GSK_RENDERER=cairo
     echo "UI tests on a headless Weston"
 elif command -v gtk4-broadwayd >/dev/null; then
@@ -73,7 +73,7 @@ elif command -v gtk4-broadwayd >/dev/null; then
     spid=$!
     wait_for "$run/broadway1.socket"
     # Broadway's own renderer, named so the app doesn't ask for GL on a machine with
-    # NVIDIA's driver (drawing_web._prefer_gpu).
+    # NVIDIA's driver (gpu.prefer_gpu).
     export GDK_BACKEND=broadway BROADWAY_DISPLAY=:0 NOTTERIZMUS_UI_BROADWAY="$run/input.socket" \
         GSK_RENDERER=broadway
     echo "UI tests on Broadway, with real keyboard and mouse input"

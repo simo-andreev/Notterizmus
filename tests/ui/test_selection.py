@@ -1,6 +1,4 @@
 """Selecting whole items with the keyboard (Ctrl+A, Ctrl+W, Shift+arrows) and acting on them."""
-from gi.repository import Gdk
-
 from notterizmus.guide import b, h, table
 
 from . import support as ui
@@ -31,6 +29,7 @@ class SelectionTest(ui.UITestCase):
         self.assertEqual((self.selected(), self.marked()), ([], []))
 
     def test_ctrl_a_selects_every_item_on_a_cyrillic_layout(self):
+        from gi.repository import Gdk  # needs GTK, so not at the top: the package build has none
         self.chapter()
         r = ui.focus(self.g)
         ok, keys = Gdk.Display.get_default().map_keyval(Gdk.KEY_a)

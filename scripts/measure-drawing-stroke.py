@@ -22,6 +22,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from notterizmus import gpu  # noqa: E402
+
+gpu.prefer_gpu()  # as the app does, before GTK and WebKit load (R29f)
+
 import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")

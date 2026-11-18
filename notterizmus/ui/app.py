@@ -4,11 +4,11 @@ import os
 import sys
 from pathlib import Path
 
-import gi
+from .. import gpu
 
-gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+gpu.prefer_gpu()  # before GTK loads: GTK and WebKit read what it sets once, at the start
+
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402  (their versions: __init__.py)
 
 from .. import APP_ID, APP_NAME  # noqa: E402
 from .window import Window  # noqa: E402
