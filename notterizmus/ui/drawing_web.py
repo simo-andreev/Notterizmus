@@ -263,6 +263,33 @@ def render(data, done):
 
 # --- the drawing window --------------------------------------------------------------
 
+class _EvenSize(Gtk.LayoutManager):
+    """Gives a widget's child an even width and height, one pixel less when the room is
+    odd. WebKit 2.52's compositor draws a canvas wider (or taller) than 2048 pixels half
+    a pixel off when that size is odd, so Excalidraw's drawing was blurred sideways in a
+    window 2493 pixels wide, and only on the GPU path (R29g; WebKit bug 317744 looks like
+    the cause). The pixel left over shows the window's background."""
+
+    def do_get_request_mode(self, _widget):
+        return Gtk.SizeRequestMode.CONSTANT_SIZE
+
+    def do_measure(self, widget, orientation, for_size):
+        child = widget.get_first_child()
+        return child.measure(orientation, for_size) if child is not None else (0, 0, -1, -1)
+
+    def do_allocate(self, widget, width, height, baseline):
+        child = widget.get_first_child()
+        if child is not None:
+            child.allocate(width - width % 2, height - height % 2, -1, None)
+
+
+def _even_size(child):
+    """child inside a bin that gives it an even size (_EvenSize)."""
+    box = Adw.Bin(child=child, hexpand=True, vexpand=True)
+    box.set_layout_manager(_EvenSize())
+    return box
+
+
 class DrawingWindow(Adw.Window):
     """Excalidraw on one drawing. Done hands the scene back; Cancel (or closing the window)
     drops the changes, after asking if there are any."""
@@ -287,7 +314,7 @@ class DrawingWindow(Adw.Window):
         header.pack_end(self.done_btn)
         tv = Adw.ToolbarView()
         tv.add_top_bar(header)
-        self.toasts = Adw.ToastOverlay(child=self.view)
+        self.toasts = Adw.ToastOverlay(child=_even_size(self.view))
         tv.set_content(self.toasts)
         self.set_content(tv)
         self.connect("close-request", self._close_request)

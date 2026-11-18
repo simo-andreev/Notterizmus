@@ -509,6 +509,28 @@ class PreferGpuTest(unittest.TestCase):
                          {"WEBKIT_FORCE_DMABUF_RENDERER": "1", "GSK_RENDERER": "vulkan"})
 
 
+class EvenSizeTest(ui.UITestCase):
+    """WebKit 2.52 drew a canvas over 2048 pixels wide half a pixel off when its width was
+    odd, which blurred the drawing (R29g), so the web view always gets an even size."""
+
+    def test_the_web_view_gets_an_even_width_and_height(self):
+        from gi.repository import Gtk
+        from notterizmus.ui import drawing_web
+        rooms = []
+        for width, height in ((901, 601), (900, 600)):
+            child = Gtk.DrawingArea()
+            win = Gtk.Window(default_width=width, default_height=height, child=drawing_web._even_size(child))
+            self.addCleanup(win.destroy)
+            win.present()
+            ui.wait_for(lambda: child.get_width() > 0, "the window to be laid out")
+            room = child.get_parent()
+            self.assertEqual((child.get_width(), child.get_height()),
+                             (room.get_width() - room.get_width() % 2, room.get_height() - room.get_height() % 2))
+            self.assertEqual((child.get_width() % 2, child.get_height() % 2), (0, 0))
+            rooms.append((room.get_width() % 2, room.get_height() % 2))
+        self.assertIn((1, 1), rooms, "no odd room was tried")
+
+
 class RealDrawingWindowTest(ui.UITestCase):
     """Excalidraw itself, where it can run: opens a scene, hands it back with a picture."""
 
