@@ -25,7 +25,7 @@ class SelectionTest(ui.UITestCase):
         self.chapter()
         r = ui.focus(self.g)
         self.assertTrue(ui.press(r.view, "a", ctrl=True))
-        self.assertEqual(self.selected(), ["Intro", "Other"], "the top-level items stand for everything under them")
+        self.assertEqual(self.selected(), ["Intro", "alpha beta", "gamma", "delta", "Other", "omega"])
         self.assertEqual(self.marked(), ["Intro", "alpha beta", "gamma", "delta", "Other", "omega"])
         ui.press(r.view, "Escape")
         self.assertEqual((self.selected(), self.marked()), ([], []))
@@ -40,7 +40,7 @@ class SelectionTest(ui.UITestCase):
                                                   Gdk.ModifierType.CONTROL_MASK)
         ui.wait_editor(0.12)
         self.assertTrue(handled, "Ctrl+A on the Bulgarian layout arrives as Ctrl+Cyrillic_a")
-        self.assertEqual(self.selected(), ["Intro", "Other"])
+        self.assertEqual(self.selected(), ["Intro", "alpha beta", "gamma", "delta", "Other", "omega"])
         self.assertIsNone(r.view.selection_offsets(), "not just the item's text")
 
     def test_ctrl_w_selects_a_little_more_each_time_and_ctrl_shift_w_goes_back(self):
@@ -53,16 +53,26 @@ class SelectionTest(ui.UITestCase):
         self.assertEqual(steps, [((0, 5), []),                      # the word
                                  ((0, 10), []),                     # the item's text
                                  (None, ["alpha beta"]),            # the item
-                                 (None, ["Intro"]),                 # its section
-                                 (None, ["Intro", "Other"])])       # everything
+                                 (None, ["Intro", "alpha beta", "gamma", "delta"]),  # its section
+                                 (None, ["Intro", "alpha beta", "gamma", "delta", "Other", "omega"])])  # everything
         ui.press(r.view, "w", ctrl=True)
-        self.assertEqual(self.selected(), ["Intro", "Other"], "nothing larger to select")
+        self.assertEqual(self.selected(), ["Intro", "alpha beta", "gamma", "delta", "Other", "omega"], "nothing larger to select")
         back = []
         for _ in range(5):
             ui.press(r.view, "w", ctrl=True, shift=True)
             back.append((r.view.selection_offsets(), self.selected()))
-        self.assertEqual(back, [(None, ["Intro"]), (None, ["alpha beta"]), ((0, 10), []), ((0, 5), []), (None, [])])
+        self.assertEqual(back, [(None, ["Intro", "alpha beta", "gamma", "delta"]), (None, ["alpha beta"]), ((0, 10), []), ((0, 5), []),
+                                (None, [])])
         self.assertEqual(r.view.cursor_offset(), 2, "the cursor is back where it was")
+
+    def test_ctrl_w_selects_an_item_then_it_with_its_sub_items(self):
+        self.chapter()
+        r = ui.focus(self.intro, 1)
+        ui.press(r.view, "w", ctrl=True)  # its text: the one word
+        ui.press(r.view, "w", ctrl=True)
+        self.assertEqual(self.marked(), ["Intro"], "the item alone")
+        ui.press(r.view, "w", ctrl=True)
+        self.assertEqual(self.marked(), ["Intro", "alpha beta", "gamma", "delta"], "then its section")
 
     def test_ctrl_w_on_a_one_word_item_goes_straight_to_its_text(self):
         self.chapter()
@@ -83,8 +93,8 @@ class SelectionTest(ui.UITestCase):
         self.assertEqual(self.selected(), ["alpha beta", "gamma"])
         ui.press(r.view, "Up", shift=True)
         ui.press(r.view, "Up", shift=True)
-        self.assertEqual(self.selected(), ["Intro"], "going above the start selects upwards; a parent stands for its items")
-        self.assertEqual(self.marked(), ["Intro", "alpha beta", "gamma", "delta"])
+        self.assertEqual(self.selected(), ["Intro", "alpha beta"], "going above the start selects upwards")
+        self.assertEqual(self.marked(), ["Intro", "alpha beta"], "a parent doesn't bring its other items along")
 
     def test_delete_removes_the_selected_items_and_undo_restores_them(self):
         self.chapter()
@@ -96,6 +106,31 @@ class SelectionTest(ui.UITestCase):
         self.assertIs(self.ed.current, self.intro, "the cursor moves to the item above")
         ui.press(self.ed.cur_view, "z", ctrl=True)
         self.assertEqual([n.text for n in self.win.doc.root.children[0].children], ["alpha beta", "gamma", "delta"])
+
+    def test_deleting_a_section_heading_keeps_the_items_under_it_that_werent_selected(self):
+        doc = ui.open_chapter([h("Intro", b("alpha"), h("Sub", b("one", b("one.a")), b("two"))), h("Other", b("omega"))])
+        intro = doc.root.children[0]
+        r = ui.focus(intro.children[0])
+        ui.press(r.view, "Down", shift=True)
+        self.assertEqual(self.selected(), ["alpha", "Sub"])
+        self.assertEqual(self.marked(), ["alpha", "Sub"], "only what the selection went over is drawn as selected")
+        self.assertTrue(ui.press(r.view, "Delete"))
+        self.assertEqual([(n.text, [c.text for c in n.children]) for n in intro.children],
+                         [("one", ["one.a"]), ("two", [])], "the section's items move up into its place")
+        self.assertIs(self.ed.current, intro, "the cursor moves to the item above")
+        ui.press(self.ed.cur_view, "z", ctrl=True)
+        self.assertEqual([n.text for n in self.win.doc.root.walk()][1:],
+                         ["Intro", "alpha", "Sub", "one", "one.a", "two", "Other", "omega"])
+
+    def test_deleting_a_section_with_its_items_selected_deletes_them_all(self):
+        doc = ui.open_chapter([h("Intro", b("alpha"), h("Sub", b("one"), b("two"))), h("Other", b("omega"))])
+        intro = doc.root.children[0]
+        r = ui.focus(intro.children[0])
+        for _ in range(3):
+            ui.press(r.view, "Down", shift=True)
+        self.assertEqual(self.marked(), ["alpha", "Sub", "one", "two"])
+        ui.press(r.view, "Delete")
+        self.assertEqual(intro.children, [])
 
     def test_deleting_everything_leaves_one_empty_item(self):
         self.chapter()
@@ -157,7 +192,7 @@ class ItemClipboardTest(ui.UITestCase):
         r = ui.focus(src.children[0])
         ui.press(r.view, "Down", shift=True)
         ui.press(r.view, "Down", shift=True)
-        self.assertEqual(len(self.ed.sel), 2)
+        self.assertEqual([n.text for n in self.ed.sel], ["one", "under one", "two"])
         self.assertTrue(ui.press(r.view, "c", ctrl=True))
         self.assertEqual(ui.clipboard("text/plain"), "     • one\n         • under one\n     • two\n")
         self.assertIn("under one", ui.clipboard("application/x-notterizmus-nodes+json"))
@@ -181,3 +216,18 @@ class ItemClipboardTest(ui.UITestCase):
         ui.row(intro.children[0]).view.emit("paste-clipboard")
         ui.wait_for(lambda: len(intro.children) == 3, "the cut items to be pasted")
         self.assertEqual([n.text for n in intro.children], ["keep", "cut me", "and me"])
+
+    def test_cutting_a_section_heading_alone_takes_only_the_heading(self):
+        doc = ui.open_chapter([h("Intro", b("keep"), h("Sub", b("stays"))), h("Other", b("here"))])
+        intro, other = doc.root.children
+        r = ui.focus(intro.children[0])
+        ui.press(r.view, "Down", shift=True)
+        self.assertTrue(ui.press(r.view, "x", ctrl=True))
+        self.assertEqual([n.text for n in intro.children], ["stays"], "the section's item moves up")
+        self.assertEqual(ui.clipboard("text/plain"), "│    • keep\n└ Ⅰ.1) Sub\n", "the heading without its item")
+        ui.wait_editor()
+        ui.row(other.children[0]).view.emit("paste-clipboard")
+        ui.wait_for(lambda: len(doc.root.children) == 3, "the cut items to be pasted")
+        self.assertEqual([n.text for n in other.children], ["here", "keep"])
+        self.assertEqual([(n.text, n.children) for n in doc.root.children[2:]], [("Sub", [])],
+                         "the heading is pasted without what wasn't cut")

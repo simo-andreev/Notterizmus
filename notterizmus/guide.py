@@ -103,7 +103,8 @@ def build(rules=None):
           b("Dragging the mouse from one item to another selects the items in between; within one "
             "item it selects text, as usual."),
           b(("Selected items can be copied (", key("Ctrl+C"), "), cut (", key("Ctrl+X"), "), deleted (",
-             key("Delete"), "), indented (", key("Tab"), ") or made bold (", key("Ctrl+B"), ") together.")),
+             key("Delete"), "), indented (", key("Tab"), ") or made bold (", key("Ctrl+B"), ") together. "
+             "Delete a numbered item without the items under it, and they move up into its place.")),
           b((key("Alt+↑"), " and ", key("Alt+↓"), " move an item up or down.")),
           b((key("Ctrl+F"), " finds text anywhere in the chapter, tables included. ", key("Enter"), " and ",
              key("Shift+Enter"), " go to the next and previous match, ", key("Esc"), " leaves the cursor on it, "

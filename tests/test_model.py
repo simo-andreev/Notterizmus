@@ -8,7 +8,7 @@ from pathlib import Path
 from notterizmus.model import (FORMAT, Document, Node, Run, can_contain, chapter_filename, display_order,
                                enclosing_heading, fresh_ids, heading_numbers, indent, is_text,
                                leaf_insert_index, move, new_table_data, normalize_runs, outdent,
-                               remove_promote, runs_text, set_kind)
+                               remove_items, remove_promote, runs_text, selected_json, set_kind)
 
 
 def H(text, *kids):
@@ -210,6 +210,58 @@ class RemoveAndKindTest(unittest.TestCase):
         top = H("A", B("a"), leaf, B("b"))
         remove_promote(leaf)
         self.assertEqual(texts(top.children), ["a", "b"])
+
+    def test_removing_selected_items_keeps_the_sub_items_that_werent_selected(self):
+        sub = H("Sub", B("one", B("one.a")), B("two"))
+        top = H("A", B("before"), sub, B("after"))
+        root = Node("root", children=[top, H("B", B("b1"))])
+        remove_items([top.children[0], sub])
+        self.assertEqual(texts(top.children), ["one", "two", "after"], "they move up into the section's place")
+        self.assertEqual(texts(top.children[0].children), ["one.a"])
+        remove_items([root.children[1]])
+        self.assertEqual([(n.kind, n.text) for n in root.children], [("heading", "A"), ("heading", "b1")],
+                         "a top-level item's bullets become numbered, as with remove_promote")
+
+    def test_removing_an_item_with_everything_under_it_selected_removes_them_all(self):
+        top = H("A", B("x", B("x1", B("x1a"))), B("y"))
+        Node("root", children=[top])
+        x = top.children[0]
+        remove_items(list(x.walk()))
+        self.assertEqual(texts(top.children), ["y"])
+
+    def test_a_block_from_a_newer_version_goes_whole(self):
+        newer = Node("chart", children=[H("inside")])
+        top = H("A", newer, B("after"))
+        Node("root", children=[top])
+        remove_items([newer])
+        self.assertEqual(texts(top.children), ["after"], "its sub-items aren't shown, so they aren't promoted")
+        hidden = H("hidden")
+        newer = Node("chart", children=[hidden])
+        top.insert(0, newer)
+        remove_items([hidden])
+        self.assertEqual(newer.children, [hidden], "an item inside one isn't removed on its own")
+
+    def test_selected_json_holds_exactly_the_selected_items_in_their_shape(self):
+        sub = H("Sub", B("one", B("one.a")), B("two"))
+        top = H("A", B("before"), sub, B("after"))
+        Node("root", children=[top])
+        one, one_a = sub.children[0], sub.children[0].children[0]
+
+        def shape(js):
+            return [(j["runs"][0]["t"], shape(j.get("children", []))) for j in js]
+
+        self.assertEqual(shape(selected_json([top.children[0], sub])), [("before", []), ("Sub", [])])
+        self.assertEqual(shape(selected_json([sub, one, one_a])), [("Sub", [("one", [("one.a", [])])])])
+        self.assertEqual(shape(selected_json([sub, one_a])), [("Sub", [("one.a", [])])],
+                         "an unselected item in between gives way to its selected sub-items")
+        self.assertEqual(shape(selected_json(list(top.walk()))), shape([top.to_json()]))
+
+    def test_selected_json_keeps_a_block_from_a_newer_version_whole(self):
+        newer = Node("chart", children=[H("inside")])
+        newer.extra = {"spec": {"bars": 3}}
+        top = H("A", newer)
+        Node("root", children=[top])
+        self.assertEqual(selected_json([newer]), [newer.to_json()])
 
     def test_a_numbered_item_cannot_become_a_bullet_while_it_has_numbered_children(self):
         top = H("A", B("b"), H("A1"))

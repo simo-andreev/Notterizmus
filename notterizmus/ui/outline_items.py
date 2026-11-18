@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from .. import drawing
-from ..model import (Node, enclosing_heading, is_text, leaf_insert_index, new_table_data, remove_promote,
-                     set_kind)
+from ..model import (Node, enclosing_heading, is_text, leaf_insert_index, new_table_data, remove_items,
+                     remove_promote, set_kind)
 from . import drawing_web
-from .outline_selection import _top_level
 
 
 class ItemsMixin:
@@ -156,16 +155,16 @@ class ItemsMixin:
             self.refresh(focus=target or self._order()[0], offset=-1)
 
     def delete_items(self, nodes):
-        """Delete items with everything under them."""
-        nodes = _top_level(list(nodes))
+        """Delete these items and nothing else: sub-items that aren't among them move up into
+        their place, as with Delete Item (model.remove_items)."""
+        order = self._order()
+        pos = {id(n): i for i, n in enumerate(order)}
+        nodes = [n for n in nodes if id(n) in pos]
         if not nodes:
             return
-        order = self._order()
-        first = min(order.index(n) for n in nodes)
+        first = min(pos[id(n)] for n in nodes)
         with self._op():
-            for n in nodes:
-                if n.parent is not None:
-                    n.detach()
+            remove_items(nodes)
             self._ensure_nonempty()
             self.sel = []
             order = self._order()

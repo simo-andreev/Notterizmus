@@ -67,6 +67,19 @@ class DragSelectTest(ui.UITestCase):
         ui.real_key("z", ctrl=True)
         self.assertEqual(len(self.win.doc.root.children[0].children), 4)
 
+    def test_dragging_onto_a_section_heading_deletes_only_the_heading(self):
+        doc = ui.open_chapter([h("Intro", b("one two three"), h("Sub", b("four five six"), b("seven eight")))])
+        ui.pump(0.2)
+        intro = doc.root.children[0]
+        first, sub = intro.children
+        ui.real_drag(self.at(first), self.at(sub))
+        self.assertEqual(self.selected(), {first.id, sub.id})
+        self.assertFalse(any(ui.row(n).has_css_class("node-selected") for n in sub.children),
+                         "the items under the heading weren't dragged over")
+        ui.real_key("Delete")
+        self.assertEqual([n.runs[0].text for n in self.win.doc.root.children[0].children],
+                         ["four five six", "seven eight"])
+
     def test_dragging_past_the_bottom_scrolls_and_keeps_selecting(self):
         doc = ui.open_chapter([h("Long list", *[b(f"note {i}") for i in range(80)])])
         ui.pump(0.2)
