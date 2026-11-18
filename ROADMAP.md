@@ -105,7 +105,7 @@ Added 2026-11-17, after drawings shipped in 1.4.0.
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R29 | **Excalidraw performance**. Measure first, as in R15: time to open the drawing window, typing and drawing delay inside it, time to Done, preview rendering when a chapter with several drawings opens, and the effect of large scenes (pasted images) on autosave, undo and Earlier Versions. Then fix what is slow. Candidates: keep one warm, hidden web view instead of starting a new one (and a new web process loading the 5.6 MB bundle) for every Ctrl+D or Edit Drawing; render previews in parallel or ahead of time; keep scene data out of the undo snapshots. Undo turns the whole chapter into JSON after every edit, drawings included, and keeps up to 500 such snapshots | Drawings are new and untested at the scale of a real chapter; each one adds a WebKit page and its scene to every save and undo step. The one real chapter with drawings is 257 KB, 137 KB of it the scenes of its three drawings | S to measure, then M. **Measured** 2026-11-18, see [R29 measurements](#r29-measurements); R29a, R29c, R29b and R29d done, released in 1.5.0; R29e measured and left as it is |
+| R29 | **Excalidraw performance**. Measure first, as in R15: time to open the drawing window, typing and drawing delay inside it, time to Done, preview rendering when a chapter with several drawings opens, and the effect of large scenes (pasted images) on autosave, undo and Earlier Versions. Then fix what is slow. Candidates: keep one warm, hidden web view instead of starting a new one (and a new web process loading the 5.6 MB bundle) for every Ctrl+D or Edit Drawing; render previews in parallel or ahead of time; keep scene data out of the undo snapshots. Undo turns the whole chapter into JSON after every edit, drawings included, and keeps up to 500 such snapshots | Drawings are new and untested at the scale of a real chapter; each one adds a WebKit page and its scene to every save and undo step. The one real chapter with drawings is 257 KB, 137 KB of it the scenes of its three drawings | S to measure, then M. **Measured** 2026-11-18, see [R29 measurements](#r29-measurements); R29a, R29c, R29b and R29d done, released in 1.5.0; R29e measured and left as it is; R29f (drawing on NVIDIA's driver) done, not released |
 | R30 | **Excalidraw copy and paste polish**. First confirm the two untried real pastes: the app → TopCoding in Chrome (Ctrl+V into the notes editor), and TopCoding → the app (a real Ctrl+C there, read by `lexical.pasted_items`; released in 1.5.0). Fix what they turn up. Then, to be agreed: paste a selection copied in Excalidraw itself (excalidraw.com or the drawing window) as a new drawing; offer a copied drawing as a PNG too, for apps that don't take Excalidraw scenes; and match the header cells TopCoding makes from HTML (we write `headerState` 1 everywhere, it uses 3 in the first column) | Copy and paste is how drawings reach TopCoding, and both directions are built only from synthetic pastes and checked node shapes | M |
 
 #### R29 measurements
@@ -121,6 +121,8 @@ Fine as it is:
 - Inside the drawing window, an input is drawn 40–65 ms later whatever the scene (110
   or 440 elements, or a 1 MB picture). Excalidraw's own handling takes 0–2 ms (12 ms
   to move all 440 elements); most of the rest is the test display's frame pacing.
+  That held only for the test display's small window: on the desktop, with NVIDIA's
+  driver, drawing was far slower (R29f below).
 - Autosave takes at most 30 ms (21 ms for the 4 MB chapter with pictures), loading a
   chapter at most 15 ms, an Earlier Versions copy at most 3 ms, restoring one at most
   40 ms, and undo or redo at most 10 ms.
@@ -130,7 +132,7 @@ Fine as it is:
 - Earlier Versions keeps about 54 copies of a chapter edited 2 hours a day for 30 days:
   9.5 MB for chapter 10, 215 MB for the chapter with 3 pictures.
 
-To fix, in the order R29a, R29c, R29b, R29d, then R29e:
+To fix, in the order R29a, R29c, R29b, R29d, then R29e (R29f was found later):
 
 | ID | Finding | Fix | Size |
 |---|---|---|---|
@@ -139,6 +141,7 @@ To fix, in the order R29a, R29c, R29b, R29d, then R29e:
 | R29c | The rows of a chapter are never freed when another chapter opens (every kind of row; the same kind of cycle as R29a). A text row costs about 40 KB, but a drawing row keeps its preview texture: each reopening of the chapter with 8 drawings added 240 MB | Break the rows' cycles, or release a row when the editor drops it. A UI test that counts live rows | S–M. **Done** 2026-11-18, released in 1.5.0: handlers on a row's widgets look the row up when the event comes (`rows.row_of`), and handlers on a text view's buffer hold the view weakly. That also frees the cells a table replaces when a row or column is added. Measured again: opening the chapter with 8 drawings three times kept the app at 405–436 MB (it grew from 705 to 1190 MB before). UI tests: `tests/ui/test_freeing.py` |
 | R29d | Undo keeps the whole chapter as text, drawings included, for each of up to 500 steps. One step is 244 KB for chapter 10 (119 MB at 500 steps), 1.1 MB with 8 drawings (536 MB) and 8 MB with the 3 pictures (3.9 GB; the Cyrillic makes Python store 2 bytes per character). Every keystroke writes that text: 1.5 ms for chapter 10, 19 ms with the pictures | Keep the scenes out of the snapshot text: a snapshot refers to each drawing's scene, shared between steps until the drawing changes | M. **Done** 2026-11-18, released in 1.5.0: a snapshot's text leaves drawings' data out and the snapshot holds each drawing's data dict itself (`outline_undo._content`), which is never changed in place. Measured again, a step is 31–32 KB whatever the drawings (15–16 MB at 500 steps instead of up to 3.9 GB), a keystroke costs 0.4 ms instead of up to 20 ms, and undo or redo about 2 ms |
 | R29e | Opening the drawing window takes 0.9 s (1.25 s the first time): 0.25 s to load the page and 0.65 s for Excalidraw to start, about the same for 2 elements as for a picture | Keep one hidden page with Excalidraw already started and hand it the scene; that keeps one web process (about 85 MB) while the app runs. Measure on the desktop first: the 0.65 s may be shorter there | M. **Decided** 2026-11-18: left as it is. On the desktop (GNOME on Wayland, with a GPU) it takes the same 0.88–0.94 s, and 2.2 s the first time in a session. Of a warm open, about 170 ms is starting the web process and requesting the page, 100 ms evaluating the bundle, 430 ms React mounting Excalidraw (JavaScript, before anything is painted) and 160 ms until it has finished loading. A page kept running would cut it to roughly 0.1–0.3 s, but costs one web process (about 150 MB) while it is kept |
+| R29f | Found 2026-11-18 on the desktop, after R29: drawing in the window is sluggish. Ubuntu's WebKitGTK doesn't use the GPU when NVIDIA's own driver is loaded (this machine: RTX 2070 Super, driver 595). That is a Debian patch, made after older drivers showed blank pages; upstream WebKit declined it. So the page is drawn on the CPU and every frame is copied to the app: a pen stroke updated 8 times a second (124–142 ms a frame) in a 2000×1300 window and 5 times in 2480×1380, with the web process using a whole core. The test display draws without a GPU anyway, so R29's measurement couldn't see this | Set `WEBKIT_FORCE_DMABUF_RENDERER=1`, which skips only that check, when NVIDIA's driver is loaded and the user hasn't set WebKit's own switches. GTK's default Vulkan renderer then can't take the compressed buffers WebKit hands it, so it copies each frame through the CPU (the app at 120–190% CPU while drawing): use GTK's GL renderer (`GSK_RENDERER=gl`) there too, unless the user has chosen one | S. **Done** 2026-11-18, not released: `drawing_web._prefer_gpu`. A stroke now draws at 60 frames a second with the app at 9% CPU, and the drawing window and the editor were checked to look right. `scripts/measure-drawing-stroke.py` measures a stroke on the real display. The UI tests name their displays' renderers, so they don't depend on the machine's driver |
 
 ### Review assistant
 
@@ -228,7 +231,7 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 7. Added 2026-11-17 and not yet placed against steps 4 and 5: R30's two
    real-paste checks, which are quick; then R29's measurements, R30's fixes and
    R31's spike. R29 is done (2026-11-18): measured, fixes R29a–R29d made (released
-   in 1.5.0), and R29e decided against.
+   in 1.5.0), and R29e decided against. R29f, found later, is done (not released).
 8. Added 2026-11-18: the R32 fix, at any time; R33 with the richer notes in
    step 5. R33 is **done** (2026-11-18, not released yet), ahead of step 5.
 

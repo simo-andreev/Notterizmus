@@ -8,6 +8,7 @@ import copy
 import gc
 import json
 import os
+import tempfile
 import unittest
 
 from notterizmus import drawing
@@ -473,6 +474,39 @@ class PasteFromTopCodingTest(DrawingTestCase):
         pasted = self.win.doc.root.children[1]
         self.assertEqual((pasted.text, [n.kind for n in pasted.children]), ("Intro", ["bullet", "drawing", "bullet"]))
         self.assertEqual(drawing.scene(pasted.children[1].data), scene())
+
+
+class PreferGpuTest(unittest.TestCase):
+    """With NVIDIA's driver, Ubuntu's WebKitGTK draws pages on the CPU unless asked not to:
+    a stroke in the drawing window then updated 8 times a second instead of 60. Once it
+    uses the GPU, GTK's Vulkan renderer copies each of its frames through the CPU, and its
+    GL renderer doesn't."""
+
+    def prefer(self, environ, driver_loaded=True):
+        from notterizmus.ui import drawing_web
+        with tempfile.TemporaryDirectory() as tmp:
+            driver = os.path.join(tmp, "version")
+            if driver_loaded:
+                open(driver, "w").close()
+            drawing_web._prefer_gpu(environ, driver)
+        return environ
+
+    def test_nvidias_driver_asks_webkit_for_the_gpu_and_gtk_for_gl(self):
+        self.assertEqual(self.prefer({}), {"WEBKIT_FORCE_DMABUF_RENDERER": "1", "GSK_RENDERER": "gl"})
+
+    def test_other_drivers_are_left_to_webkit_and_gtk(self):
+        self.assertEqual(self.prefer({}, driver_loaded=False), {})
+
+    def test_webkits_own_switches_set_by_the_user_win(self):
+        for var in ("WEBKIT_FORCE_DMABUF_RENDERER", "WEBKIT_DISABLE_DMABUF_RENDERER",
+                    "WEBKIT_DISABLE_COMPOSITING_MODE"):
+            self.assertEqual(self.prefer({var: "0"}), {var: "0"})
+        self.assertEqual(self.prefer({"WEBKIT_FORCE_DMABUF_RENDERER": "1"}),
+                         {"WEBKIT_FORCE_DMABUF_RENDERER": "1", "GSK_RENDERER": "gl"})
+
+    def test_a_renderer_chosen_by_the_user_is_kept(self):
+        self.assertEqual(self.prefer({"GSK_RENDERER": "vulkan"}),
+                         {"WEBKIT_FORCE_DMABUF_RENDERER": "1", "GSK_RENDERER": "vulkan"})
 
 
 class RealDrawingWindowTest(ui.UITestCase):

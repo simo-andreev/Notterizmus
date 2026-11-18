@@ -62,15 +62,20 @@ if [ "${NOTTERIZMUS_UI_BACKEND:-}" = weston ]; then
         >"$tmp/server.log" 2>&1 &
     spid=$!
     wait_for "$run/notterizmus-ui"
-    # No GPU on a headless display: skip GTK's GL/Vulkan probing (and its libEGL noise)
-    export GDK_BACKEND=wayland WAYLAND_DISPLAY=notterizmus-ui GDK_DISABLE=gl,vulkan
+    # No GPU on a headless display: skip GTK's GL/Vulkan probing (and its libEGL noise).
+    # The renderer is named too, or the app would ask for GL on a machine with NVIDIA's
+    # driver (drawing_web._prefer_gpu).
+    export GDK_BACKEND=wayland WAYLAND_DISPLAY=notterizmus-ui GDK_DISABLE=gl,vulkan GSK_RENDERER=cairo
     echo "UI tests on a headless Weston"
 elif command -v gtk4-broadwayd >/dev/null; then
     # Display :0 is socket broadway1.socket; the tests' input client talks to input.socket.
     gtk4-broadwayd --unixsocket "$run/input.socket" :0 >"$tmp/server.log" 2>&1 &
     spid=$!
     wait_for "$run/broadway1.socket"
-    export GDK_BACKEND=broadway BROADWAY_DISPLAY=:0 NOTTERIZMUS_UI_BROADWAY="$run/input.socket"
+    # Broadway's own renderer, named so the app doesn't ask for GL on a machine with
+    # NVIDIA's driver (drawing_web._prefer_gpu).
+    export GDK_BACKEND=broadway BROADWAY_DISPLAY=:0 NOTTERIZMUS_UI_BROADWAY="$run/input.socket" \
+        GSK_RENDERER=broadway
     echo "UI tests on Broadway, with real keyboard and mouse input"
 else
     echo "Needs gtk4-broadwayd: sudo apt install libgtk-4-bin" >&2

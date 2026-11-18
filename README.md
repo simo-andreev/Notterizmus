@@ -180,6 +180,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | Search Commands: matching, and the list of commands |
 | `notterizmus/find.py`, `notterizmus/ui/findbar.py` | Find and replace: matching, and the find bar |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
+| `scripts/measure-drawing-stroke.py` | Times a pen stroke in the drawing window on your own display |
 | `notterizmus/ui/outline.py` | Editor widget: building and refreshing rows, focus, scrolling |
 | `notterizmus/ui/outline_*.py` | The editor's mixins, one theme each: `undo`, `keys`, `items`, `selection`, `clipboard`, `menus`, `assist` (spelling, Ctrl+Space), `carets` (multi-cursor) |
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table, drawing) and the rich-text view |
