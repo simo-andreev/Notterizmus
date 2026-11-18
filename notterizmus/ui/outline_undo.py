@@ -11,7 +11,7 @@ import json
 import time
 from contextlib import contextmanager
 
-from ..model import Node, display_order, is_text
+from ..model import Node, editable_order, is_text
 from .rows import DrawingRow, TableRow, TextRow, row_type
 COALESCE = 1.5     # seconds: typing in one item within this gap is one undo step
 SCENE = "$scene"   # stands for a drawing's data in a snapshot's text
@@ -96,12 +96,23 @@ class UndoMixin:
             if self._suspend == 0:
                 self._commit(group)
 
+    def undo_mark(self):
+        """A token for the chapter as it is now (see unchanged_since)."""
+        return self._cur, len(self._undo)
+
+    def unchanged_since(self, mark):
+        """Whether the chapter is as it was when undo_mark() gave mark, so that undo()
+        would take back the step just before it. Undoing back to that point counts as
+        unchanged; another change, or a change undone in a later step, doesn't."""
+        snap, depth = mark
+        return len(self._undo) == depth and self._cur is not None and snap is not None and _same(self._cur, snap)
+
     def replace_content(self, root):
         """Replace the whole chapter (e.g. with an earlier version) as one undoable step."""
         self._undo.append(self._cur)
         self._redo.clear()
         content, scenes = _content(root.children)
-        first = next((n for n in display_order(root) if is_text(n)), None)
+        first = next((n for n in editable_order(root) if is_text(n)), None)
         self._restore((content, first.id if first else None, -1, scenes))
 
     def undo(self):
@@ -146,7 +157,7 @@ class UndoMixin:
         self.sel = []
         self.current = self.cur_view = None
         target = next((n for n in self.doc.root.walk() if n.id == fid), None) \
-            or next(n for n in display_order(self.doc.root))
+            or next(n for n in editable_order(self.doc.root))
         self.refresh(focus=target, offset=-1 if off is None else off)
         self.emit("changed")
 

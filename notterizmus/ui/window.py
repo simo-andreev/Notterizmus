@@ -54,6 +54,7 @@ class Window(Adw.ApplicationWindow):
         self.state = load_state()
         self.doc = None
         self._save_src = None
+        self._disk_dialog = None  # asking what to do about a chapter changed on disk (CR10)
         self.speller = Speller()
         self.languages = self.speller.languages()
 
@@ -129,7 +130,7 @@ class Window(Adw.ApplicationWindow):
         self.editor.spell_menu = spell
         self.editor.connect("changed", lambda *_: (self._schedule_save(), self.findbar.schedule_refresh()))
         self.editor.connect("message", lambda _e, msg: self.toast(msg))
-        self.editor.connect("toast", lambda _e, msg, button, cb: self.toast(msg, button, cb))
+        self.editor.connect("toast", lambda _e, msg, button, cb: self._editor_toast(msg, button, cb))
         self.findbar = FindBar(self.editor, self.toast)
         tv.add_top_bar(self.findbar)
         self.editor.on_escape = lambda: self.findbar.get_search_mode() and (
@@ -255,6 +256,7 @@ class Window(Adw.ApplicationWindow):
         last = self.state.get("last_file")
         if last and Path(last).exists():
             self.open_path(last)
+        self._offer_stranded()
 
     # -- helpers ------------------------------------------------------------------
 
@@ -264,6 +266,23 @@ class Window(Adw.ApplicationWindow):
             t.set_button_label(button)
             t.connect("button-clicked", lambda *_: callback())
         self.toasts.add_toast(t)
+        return t
+
+    def _editor_toast(self, msg, button, callback):
+        """A toast about what the editor just did. Its button acts on that, so the toast
+        goes as soon as the chapter changes again (CR3)."""
+        t = self.toast(msg, button, callback)
+        if t is None or not button:  # (the UI tests replace toast())
+            return
+        handler = self.editor.connect("changed", lambda *_: t.dismiss())
+
+        def stop_watching(*_):
+            nonlocal handler
+            if handler:
+                self.editor.disconnect(handler)
+                handler = 0
+
+        t.connect("dismissed", stop_watching)
 
     # -- spelling ---------------------------------------------------------------------
 
@@ -325,6 +344,9 @@ class Window(Adw.ApplicationWindow):
         self.set_title(f"{title} · {APP_NAME}")
 
     def set_doc(self, doc):
+        self._save_pending()  # the chapter being replaced (e.g. by New Chapter)
+        if self._disk_dialog is not None:  # a question about the chapter being replaced
+            self._disk_dialog.force_close()
         self.doc = doc
         self.editor.load(doc)
         if self.speller.available:
@@ -364,6 +386,7 @@ class Window(Adw.ApplicationWindow):
             pass
 
     def open_path(self, path):
+        self._save_pending()  # before reading: it may be this very chapter
         try:
             self.set_doc(Document.load(path))
         except (OSError, ValueError, KeyError) as e:
@@ -379,11 +402,20 @@ class Window(Adw.ApplicationWindow):
     # -- renaming, reordering and trashing chapters and books ------------------------------------
 
     def _flush_save(self):
-        """Write the open chapter now: file operations read chapters from disk."""
+        """Write the open chapter now: file operations read chapters from disk. Nothing
+        can wait for an answer here, so a version changed on disk goes to Earlier Versions."""
         if self._save_src:
             GLib.source_remove(self._save_src)
             self._save_src = None
-        self.save(quiet=True)
+        self.save(quiet=True, ask=False)
+
+    def _save_pending(self):
+        """Write the open chapter now if an autosave is waiting: before another chapter
+        replaces it, or the autosave would write that one instead and these edits would be
+        lost (CR4 in CODE_REVIEW.md). An open question about a change on disk counts too:
+        an autosave asked it, so its edits aren't written yet."""
+        if self._save_src or self._disk_dialog is not None:
+            self._flush_save()
 
     def _after_move(self, moved, focus=None):
         """Point the open chapter at its new file and refresh the list."""
@@ -398,6 +430,7 @@ class Window(Adw.ApplicationWindow):
                 self.doc.path = Path(new)
                 self.doc.book, self.doc.chapter_no, self.doc.chapter_title = \
                     fresh.book, fresh.chapter_no, fresh.chapter_title
+                self.doc.remember_disk()  # written by the move, not by another program
                 self.state["last_file"] = str(new)
                 self.state["last_book"] = fresh.book
                 save_state(self.state)
@@ -510,9 +543,11 @@ class Window(Adw.ApplicationWindow):
             moved = library.set_chapter(path, number, title, None if same_book else folder)
         except FileExistsError:
             self.toast(f"“{Path(folder).name}” already has a chapter {number}")
+            self._offer_stranded()
             return
         except (OSError, ValueError) as e:  # ValueError: a file that isn't a chapter
             self.toast(f"Could not change the chapter: {e}")
+            self._offer_stranded()
             return
         if not same_book:
             self.sidebar.expanded.add(Path(folder).name)
@@ -568,8 +603,30 @@ class Window(Adw.ApplicationWindow):
         except (OSError, ValueError) as e:  # FileExistsError is an OSError
             self.toast(f"Could not reorder the chapters: {e}")
             self._reload_sidebar()
+            self._offer_stranded()
             return
         self._after_move(moved, focus=moving)
+
+    def _offer_stranded(self):
+        """Offer to give back chapters that a change left under a hidden staging name
+        (CR6): at start-up, after a crash or power cut in the middle of a reorder, and
+        after a change that failed and couldn't be wholly undone."""
+        lost = library.stranded(notes_root())
+        if lost:
+            n = len(lost)
+            self.toast(f"An interrupted change left {n} chapter{'s' if n > 1 else ''} hidden", "Restore",
+                       lambda: self._restore_stranded(lost))
+
+    def _restore_stranded(self, lost):
+        failed = []
+        for path in lost:
+            try:
+                library.restore_stranded(path)
+            except (OSError, ValueError) as e:
+                failed.append(f"{path.name}: {e}")
+        self._reload_sidebar()
+        n = len(lost) - len(failed)
+        self.toast(f"Could not restore {failed[0]}" if failed else f"Restored {n} chapter{'s' if n > 1 else ''}")
 
     def on_chapter_move(self, path, delta):
         """Alt+↑/↓ in the sidebar: swap places (and numbers) with the neighbour."""
@@ -674,7 +731,6 @@ class Window(Adw.ApplicationWindow):
 
     def _open_from_sidebar(self, path):
         if not (self.doc and self.doc.path and Path(self.doc.path).resolve() == Path(path).resolve()):
-            self.save(quiet=True)
             self.open_path(path)
         if self.split.get_collapsed():
             self.split.set_show_sidebar(False)
@@ -693,7 +749,6 @@ class Window(Adw.ApplicationWindow):
         if ch is None:
             self.toast(f"No {'next' if delta > 0 else 'previous'} chapter in “{book.name}”")
             return
-        self.save(quiet=True)
         self.open_path(ch.path)
 
     def _schedule_save(self):
@@ -706,10 +761,21 @@ class Window(Adw.ApplicationWindow):
         self.save(quiet=True)
         return False
 
-    def save(self, quiet=False):
+    def save(self, quiet=False, ask=True):
+        """Write the open chapter. If another program changed its file since it was opened
+        or last saved, ask first (Reload or Keep Mine) instead of overwriting that version;
+        with ask=False, where no answer can wait, keep this one and put the other in Earlier
+        Versions (CR10 in CODE_REVIEW.md, R16)."""
         if not self.doc:
             return
-        self._backup()  # at most every few minutes: the version about to be overwritten
+        changed = self.doc.changed_on_disk()
+        if changed and ask:
+            self._ask_about_disk_change()
+            return
+        if changed:
+            self._keep_disk_version()
+        else:
+            self._backup()  # at most every few minutes: the version about to be overwritten
         try:
             self.doc.save()
             if not quiet:
@@ -717,11 +783,75 @@ class Window(Adw.ApplicationWindow):
         except OSError as e:
             self.toast(f"Save failed: {e}")
 
+    def _keep_disk_version(self):
+        """Put the file another program changed in Earlier Versions before this version
+        replaces it: always, even in the second the last copy was taken."""
+        if self.doc.path and not self._is_guide():
+            try:
+                backups.keep(Path(self.doc.path).read_bytes(), self._backup_folder())
+            except OSError:
+                pass
+
+    def _ask_about_disk_change(self):
+        if self._disk_dialog is not None:
+            return
+        doc = self.doc
+        label = doc.chapter_title or f"Chapter {doc.chapter_no}"
+        dlg = Adw.AlertDialog(
+            heading="Changed on Disk",
+            body=f"Another program changed “{label}” since it was opened here, a sync tool perhaps. "
+                 "Reload that version, or keep the one you have here? The other one stays in Earlier "
+                 "Versions either way.")
+        dlg.add_response("keep", "Keep Mine")
+        dlg.add_response("reload", "Reload")
+        dlg.set_response_appearance("reload", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("reload")
+        dlg.set_close_response("later")  # Escape: nothing now; the next save asks again
+        dlg.connect("response", lambda _d, response: self._on_disk_change(doc, response))
+        dlg.connect("closed", self._disk_dialog_closed)  # however it closes, or no save would write again
+        self._disk_dialog = dlg
+        dlg.present(self)
+
+    def _disk_dialog_closed(self, dlg):
+        if self._disk_dialog is dlg:
+            self._disk_dialog = None
+
+    def _on_disk_change(self, doc, response):
+        if doc is not self.doc:
+            return
+        if response == "keep":
+            self.save(quiet=True, ask=False)
+            self.toast("Saved yours: the other version is in Earlier Versions")
+        elif response == "reload":
+            self._reload_from_disk()
+
+    def _reload_from_disk(self):
+        """Replace the open chapter with its file, as one undoable step; the version it
+        replaces goes to Earlier Versions too."""
+        doc = self.doc
+        try:
+            fresh = Document.load(doc.path)
+        except (OSError, ValueError) as e:
+            self.toast(f"Could not reload {Path(doc.path).name}: {e}")
+            return
+        if not self._is_guide():
+            try:
+                backups.keep(doc.dumps().encode("utf-8"), self._backup_folder())
+            except OSError:
+                pass
+        self.editor.replace_content(fresh.root)
+        doc.lang, doc.format, doc.extra, doc.chapter_extra = fresh.lang, fresh.format, fresh.extra, fresh.chapter_extra
+        doc.remember_disk()
+        if self._save_src:  # nothing to write: the chapter is now what the file holds
+            GLib.source_remove(self._save_src)
+            self._save_src = None
+        self.toast("Reloaded from disk: Ctrl+Z brings back your version")
+
     def _on_close(self, *_):
         if self._save_src:
             GLib.source_remove(self._save_src)
             self._save_src = None
-        self.save(quiet=True)
+        self.save(quiet=True, ask=False)
         return False
 
     # -- actions -----------------------------------------------------------------------
@@ -794,14 +924,13 @@ class Window(Adw.ApplicationWindow):
             except GLib.Error:
                 return
             if gf:
-                self.save(quiet=True)
                 self.open_path(gf.get_path())
 
         fd.open(self, None, done)
 
     def on_guide(self, *_):
         """Open a fresh practice copy of the Getting Started chapter."""
-        self.save(quiet=True)
+        self._flush_save()  # now, and not after the fresh copy is written: it may be the guide
         doc = guide.document(paths.guide_path(), self.rules)
         try:
             doc.save()

@@ -147,6 +147,61 @@ class PasteTest(ui.UITestCase):
         ui.wait_for(lambda: len(self.win.doc.root.children) == 1 and self.win.doc.root.children[0].text, "the plain paste")
         self.assertEqual(self.win.doc.root.children[0].text, "I) Pasted • a note II) Second")
 
+    def texts(self):
+        return [n.text for n in self.win.doc.root.walk()]
+
+    def test_the_toasts_button_leaves_an_outline_paste_alone_once_something_changed(self):
+        """The buttons undid the last step, whatever it was: after a word typed within the
+        toast's 6 seconds, Paste as Plain Text undid the word, kept the pasted items and
+        pasted the same text again (CR3)."""
+        doc = ui.open_chapter([h("")])
+        self.put(plain="I) Pasted\n  • a note\nII) Second")
+        self.paste(ui.focus(doc.root.children[0], 0), lambda: len(self.win.doc.root.children) == 2)
+        as_plain = self.toasts[-1][2]
+        pasted = self.texts()
+        ui.type_text(self.ed.cur_view, " typed")
+        typed = self.texts()
+        as_plain()
+        ui.wait_editor()
+        self.assertEqual(self.texts(), typed, "the paste and the word are both kept")
+        self.assertEqual(self.toasts[-1], ("The paste was changed since: use Ctrl+Z", None, None))
+        self.ed.undo()  # the word: the paste is the last change again
+        ui.wait_editor()
+        self.assertEqual(self.texts(), pasted)
+        as_plain()
+        ui.wait_for(lambda: len(self.win.doc.root.children) == 1, "the plain paste")
+        self.assertEqual(self.win.doc.root.children[0].text, "I) Pasted • a note II) Second")
+
+    def test_one_item_per_paragraph_leaves_a_paste_alone_once_something_changed(self):
+        doc = ui.open_chapter([h("Intro", b("Notes: "))])
+        item = doc.root.children[0].children[0]
+        self.put(plain="First paragraph.\n\nSecond paragraph.\n")
+        self.paste(ui.focus(item), lambda: "First" in item.text)
+        split = self.toasts[-1][2]
+        ui.type_text(self.ed.cur_view, " typed")
+        typed = self.texts()
+        split()
+        ui.wait_editor()
+        self.assertEqual(self.texts(), typed)
+        self.assertEqual(self.toasts[-1], ("The paste was changed since: use Ctrl+Z", None, None))
+
+    def test_the_toast_goes_once_the_chapter_changes_again(self):
+        del self.win.toast  # the window's own toasts, kept to watch them
+        made = []
+        real = self.win.toast
+        self.win.toast = lambda *args: made.append(real(*args)) or made[-1]
+        doc = ui.open_chapter([h("")])
+        self.put(plain="I) Pasted\n  • a note\nII) Second")
+        self.paste(ui.focus(doc.root.children[0], 0), lambda: len(self.win.doc.root.children) == 2)
+        toast = made[-1]
+        self.assertEqual(toast.get_button_label(), "Paste as Plain Text")
+        gone = []
+        toast.connect("dismissed", lambda *_: gone.append(True))
+        ui.settle()
+        self.assertEqual(gone, [], "the paste itself doesn't dismiss it")
+        ui.type_text(self.ed.cur_view, " typed")
+        ui.wait_for(lambda: gone, "the toast to go")
+
     def test_an_outline_pasted_into_an_item_with_text_goes_after_it(self):
         doc = ui.open_chapter([h("Intro", b("mine"), h("Sub")), h("Last")])
         intro = doc.root.children[0]

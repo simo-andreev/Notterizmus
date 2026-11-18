@@ -211,17 +211,30 @@ class ClipboardMixin:
                     paras.append(join_lines(cur))
                     cur = []
             if len(paras) > 1:
+                mark = self.undo_mark()
                 self.emit("toast", f"Pasted {len(paras)} paragraphs into one item", "One Item per Paragraph",
-                          lambda: self._resplit(ctx, paras, block_nodes(items)))
+                          lambda: self._resplit(ctx, paras, block_nodes(items), mark))
             return
         count = sum(1 for top in forest for _ in top.walk())
         self.insert_forest(node, forest)
         plain_text = "\n".join(runs_text(l) for l in lines)
+        mark = self.undo_mark()
         self.emit("toast", f"Pasted {count} items as an outline", "Paste as Plain Text",
-                  lambda: self._replace_with_plain(ctx, plain_text))
+                  lambda: self._replace_with_plain(ctx, plain_text, mark))
 
-    def _resplit(self, ctx, lines, blocks=()):
+    def _undo_paste(self, mark):
+        """Take back the paste a toast's button is about. It must still be the last change:
+        undo() takes back whatever came last, so after a word typed since, the button
+        undid the word and pasted a second copy (CR3 in CODE_REVIEW.md)."""
+        if not self.unchanged_since(mark):
+            self.emit("message", "The paste was changed since: use Ctrl+Z")
+            return False
         self.undo()
+        return True
+
+    def _resplit(self, ctx, lines, blocks, mark):
+        if not self._undo_paste(mark):
+            return
         row = self.rows.get(ctx[0])
         if isinstance(row, TextRow):
             row.view.set_cursor(ctx[1])
@@ -243,9 +256,9 @@ class ClipboardMixin:
         elif blocks:
             self.refresh()
 
-    def _replace_with_plain(self, ctx, text):
-        self.undo()
-        self._pasted(ctx, "text/plain", text, True)
+    def _replace_with_plain(self, ctx, text, mark):
+        if self._undo_paste(mark):
+            self._pasted(ctx, "text/plain", text, True)
 
     def _paste_lines(self, node, v, lines, blocks=()):
         if not lines:

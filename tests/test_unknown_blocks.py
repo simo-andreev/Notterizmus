@@ -75,6 +75,15 @@ class UnknownBlocksTest(unittest.TestCase):
         laid = [ln.node.kind for ln in layout(root, Rules()) if ln.node is not None]
         self.assertEqual(laid, ["heading", "mindmap"])
 
+    def test_the_editors_order_leaves_out_its_children(self):
+        """The editor shows the block as one row: the cursor's order must not go into its
+        children, or keys next to it edit them unseen (CR12)."""
+        from notterizmus.model import display_order, editable_order
+        root = Document.from_json(chapter(heading("Intro", bullet("before"), copy.deepcopy(MINDMAP),
+                                                  bullet("after")))).root
+        self.assertEqual([n.id for n in editable_order(root)], ["Intro", "before", "d1", "after"])
+        self.assertEqual([n.id for n in display_order(root)], ["Intro", "before", "d1", "c1", "after"])
+
     def test_it_holds_no_text_of_its_own(self):
         node = Node.from_json(copy.deepcopy(MINDMAP))
         self.assertEqual(node.text, "")

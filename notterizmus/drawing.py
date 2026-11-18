@@ -10,8 +10,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 from pathlib import Path
+
+from .files import atomic_write
 
 SCENE_KEYS = ("elements", "appState", "files")
 # What a drawing keeps of Excalidraw's view state: only what changes how it looks
@@ -105,18 +106,8 @@ def store_preview(data, png, env=None):
     (the preview is then simply made again next time)."""
     path = preview_path(data, env)
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(png)
-            os.replace(tmp, path)
-        except BaseException:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-            raise
+        with atomic_write(path, binary=True) as f:
+            f.write(png)
         _prune(path.parent)
     except OSError:
         return None

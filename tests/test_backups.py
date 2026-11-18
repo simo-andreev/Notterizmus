@@ -1,6 +1,8 @@
+import os
 import tempfile
+import time
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from notterizmus import backups
@@ -58,6 +60,7 @@ class BackupsTest(unittest.TestCase):
             when += timedelta(minutes=10)
             made += 1
         backups.thin(self.folder, now)
+        now = now.astimezone()  # ages are the time that really passed, across a clock change too
         kept = [b.when for b in backups.list_backups(self.folder)]
         last_day = [w for w in kept if now - w < timedelta(days=1)]
         week = [w for w in kept if timedelta(days=1) <= now - w < timedelta(days=7)]
@@ -113,8 +116,8 @@ class MoreBackupsTest(BackupsTest):
 
     def test_copies_are_named_by_when_they_were_taken(self):
         made = backups.backup(self.chapter, self.folder, now=T0)
-        self.assertEqual(made, self.folder / "2026-11-06T12-00-00.notz")
-        self.assertEqual([b.when for b in backups.list_backups(self.folder)], [T0])
+        self.assertEqual(made, self.folder / f"{T0.astimezone(timezone.utc):%Y-%m-%dT%H-%M-%S}Z.notz", "in UTC")
+        self.assertEqual([b.when for b in backups.list_backups(self.folder)], [T0.astimezone()])
 
     def test_a_second_copy_in_the_same_second_keeps_the_first(self):
         backups.backup(self.chapter, self.folder, now=T0)
@@ -138,19 +141,19 @@ class MoreBackupsTest(BackupsTest):
         self.assertEqual(self.contents(), ["v1", "v2", "v1"], "only the newest copy is compared")
 
     def test_other_files_in_the_folder_are_neither_listed_nor_thinned(self):
-        backups.backup(self.chapter, self.folder, now=T0)
-        for name in ("junk.notz", "2026-13-45T99-99-99.notz", "note.txt"):
+        made = backups.backup(self.chapter, self.folder, now=T0)
+        for name in ("junk.notz", "2026-13-45T99-99-99.notz", "2026-13-45T99-99-99Z.notz", "note.txt"):
             (self.folder / name).write_text("x", encoding="utf-8")
-        self.assertEqual([b.path.name for b in backups.list_backups(self.folder)], ["2026-11-06T12-00-00.notz"])
+        self.assertEqual([b.path.name for b in backups.list_backups(self.folder)], [made.name])
         self.assertEqual(backups.thin(self.folder, T0 + timedelta(days=400)), 0)
-        self.assertEqual(len(list(self.folder.iterdir())), 4)
+        self.assertEqual(len(list(self.folder.iterdir())), 5)
 
     def test_a_folder_that_does_not_exist_has_no_copies(self):
         self.assertEqual(backups.list_backups(self.root / "nowhere"), [])
         self.assertEqual(backups.thin(self.root / "nowhere"), 0)
 
     def test_the_tiers_meet_without_gaps(self):
-        now = datetime(2026, 11, 13, 12, 0)
+        now = datetime(2026, 11, 13, 12, 0).astimezone()  # ages are the time that really passed
         self.folder.mkdir(parents=True)
         ages = {"23 h 59 min": timedelta(hours=23, minutes=59), "24 h": timedelta(days=1),
                 "24 h 10 min": timedelta(days=1, minutes=10),            # the hour before 24 h
@@ -160,7 +163,7 @@ class MoreBackupsTest(BackupsTest):
                 "89 d": timedelta(days=89), "90 d": timedelta(days=90),
                 "91 d": timedelta(days=91)}                              # same ISO week as 90 d
         for age in ages.values():
-            (self.folder / self.stamp(now - age)).write_text("x", encoding="utf-8")
+            (self.folder / f"{(now - age).astimezone(timezone.utc):%Y-%m-%dT%H-%M-%S}Z.notz").write_text("x")
         backups.thin(self.folder, now)
         kept = {now - b.when for b in backups.list_backups(self.folder)}
         gone = {label for label, age in ages.items() if age not in kept}
@@ -199,11 +202,119 @@ class MoreBackupsTest(BackupsTest):
         backups.move({self.chapter: self.chapter}, self.notes, self.root)
         self.assertEqual(self.contents(), ["v1"])
 
+    def test_a_version_that_is_not_on_disk_can_be_kept(self):
+        """Reload (a chapter changed on disk) keeps the edits it replaces (CR10)."""
+        backups.backup(self.chapter, self.folder, now=T0)
+        made = backups.keep(b"unsaved edits", self.folder, now=T0)
+        self.assertEqual(made.read_bytes(), b"unsaved edits")
+        self.assertEqual(self.contents(), ["unsaved edits", "v1"], "the newest, though taken in the same second")
+        self.assertIsNone(backups.keep(b"unsaved edits", self.folder, now=T0 + timedelta(minutes=1)))
+
     def test_a_copy_is_the_file_byte_for_byte(self):
         data = bytes(range(256)) * 3
         self.chapter.write_bytes(data)
         made = backups.backup(self.chapter, self.folder, now=T0)
         self.assertEqual(made.read_bytes(), data)
+
+
+class DaylightSavingTest(unittest.TestCase):
+    """Copies were named by local time, which has an hour twice when daylight saving ends:
+    copies in that hour sorted in the wrong order or collided, so the newest copy and the
+    ten-minute check could be wrong (CR26 in CODE_REVIEW.md). On 2026-10-25 in Sofia the
+    clocks go back from 04:00 summer time to 03:00, so 03:00–04:00 comes twice."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.chapter = base / "Notterizmus" / "Book" / "01 Intro.notz"
+        self.chapter.parent.mkdir(parents=True)
+        self.folder = base / "backups" / "Book" / "01 Intro"
+        self.addCleanup(self.set_zone, os.environ.get("TZ"))
+        self.set_zone("Europe/Sofia")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    @staticmethod
+    def set_zone(zone):
+        if zone is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = zone
+        time.tzset()
+
+    def copy(self, text, now, force=True):
+        self.chapter.write_text(text, encoding="utf-8")
+        return backups.backup(self.chapter, self.folder, now=now, force=force)
+
+    def contents(self):
+        return [b.path.read_text(encoding="utf-8") for b in backups.list_backups(self.folder)]
+
+    def test_two_copies_in_the_hour_that_comes_twice_are_kept_in_order(self):
+        self.assertIsNotNone(self.copy("v1", datetime(2026, 10, 25, 3, 50)))          # summer time
+        self.assertIsNotNone(self.copy("v2", datetime(2026, 10, 25, 3, 10, fold=1)))  # 20 min later
+        self.assertEqual(self.contents(), ["v2", "v1"], "newest first")
+        self.assertEqual(sorted(p.name for p in self.folder.iterdir()),
+                         ["2026-10-25T00-50-00Z.notz", "2026-10-25T01-10-00Z.notz"], "named in UTC")
+        self.assertEqual([f"{b.when:%H:%M}" for b in backups.list_backups(self.folder)], ["03:10", "03:50"],
+                         "shown in local time")
+
+    def test_the_ten_minute_check_counts_the_hour_that_comes_twice(self):
+        self.copy("v1", datetime(2026, 10, 25, 3, 50))
+        self.assertIsNotNone(self.copy("v2", datetime(2026, 10, 25, 3, 55, fold=1), force=False),
+                             "03:55 winter time is 65 minutes after 03:50 summer time")
+
+    def test_copies_with_old_local_time_names_are_still_listed_and_thinned(self):
+        self.folder.mkdir(parents=True)
+        for minute in (5, 25):
+            (self.folder / f"2026-11-10T10-{minute:02d}-00.notz").write_text(f"old {minute}", encoding="utf-8")
+        self.copy("new", datetime(2026, 11, 10, 10, 45))
+        self.assertEqual(self.contents(), ["new", "old 25", "old 5"])
+        backups.thin(self.folder, datetime(2026, 11, 13, 12, 0))  # three days on: one copy per hour
+        self.assertEqual(self.contents(), ["new"])
+
+
+class SwapTest(unittest.TestCase):
+    """When chapters whose file names differ only in the number (untitled ones, or ones with
+    the same title) swapped places, their copies moved one folder at a time, and the first
+    move merged into the other chapter's folder: chapter 01 then listed both chapters'
+    copies, and 02 none (CR5 in CODE_REVIEW.md)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.notes, self.root = base / "Notterizmus", base / "backups"
+        self.book = self.notes / "Book"
+        self.book.mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def copies_of(self, names):
+        """One copy of each chapter (a file name in Book); its text names the chapter."""
+        for i, name in enumerate(names):
+            (self.book / name).write_text(f"copy of {name}", encoding="utf-8")
+            backups.backup(self.book / name, backups.folder_for(self.book / name, self.notes, self.root),
+                           now=T0 + timedelta(minutes=i))
+
+    def copies(self, name):
+        folder = backups.folder_for(self.book / name, self.notes, self.root)
+        return [b.path.read_text(encoding="utf-8") for b in backups.list_backups(folder)]
+
+    def test_untitled_chapters_that_swap_keep_their_own_copies(self):
+        self.copies_of(["01.notz", "02.notz"])
+        backups.move({self.book / "01.notz": self.book / "02.notz",
+                      self.book / "02.notz": self.book / "01.notz"}, self.notes, self.root)
+        self.assertEqual([self.copies("01.notz"), self.copies("02.notz")], [["copy of 02.notz"], ["copy of 01.notz"]])
+
+    def test_three_chapters_with_one_title_that_rotate_keep_their_own_copies(self):
+        names = ["01 Same.notz", "02 Same.notz", "03 Same.notz"]
+        self.copies_of(names)
+        backups.move({self.book / a: self.book / b for a, b in zip(names, names[1:] + names[:1])},
+                     self.notes, self.root)
+        self.assertEqual([self.copies(n) for n in names],
+                         [["copy of 03 Same.notz"], ["copy of 01 Same.notz"], ["copy of 02 Same.notz"]])
+        self.assertEqual([p.name for p in self.root.rglob(".*")], [], "nothing is left aside")
 
 
 if __name__ == "__main__":

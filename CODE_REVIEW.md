@@ -291,13 +291,13 @@ that need things this session didn't have: a real clean build, and your desk.
 
 ### Phase 2: Data safety (M)
 
-- [ ] **CR4. Save the open chapter before switching.**
+- [x] **CR4. Save the open chapter before switching.**
   - Fix: at the start of `Window.set_doc`, when another chapter is open and has a pending
     save, `_flush_save()` it. The scattered `self.save(quiet=True)` calls before
     `open_path` then become redundant.
   - Test (UI): open chapter A, type, then at once `win.open_path(B)` (what `App.do_open`
     does). A's file holds the typed text. The same through the Trash toast's Undo.
-- [ ] **CR3. Toast buttons undo only their own paste.**
+- [x] **CR3. Toast buttons undo only their own paste.**
   - Fix: remember the snapshot the paste committed, and the undo depth. `_resplit` and
     `_replace_with_plain` act only while that snapshot is still the current one;
     otherwise they say "The paste was changed since; use Ctrl+Z" and do nothing. Also
@@ -306,7 +306,7 @@ that need things this session didn't have: a real clean build, and your desk.
   - Test (UI): paste a three-line outline, type a word, run the toast's callback: the
     chapter is unchanged (no second copy, the word kept). Without the typing, the button
     still converts the paste.
-- [ ] **CR6. Renumbering that can't half-finish.**
+- [x] **CR6. Renumbering that can't half-finish.**
   - Fix: `library.renumber` rolls back on any exception, not only `FileExistsError`:
     staged files go back under their original names and numbers, best effort, collecting
     the files it couldn't restore, and the exception is raised again. The same for the
@@ -319,32 +319,32 @@ that need things this session didn't have: a real clean build, and your desk.
     original name and number, `scan()` lists them all, and no `.moving-*` file is left.
   - Test (unit): `set_chapter` into a book that has two chapters numbered 5 raises before
     any file moves.
-- [ ] **CR5. Earlier Versions follow swapped chapters.**
+- [x] **CR5. Earlier Versions follow swapped chapters.**
   - Fix: `backups.move` in two phases, like `renumber`: first move every source folder to
     a hidden temporary name, then each to its destination, merging only with copies
     already there that aren't part of this move.
   - Test (unit): swap untitled `01.notz` and `02.notz`; rotate three chapters with the same
     title. Afterwards each chapter's folder holds exactly its own copies, and the existing
     backup tests pass.
-- [ ] **CR12. Keep the cursor out of blocks from a newer version.**
+- [x] **CR12. Keep the cursor out of blocks from a newer version.**
   - Fix: a model helper (e.g. `editable_order(root)`) that leaves out the sub-items of
     blocks from a newer version, used by `KeysMixin._order()`, `_prev_text_node`,
     `focus_neighbor` and the selection code; rows are looked up with `.get()`.
   - Test (UI): in `test_unknown.py`, a block with sub-items. Backspace and Delete next to
     it don't join into it, nothing raises, and the block's JSON in the saved file is
     unchanged.
-- [ ] **CR25. Durable saves that keep permissions.**
+- [x] **CR25. Durable saves that keep permissions.**
   - Fix: in `Document.save`, flush and `os.fsync()` the temporary file, give it the
     existing file's mode (or `0o666 & ~umask` for a new file) before `os.replace`, then
     fsync the folder. Share this helper with CR22.
   - Test (unit): a 0644 chapter is still 0644 after a save; a new chapter follows the
     umask; `os.fsync` is called (patched).
-- [ ] **CR26. Backup names across daylight-saving changes.**
+- [x] **CR26. Backup names across daylight-saving changes.**
   - Fix: name new copies in UTC (`…Z`), read both forms, show local time.
   - Test (unit): two copies at 03:30 local time on 2026-10-25 (Europe/Sofia, the repeated
     hour) get distinct names and sort in the right order; copies with the old local-time
     names are still listed and thinned.
-- [ ] **CR10 (R16). Changes made on disk.**
+- [x] **CR10 (R16). Changes made on disk.**
   - Fix: remember the file's `st_mtime_ns` and size after loading and after each save.
     Before an autosave, if they changed, don't overwrite: keep both versions (save ours as
     a conflict copy) or ask Reload or Keep Mine.
@@ -353,6 +353,55 @@ that need things this session didn't have: a real clean build, and your desk.
 
 Done when all phase 2 tests pass, phase 0's checks are done and anything they found is
 repaired. Then release (suggested 1.6.0).
+
+#### Phase 2 results
+
+Done 2026-11-19. All eight are fixed, each with tests that failed before the fix.
+
+- CR4: `open_path` and `set_doc` first write an autosave that is still waiting
+  (`_save_pending`), before the new file is read, since it may be the same chapter; F1
+  writes the open chapter before it writes a fresh guide. The extra saves before
+  `open_path` are gone. UI tests: a chapter opened through `App.do_open` (another one,
+  and the open one itself), and the Trash toast's Undo.
+- CR3: the paste toasts' buttons act only while the paste is still the last change
+  (`undo_mark()` and `unchanged_since()` in the undo mixin); otherwise they say "The paste
+  was changed since: use Ctrl+Z". The window dismisses such a toast on the editor's next
+  change (`Window.toast` returns the toast now).
+- CR6: `renumber` puts every chapter back on any error, without ever overwriting a
+  chapter: a failed write at each step, a failed final rename, and with the disk still
+  full at least the names come back. `set_chapter` checks everything first (a number two
+  chapters share is refused) and undoes its swap if the final rename fails. Chapters left
+  hidden by a crash are found by `library.stranded()` and named again by
+  `restore_stranded()`, which the window offers at start-up and after a failed change.
+  An existing test caught a mistake in my first version: a chapter's file counts as freed
+  by a swap only if its number really changes.
+- CR5: `backups.move` puts every moving folder aside first, so untitled chapters that
+  swap, or chapters with one title that rotate, keep their own copies.
+- CR12: `model.editable_order()` leaves out the sub-items of blocks from a newer version;
+  the cursor uses it, and Backspace and Delete also check that the item they would join
+  has a row before changing anything.
+- CR25: `files.atomic_write` (new, no GTK) syncs the file before it replaces the old one
+  and the folder after, and keeps the file's mode (a new file follows the umask).
+  `Document.save` and the drawing previews use it; `state.json` can too (CR22).
+- CR26: copies are named in UTC (`…Z.notz`), older local-time names are still read, and
+  `Backup.when` carries its offset, so copies sort by when they were taken; thinning
+  counts the time that really passed. Tested in Sofia's doubled hour on 2026-10-25; the
+  backup tests pass in seven time zones, Lord Howe's half-hour change included. Two older
+  tests built their copies by wall-clock time and now use real ages.
+- CR10 (R16): a chapter remembers its file's inode, modification time and size when it
+  reads or writes it. A save that finds the file changed asks "Changed on Disk": Reload
+  (the default: your version goes to Earlier Versions, and Ctrl+Z brings it back) or Keep
+  Mine (the other version goes to Earlier Versions first); Escape decides nothing. Where
+  no answer can wait (another chapter opens, the window closes, a file operation), yours
+  is written and the other is kept, never dropped for a copy taken in the same second; an
+  open question counts as unsaved edits. Two of the UI tests found holes in my first
+  version: a same-second copy that was dropped, and a question still open while another
+  chapter opened. The change is noticed at the next save, not the moment it happens.
+- Results: unit suite 395 tests pass (5.4 s), with and without PyGObject. UI suite 256
+  tests pass (210 s; it ran just before the last test was added), and all 257 with the
+  real Excalidraw (216 s) and in the load check (264 s).
+- Left for you: the release (suggested 1.6.0, with 1.5.0's unbuilt fixes and phase 1), and
+  phase 0's open question about the SDI notes.
 
 ### Phase 3: Broken or surprising behaviour (M)
 

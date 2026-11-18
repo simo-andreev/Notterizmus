@@ -164,6 +164,64 @@ class ChaptersTest(ui.UITestCase):
         finally:
             del self.win.toast
 
+    def type_into_first_item(self, text):
+        r = ui.focus(self.win.doc.root.children[0])
+        ui.type_text(r.view, text)
+
+    def test_a_chapter_opened_from_files_saves_the_open_one_first(self):
+        """A chapter opened from Files (App.do_open) replaced the open one while its
+        autosave was still pending, which then saved the new chapter instead: the last
+        edits of the old one were lost, and reopening the same chapter dropped them (CR4)."""
+        first, second = self.book("From Files", ["First", "Second"])
+        self.win.open_path(first)
+        ui.settle()
+        self.type_into_first_item(" typed")
+        ui.app().do_open([ui.Gio.File.new_for_path(str(second))], 1, "")  # before the autosave
+        ui.settle()
+        self.assertIn("First typed", first.read_text(encoding="utf-8"))
+        self.type_into_first_item(" again")
+        ui.app().do_open([ui.Gio.File.new_for_path(str(second))], 1, "")  # the open chapter itself
+        ui.settle()
+        self.assertEqual(self.win.doc.root.children[0].text, "Second again")
+        self.assertIn("Second again", second.read_text(encoding="utf-8"))
+
+    def test_undoing_a_trash_saves_the_chapter_opened_meanwhile(self):
+        doomed, other = self.book("Untrash", ["Doomed", "Other"])
+        toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: toasts.append((msg, button, cb))
+        try:
+            self.win.open_path(doomed)
+            ui.settle()
+            self.win.lookup_action("chapter-trash").activate(ui.GLib.Variant.new_string(str(doomed)))
+            ui.wait_for(lambda: self.win.doc is None, "the trashed chapter to close")
+            undo = toasts[-1][2]
+            self.win.open_path(other)
+            ui.settle()
+            self.type_into_first_item(" typed")
+            undo()  # reopens the trashed chapter before the autosave
+            ui.settle()
+            self.assertIn("Other typed", other.read_text(encoding="utf-8"))
+            self.assertEqual(Path(self.win.doc.path).resolve(), doomed.resolve())
+        finally:
+            del self.win.toast
+
+    def test_a_chapter_left_hidden_by_an_interrupted_change_can_be_restored(self):
+        """A crash or power cut in the middle of a reorder leaves a chapter under a hidden
+        staging name, gone from the list: the app offers to give it back (CR6)."""
+        path = self.book("Stranded", ["Lost"])[0]
+        path.rename(path.parent / ".moving-0123abcd.notz")
+        toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: toasts.append((msg, button, cb))
+        try:
+            self.win._offer_stranded()  # as when the app starts
+            msg, button, restore = toasts[-1]
+            self.assertEqual((msg, button), ("An interrupted change left 1 chapter hidden", "Restore"))
+            restore()
+            self.assertEqual(toasts[-1][0], "Restored 1 chapter")
+            self.assertEqual(names(path.parent), [path.name])
+        finally:
+            del self.win.toast
+
     def test_rename_book_renames_the_folder_and_its_chapters(self):
         a, _b = self.book("Old title", ["Ch A", "Ch B"])
         self.book("Taken title", ["Other"])

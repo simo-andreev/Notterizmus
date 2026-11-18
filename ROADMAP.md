@@ -52,7 +52,6 @@ As of 2026-11-18:
   - Undo is lost on close; Earlier Versions (R4) is the way back.
   - Drawings haven't been pasted for real between the app and TopCoding, in
     either direction (R30).
-  - An autosave can overwrite a chapter that a sync tool changed on disk (R16).
   - The UI is English only (R20).
   - The app doesn't show up in App Center search (R17).
   - The GitHub repository has no CI (R22).
@@ -159,7 +158,7 @@ To fix, in the order R29a, R29c, R29b, R29d, then R29e (R29f and R29g were found
 | R13 | **UI tests**: turn this project's test-harness scripts (drive keys, step the GTK main loop, check row positions frame by frame) into `tests/ui/` that run without a visible window | The hidden cursor and the tall first item were caught by hand | M. **Done**: `scripts/ui-tests.sh`; real key presses through Broadway since 1.3.1 |
 | R14 | **Split `ui/outline.py`** into keys, selection, clipboard, menus, multi-cursor and undo modules, with no change in behavior | Every item above lands in this one file | M. **Done** in 1.3.1: `outline.py` plus eight `outline_*.py` mixins, methods moved unchanged |
 | R15 | **Large-chapter check**: generate a 500-item chapter and measure open time, typing delay and memory. Only if it's slow, create rows lazily | Every item is its own GtkTextView; the largest real chapter has 192 items (56 on 2026-11-06) | S to measure |
-| R16 | **Changes on disk**: notice when the open file changes outside the app (Syncthing, Nextcloud, a second machine) and offer to reload | Chapters are plain JSON in Documents, so they're easy to sync. Without this, an autosave could silently overwrite the other copy | S |
+| R16 | **Changes on disk**: notice when the open file changes outside the app (Syncthing, Nextcloud, a second machine) and offer to reload | Chapters are plain JSON in Documents, so they're easy to sync. Without this, an autosave could silently overwrite the other copy | S. **Done** 2026-11-19 as CR10 (CODE_REVIEW.md), not released: before writing, a save that finds the file changed since it was opened or saved asks Reload or Keep Mine, and the other version goes to Earlier Versions either way. It notices at the next save, not the moment the file changes |
 
 ## Distribution and reach
 

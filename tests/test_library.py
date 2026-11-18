@@ -1,10 +1,12 @@
+import errno
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from notterizmus.library import (find, neighbor, parse_name, rename_book, renumber, reorder, safe_name, scan,
-                                 set_chapter)
+from notterizmus.library import (find, neighbor, parse_name, rename_book, renumber, reorder, restore_stranded,
+                                 safe_name, scan, set_chapter, stranded)
 from notterizmus.model import Document, Node, chapter_filename
 
 
@@ -62,7 +64,9 @@ class LibraryTest(unittest.TestCase):
 
 
 
-class ChangeTest(unittest.TestCase):
+class ChaptersCase(unittest.TestCase):
+    """Chapters saved in a temporary notes folder."""
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
@@ -88,6 +92,8 @@ class ChangeTest(unittest.TestCase):
             out.append((f.name, d.chapter_no, d.chapter_title, d.book, d.root.children[0].text))
         return out
 
+
+class ChangeTest(ChaptersCase):
     def test_rename_keeps_the_content(self):
         p = self.chapter("Book", 1, "Old", "notes")
         moved = set_chapter(p, 1, "New")
@@ -371,6 +377,92 @@ class MoreChangesTest(ChangeTest):
         self.assertIsNone(chapter_numbered(folder, 9))
         self.assertEqual(chapter_numbered(folder, 1, exclude=b).path, a)
         self.assertIsNone(chapter_numbered(self.root / "No such book", 1))
+
+
+class InterruptedChangeTest(ChaptersCase):
+    """A renumbering put things back only when a file was in the way. When the second
+    chapter's write failed (a full disk, say), the first was left under a hidden staging
+    name and vanished from the chapter list (CR6 in CODE_REVIEW.md)."""
+
+    def setUp(self):
+        super().setUp()
+        self.a = self.chapter("Book", 1, "A", "a")
+        self.b = self.chapter("Book", 2, "B", "b")
+        self.c = self.chapter("Book", 3, "C", "c")
+        self.before = self.state()
+
+    def hidden(self):
+        return sorted(f.name for f in (self.root / "Book").iterdir() if f.name.startswith("."))
+
+    def failing(self, owner, name, at, then_all=False):
+        """Patch owner.name so that its at-th call (and with then_all, every later one) fails
+        as on a full disk."""
+        real, calls = getattr(owner, name), []
+
+        def call(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == at or (then_all and len(calls) > at):
+                raise OSError(errno.ENOSPC, "No space left on device")
+            return real(*args, **kwargs)
+        return mock.patch.object(owner, name, call)
+
+    def assert_put_back(self):
+        self.assertEqual(self.state(), self.before)
+        self.assertEqual([c.path.name for c in scan(self.root)[0].chapters], ["01 A.notz", "02 B.notz", "03 C.notz"])
+        self.assertEqual(self.hidden(), [])
+
+    def test_a_write_that_fails_halfway_puts_every_chapter_back(self):
+        for at in (1, 2, 3):
+            with self.subTest(write=at), self.failing(Document, "save", at), self.assertRaises(OSError):
+                renumber({self.a: 2, self.b: 3, self.c: 1})
+            self.assert_put_back()
+
+    def test_a_final_rename_that_fails_puts_every_chapter_back(self):
+        for at in (1, 2, 3):
+            with self.subTest(rename=at), self.failing(Path, "rename", at), self.assertRaises(OSError):
+                renumber({self.a: 2, self.b: 3, self.c: 1})
+            self.assert_put_back()
+
+    def test_with_the_disk_still_full_the_names_at_least_come_back(self):
+        with self.failing(Document, "save", 2, then_all=True), self.assertRaises(OSError):
+            reorder(scan(self.root)[0].chapters[::-1])  # C and A swap (B keeps 2): C's write, A's fails
+        self.assertEqual([c.path.name for c in scan(self.root)[0].chapters], ["01 A.notz", "02 B.notz", "03 C.notz"])
+        self.assertEqual(self.hidden(), [])
+
+    def test_a_number_two_chapters_share_is_refused_before_anything_moves(self):
+        x = self.chapter("Twice", 3, "X")
+        self.chapter("Twice", 5, "A")
+        self.chapter("Twice", 5, "B")
+        before = self.state("Twice")
+        with self.assertRaises(FileExistsError):
+            set_chapter(x, 5, "X")
+        self.assertEqual(self.state("Twice"), before)
+
+    def test_a_new_title_that_fails_after_a_swap_undoes_the_swap(self):
+        with self.failing(Document, "save", 3), self.assertRaises(OSError):
+            set_chapter(self.a, 2, "New")  # swaps numbers with B (writes 1 and 2), then renames A (3)
+        self.assertEqual(self.state(), self.before)
+        self.assertEqual(self.hidden(), [])
+
+    def test_a_chapter_left_hidden_by_a_crash_gets_its_name_back(self):
+        """A crash or power cut halfway leaves a chapter under its staging name, with its
+        new number already inside."""
+        doc = Document.load(self.b)
+        doc.chapter_no = 4
+        doc.save(self.root / "Book" / ".moving-0123abcd.notz")
+        self.b.unlink()
+        lost = stranded(self.root)
+        self.assertEqual([p.name for p in lost], [".moving-0123abcd.notz"])
+        self.assertEqual(restore_stranded(lost[0]), self.root / "Book" / "04 B.notz")
+        self.assertEqual(self.state()[-1], ("04 B.notz", 4, "B", "Book", "b"))
+        self.assertEqual((stranded(self.root), self.hidden()), ([], []))
+
+    def test_a_stranded_chapter_whose_name_is_taken_is_restored_beside_it(self):
+        Document.load(self.c).save(self.root / "Book" / ".moving-0123abcd.notz")  # a copy of 03 C
+        restored = restore_stranded(stranded(self.root)[0])
+        self.assertEqual(restored.name, "03 C (restored).notz")
+        self.assertEqual(Document.load(restored).chapter_title, "C (restored)")
+        self.assertEqual(Document.load(self.c).chapter_title, "C", "the chapter with that name is untouched")
 
 
 if __name__ == "__main__":

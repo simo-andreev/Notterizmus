@@ -5,7 +5,7 @@ import time
 
 from gi.repository import Gdk
 
-from ..model import Node, display_order, indent, is_text, move, normalize_runs, outdent, remove_promote
+from ..model import Node, editable_order, indent, is_text, move, normalize_runs, outdent, remove_promote
 from .rows import TableRow, _mods
 DOUBLE_CTRL = 0.4  # seconds between two Ctrl taps
 MODIFIER_KEYS = {"Shift_L", "Shift_R", "Alt_L", "Alt_R", "Super_L", "Super_R", "Meta_L", "Meta_R",
@@ -142,7 +142,7 @@ class KeysMixin:
         return False
 
     def _order(self):
-        return display_order(self.doc.root)
+        return editable_order(self.doc.root)
 
     def focus_neighbor(self, node, delta, create=False):
         order = self._order()
@@ -224,7 +224,7 @@ class KeysMixin:
                 self._ensure_nonempty()
                 self.refresh(focus=target or self._order()[0], offset=-1)
             return True
-        if node.children or prev is None or not is_text(prev):
+        if node.children or prev is None or not is_text(prev) or prev.id not in self.rows:
             return True
         with self._op():
             join = len(prev.text)
@@ -239,7 +239,7 @@ class KeysMixin:
         order = self._order()
         idx = order.index(node)
         nxt = order[idx + 1] if idx + 1 < len(order) else None
-        if nxt is None or not is_text(nxt) or nxt.children:
+        if nxt is None or not is_text(nxt) or nxt.children or nxt.id not in self.rows:
             return True
         with self._op():
             join = len(node.text)

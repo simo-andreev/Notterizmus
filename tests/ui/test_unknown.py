@@ -49,6 +49,25 @@ class UnknownBlockTest(ui.UITestCase):
         self.assertEqual([c.kind for c in intro.children], ["bullet", "mindmap", "bullet"])
         self.assertEqual((before.text, after.text), ("before", "after"))
 
+    def test_keys_next_to_one_with_sub_items_leave_them_alone(self):
+        """The cursor's order went into the block's sub-items, which the editor doesn't
+        show: Backspace at the start of the next item joined its text into a hidden sub-item,
+        which was saved, and then raised KeyError (CR12 in CODE_REVIEW.md)."""
+        with_items = {"kind": "mindmap", "id": "d2", "data": {"x": 1},
+                      "children": [{"kind": "bullet", "id": "c1", "runs": [{"t": "inside"}], "marker": "dot"}]}
+        doc = ui.open_chapter([h("Intro", b("before"), Node.from_json(json.loads(json.dumps(with_items))),
+                                 b("after"))])
+        before, _block, after = doc.root.children[0].children
+        self.assertTrue(ui.press(ui.focus(after, 0).view, "Up"))
+        self.assertIs(self.ed.current, before)
+        self.assertTrue(ui.press(ui.focus(before, -1).view, "Down"))
+        self.assertIs(self.ed.current, after)
+        ui.press(ui.focus(after, 0).view, "BackSpace")
+        ui.press(ui.focus(before, -1).view, "Delete")
+        self.assertEqual((before.text, after.text), ("before", "after"))
+        self.win.save(quiet=True)
+        self.assertEqual(saved_block(doc.path), with_items)
+
     def test_editing_around_it_keeps_its_data_in_the_file(self):
         doc, _intro, before, _block, _after = self.open()
         ui.type_text(ui.focus(before).view, " edited")

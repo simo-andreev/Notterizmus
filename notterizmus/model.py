@@ -17,12 +17,12 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import drawing
+from .files import atomic_write
 
 FORMAT = "notterizmus/1"
 
@@ -216,6 +216,20 @@ def display_order(root):
     return [n for n in root.walk() if n is not root]
 
 
+def editable_order(root):
+    """display_order() without what the editor doesn't show: the sub-items of a block from
+    a newer version, kept unchanged in the file but never edited (CR12 in CODE_REVIEW.md)."""
+    out = []
+
+    def add(node):
+        for c in node.children:
+            out.append(c)
+            if c.kind in BLOCK_KINDS:
+                add(c)
+    add(root)
+    return out
+
+
 # --- structural operations (return True when something changed) --------------
 
 def indent(node):
@@ -380,6 +394,7 @@ class Document:
         self.format = FORMAT
         self.extra = {}
         self.chapter_extra = {}
+        self._disk = None  # the file as this document last read or wrote it (see changed_on_disk)
 
     @classmethod
     def new(cls, book, chapter_no, chapter_title, path=None):
@@ -427,36 +442,53 @@ class Document:
     @classmethod
     def load(cls, path):
         """Raises OSError if the file can't be read, ValueError if it isn't a chapter."""
+        disk = _disk_state(path)  # before reading: a change made meanwhile still shows
         with open(path, encoding="utf-8") as f:
             try:
                 data = json.load(f)
             except RecursionError as e:  # nested too deep to read
                 raise ValueError("this isn't a Notterizmus chapter file") from e
-        return cls.from_json(data, path)
+        doc = cls.from_json(data, path)
+        doc._disk = disk
+        return doc
+
+    def dumps(self):
+        """The chapter file's text."""
+        return json.dumps(self.to_json(), ensure_ascii=False, indent=1) + "\n"
 
     def save(self, path=None):
+        """Write the chapter in one step (files.atomic_write): a save that fails (a full
+        disk, say) leaves the file as it was, and nothing half written in the book's folder."""
         path = Path(path or self.path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".", suffix=".tmp")
-        try:
-            try:
-                f = os.fdopen(fd, "w", encoding="utf-8")
-            except BaseException:
-                os.close(fd)
-                raise
-            with f:
-                json.dump(self.to_json(), f, ensure_ascii=False, indent=1)
-                f.write("\n")
-            os.replace(tmp, path)
-        except BaseException:
-            # A save that fails (a full disk, say) is retried by every autosave: don't
-            # leave a half-written file in the book's folder each time.
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-            raise
+        with atomic_write(path) as f:
+            f.write(self.dumps())
         self.path = path
+        self.remember_disk()
+
+    def remember_disk(self):
+        """Take the file as it is now as this document's own: after it was written for
+        this document by other means (a chapter renamed or renumbered, say)."""
+        self._disk = _disk_state(self.path) if self.path else None
+
+    def changed_on_disk(self):
+        """Whether another program changed or replaced the file since this document last
+        read or wrote it: a sync tool, a second machine (CR10 in CODE_REVIEW.md, R16). A file
+        that is gone counts as unchanged, so a save brings it back, as before."""
+        if self._disk is None or self.path is None:
+            return False
+        now = _disk_state(self.path)
+        return now is not None and now != self._disk
+
+
+def _disk_state(path):
+    """What tells one version of a file from another: a file replaced in one step (as sync
+    tools and this app write) is a new inode; one rewritten in place has a new modification
+    time and usually size. None if there is no file."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return st.st_ino, st.st_mtime_ns, st.st_size
 
 
 def chapter_filename(chapter_no, title):

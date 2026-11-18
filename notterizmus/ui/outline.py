@@ -14,7 +14,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Graphene, Gtk
 
 from ..completion import BookWords
 from ..layout import layout
-from ..model import Node, display_order, is_text, set_kind
+from ..model import Node, editable_order, is_text, set_kind
 from .rows import TextRow, _prefix_markup, row_type
 from .outline_undo import UndoMixin
 from .outline_keys import KeysMixin
@@ -128,7 +128,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         self.current = self.cur_view = None
         self.sel, self.mc_views = [], []
         self._ensure_nonempty()
-        first = next((n for n in display_order(doc.root) if is_text(n)), None)
+        first = next((n for n in editable_order(doc.root) if is_text(n)), None)
         self.refresh(focus=first, offset=-1)
         self._undo, self._redo = [], []
         self._cur = self._snapshot()
