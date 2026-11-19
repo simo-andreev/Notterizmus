@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Earlier Versions** opens at once on big chapters: 0.07 s instead of 0.9 s for 54 copies of a 4 MB chapter. Each copy's item count and "same as now" are filled in a moment later.
+- Long chapters are lighter to edit: Enter, Tab and undo in a chapter of 500 items re-measure the few rows they change instead of every row. Ctrl+Space in a book of 30 chapters keeps up with typing (0.09 ms a key instead of 2.8 ms), and pasting 5,000 lines takes 0.1 s instead of 17 s.
+- **Copy for TopCoding** with a drawing gives tables the same header cells TopCoding makes itself: the first cell of a header row is both a row and a column header.
+
 ## 1.6.0 — 2026-11-19
 
 - **Changed on disk**: if another program changes the open chapter's file (a sync tool, a second machine), the app asks before saving over it. **Reload** takes that version, and Ctrl+Z brings yours back; **Keep Mine** saves yours. The other version stays in Earlier Versions either way.

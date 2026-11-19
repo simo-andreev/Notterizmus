@@ -17,14 +17,14 @@ class EditingTest(ui.UITestCase):
         doc = ui.open_chapter([h("Intro", b("text"))])
         bullet = doc.root.children[0].children[0]
         r = ui.focus(bullet, 0)
-        ui.type_text(r.view, "+ ", wait=0.3)
+        ui.type_text(r.view, "+ ")
         self.assertEqual((bullet.kind, bullet.marker, bullet.text), ("bullet", "plus", "text"))
 
     def test_typing_an_exclamation_or_question_mark_makes_those_bullets(self):
         doc = ui.open_chapter([h("Intro", b("remember"), b("check"))])
         important, question = doc.root.children[0].children
-        ui.type_text(ui.focus(important, 0).view, "! ", wait=0.3)
-        ui.type_text(ui.focus(question, 0).view, "? ", wait=0.3)
+        ui.type_text(ui.focus(important, 0).view, "! ")
+        ui.type_text(ui.focus(question, 0).view, "? ")
         self.assertEqual([(n.kind, n.marker, n.text) for n in (important, question)],
                          [("bullet", "important", "remember"), ("bullet", "question", "check")])
         self.assertEqual([ui.row(n).prefix.get_text() for n in (important, question)], ["     ! ", "     ? "])
@@ -36,9 +36,9 @@ class EditingTest(ui.UITestCase):
         doc = ui.open_chapter([h("Intro", b("outer", b("inner")))])
         intro = doc.root.children[0]
         inner = intro.children[0].children[0]
-        ui.type_text(ui.focus(intro, 0).view, "* ", wait=0.3)
+        ui.type_text(ui.focus(intro, 0).view, "* ")
         self.assertEqual((intro.kind, intro.text), ("heading", "* Intro"))
-        ui.type_text(ui.focus(inner, 0).view, "# ", wait=0.3)
+        ui.type_text(ui.focus(inner, 0).view, "# ")
         self.assertEqual((inner.kind, inner.text), ("bullet", "# inner"))
         self.assertTrue(ui.press(ui.focus(intro).view, "space", ctrl=True, shift=True))
         self.assertEqual(intro.kind, "heading", "Ctrl+Shift+Space leaves out bullets at the top level")
@@ -181,7 +181,7 @@ class EditingTest(ui.UITestCase):
         said = []
         self.win.toast = lambda msg, *a: said.append(msg)
         try:
-            ui.type_text(ui.focus(inner, 0).view, "# ", wait=0.3)
+            ui.type_text(ui.focus(inner, 0).view, "# ")
         finally:
             del self.win.toast
         self.assertEqual((inner.kind, inner.text), ("bullet", "# inner"),
@@ -295,7 +295,7 @@ class EditingTest(ui.UITestCase):
         doc = ui.open_chapter([h("Intro", h("Going", b("stays"), h("Stays too")), h("Next"))])
         intro = doc.root.children[0]
         self.ed.show_item_menu(ui.row(intro.children[0]))
-        ui.pump(0.2)
+        ui.wait_for(ui.open_popovers, "the item menu")
         pop = ui.open_popovers()[0]
         row = next(r for _n, text, r in ui.menu_choices(pop) if text == "Delete Item")
         row.get_parent().emit("row-activated", row)

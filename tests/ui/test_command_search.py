@@ -6,13 +6,13 @@ from . import support as ui
 
 class CommandSearchTest(ui.UITestCase):
     def tearDown(self):
-        while self.win.get_visible_dialog() is not None:
-            self.win.get_visible_dialog().force_close()
-            ui.pump(0.3)
+        while (dlg := self.win.get_visible_dialog()) is not None:
+            dlg.force_close()
+            ui.wait_for(lambda: self.win.get_visible_dialog() is not dlg, "a dialog to close")
 
     def open_search(self, text=""):
         self.win.lookup_action("commands").activate(None)
-        ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "Search Commands")
         dlg = self.win._command_search
         self.search(dlg, text)
         return dlg
@@ -20,16 +20,17 @@ class CommandSearchTest(ui.UITestCase):
     def search(self, dlg, text):
         dlg.entry.set_text(text)
         ui.wait_for(lambda: dlg._filled_for == text, "the list to follow the search")
-        ui.pump(0.05)
 
     def titles(self, dlg):
         return [r._cmd.title for r in dlg.rows()]
 
     def pick(self, dlg, title):
         row = next(r for r in dlg.rows() if r._cmd.title == title)
+        ran, run = [], row._cmd.run
+        row._cmd.run = lambda: (run(), ran.append(True))  # it runs once the dialog has gone
         dlg.list.emit("row-activated", row)
-        ui.pump_until(lambda: self.win.get_visible_dialog() is None)
-        ui.pump(0.3)
+        ui.wait_for(lambda: ran, f"“{title}” to run")
+        ui.settle()
 
     def test_ctrl_shift_p_opens_it(self):
         accels = self.app.get_accels_for_action("win.commands")
@@ -85,16 +86,14 @@ class CommandSearchTest(ui.UITestCase):
         self.assertEqual(self.titles(dlg)[0], "Show or Hide the Chapter List")
         shown = self.win.split.get_show_sidebar()
         dlg.entry.emit("activate")
-        ui.pump_until(lambda: self.win.get_visible_dialog() is None)
-        ui.pump(0.3)
-        self.assertEqual(self.win.split.get_show_sidebar(), not shown)
+        ui.wait_for(lambda: self.win.split.get_show_sidebar() != shown, "the chapter list to be toggled")
+        self.assertIsNone(self.win.get_visible_dialog())
         self.win.lookup_action("sidebar").activate(None)  # put it back
-        ui.pump(0.2)
+        ui.wait_for(lambda: self.win.split.get_show_sidebar() == shown, "the chapter list back")
 
     def test_without_an_open_chapter_only_window_commands_are_offered(self):
         ui.open_chapter([h("Intro")])
         self.win._close_doc()
-        ui.pump(0.2)
         titles = self.titles(self.open_search())
         self.assertIn("New Chapter", titles)
         self.assertNotIn("Bold", titles)

@@ -1,5 +1,4 @@
 """Earlier versions (R4): copies kept on open and while editing, restored from a dialog."""
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -13,15 +12,10 @@ from . import support as ui
 
 
 class BackupsTest(ui.UITestCase):
-    def setUp(self):
-        super().setUp()
-        self.every = backups.BACKUP_EVERY
-
     def tearDown(self):
-        backups.BACKUP_EVERY = self.every
-        while self.win.get_visible_dialog() is not None:
-            self.win.get_visible_dialog().force_close()
-            ui.pump(0.3)
+        while (dlg := self.win.get_visible_dialog()) is not None:
+            dlg.force_close()
+            ui.wait_for(lambda: self.win.get_visible_dialog() is not dlg, "a dialog to close")
 
     def folder(self):
         return backups.folder_for(self.win.doc.path, self.win.notes_root_path(), paths.backups_dir())
@@ -45,8 +39,10 @@ class BackupsTest(ui.UITestCase):
         ui.type_text(view, " v2")
         self.win.save(quiet=True)
         self.assertEqual(self.texts(), ["v1"], "within the interval: no new copy")
-        backups.BACKUP_EVERY = 0
-        time.sleep(1.1)  # copies are named by the second
+        # the interval has passed: the copy was taken that long ago
+        first, = backups.list_backups(self.folder())
+        first.path.rename(first.path.with_name(
+            backups._name(first.when - timedelta(seconds=backups.BACKUP_EVERY + 1))))
         ui.type_text(view, " v3")
         self.win.save(quiet=True)
         self.assertEqual(self.texts(), ["v1 v2", "v1"])
@@ -75,21 +71,21 @@ class BackupsTest(ui.UITestCase):
             target = folder / f"{(datetime.now() - timedelta(hours=2 - i)).strftime('%Y-%m-%dT%H-%M-%S')}.notz"
             tmp.rename(target)
         self.win.lookup_action("versions").activate(None)
-        ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "Earlier Versions")
         dlg = self.win.get_visible_dialog()
         rows = [w for w in ui.walk(dlg) if isinstance(w, ui.Adw.ActionRow)]
+        ui.wait_for(lambda: "…" not in [r.get_subtitle() for r in rows], "the copies' details")  # (CR32)
         self.assertEqual([r.get_subtitle() for r in rows], ["1 item · same as now", "1 item", "1 item"])
         self.assertRegex(rows[0].get_title(), r"^\d\d:\d\d$")
         self.assertEqual(rows[0].get_header().get_label(), "Today")
         listbox = rows[0].get_parent()
         listbox.select_row(rows[2])  # the oldest
-        ui.pump(0.1)
         buf = self.win._versions_preview.get_buffer()
         self.assertEqual(buf.get_text(*buf.get_bounds(), True),
                          to_plain(layout(Document.load(rows[2]._backup.path).root, self.win.rules)))
         restore = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.Button) and w.get_label() == "Restore")
         restore.emit("clicked")
-        ui.pump_until(lambda: self.win.get_visible_dialog() is None)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is None, "the dialog to close")
         ui.settle()
         self.assertEqual(self.win.doc.root.children[0].text, "older")
         self.assertEqual(self.win.doc.chapter_title, doc.chapter_title, "only the content changes")
@@ -101,7 +97,6 @@ class BackupsTest(ui.UITestCase):
         before = self.folder()
         self.assertTrue(before.is_dir())
         self.win.apply_chapter_props(doc.path, doc.path.parent, doc.chapter_no, "After")
-        ui.pump(0.2)
         self.assertFalse(before.exists())
         self.assertEqual(self.texts(), ["kept"])
         self.assertTrue(self.folder().name.endswith("After"))
@@ -114,9 +109,9 @@ def ui_run(text):
 
 class VersionsByDayTest(ui.UITestCase):
     def tearDown(self):
-        while self.win.get_visible_dialog() is not None:
-            self.win.get_visible_dialog().force_close()
-            ui.pump(0.3)
+        while (dlg := self.win.get_visible_dialog()) is not None:
+            dlg.force_close()
+            ui.wait_for(lambda: self.win.get_visible_dialog() is not dlg, "a dialog to close")
 
     def test_copies_are_grouped_by_day(self):
         doc = ui.open_chapter([h("days")], book="Backups days")
@@ -125,7 +120,7 @@ class VersionsByDayTest(ui.UITestCase):
             when = datetime.now() - timedelta(days=days)
             (folder / f"{when:%Y-%m-%dT%H-%M-%S}.notz").write_bytes(doc.path.read_bytes())
         self.win.lookup_action("versions").activate(None)
-        ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "Earlier Versions")
         rows = [w for w in ui.walk(self.win.get_visible_dialog()) if isinstance(w, ui.Adw.ActionRow)]
         headers = [r.get_header().get_label() if r.get_header() else None for r in rows]
         ten_days = f"{(datetime.now() - timedelta(days=10)):%Y-%m-%d}"

@@ -56,9 +56,8 @@ class GuideTest(ui.UITestCase):
                         words.add(buf.get_text(it, end, True))
             return words
 
-        ui.pump(0.6)  # spelling is checked a moment after the text is set
-        ui.pump_until(lambda: marked() == {"misspeled"})
-        self.assertEqual(marked(), {"misspeled"})
+        # spelling is checked a moment after the text is set
+        ui.wait_for(lambda: marked() == {"misspeled"}, "only the misspelled word underlined")
 
 
 class GuideWordsTest(ui.UITestCase):

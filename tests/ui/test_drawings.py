@@ -470,7 +470,6 @@ class PasteFromTopCodingTest(DrawingTestCase):
                    ("text/plain;charset=utf-8", b"[from the browser]")]
         self.win.get_clipboard().set_content(ui.Gdk.ContentProvider.new_union(
             [ui.Gdk.ContentProvider.new_for_bytes(m, ui.GLib.Bytes.new(d)) for m, d in formats]))
-        ui.pump(0.05)
 
     def paste(self, row, until, what="the paste"):
         row.view.emit("paste-clipboard")

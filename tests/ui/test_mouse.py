@@ -11,7 +11,7 @@ class DragSelectTest(ui.UITestCase):
             self.skipTest("real mouse input needs the Broadway display (the default runner)")
         self.win.findbar.set_search_mode(False)
         self.win.set_zoom(100, save=True, announce=False)
-        ui.pump(0.6)  # past the double-click time of the previous test's clicks
+        ui.past_double_click()  # the previous test's clicks don't count with this one's
 
     def tearDown(self):
         ui.release_mouse()
@@ -19,7 +19,6 @@ class DragSelectTest(ui.UITestCase):
     def chapter(self):
         doc = ui.open_chapter([h("Intro", b("one two three"), b("four five six"),
                                  b("seven eight nine"), b("ten eleven"))])
-        ui.pump(0.2)
         return doc.root.children[0].children
 
     def at(self, node, x=40):
@@ -69,7 +68,6 @@ class DragSelectTest(ui.UITestCase):
 
     def test_dragging_onto_a_section_heading_deletes_only_the_heading(self):
         doc = ui.open_chapter([h("Intro", b("one two three"), h("Sub", b("four five six"), b("seven eight")))])
-        ui.pump(0.2)
         intro = doc.root.children[0]
         first, sub = intro.children
         ui.real_drag(self.at(first), self.at(sub))
@@ -82,17 +80,17 @@ class DragSelectTest(ui.UITestCase):
 
     def test_dragging_past_the_bottom_scrolls_and_keeps_selecting(self):
         doc = ui.open_chapter([h("Long list", *[b(f"note {i}") for i in range(80)])])
-        ui.pump(0.2)
         items = doc.root.children[0].children
         adj = self.ed.get_vadjustment()
         adj.set_value(0)
-        ui.pump(0.2)
+        ui.settle()
         bottom = ui.surface_point(self.ed, 40, self.ed.get_height() + 30)
         ui.real_drag(self.at(items[0]), bottom, hold=True)
         ui.pump_until(lambda: adj.get_value() > 0 and len(self.ed.sel) > 20)
         self.assertGreater(adj.get_value(), 0, "the outline scrolls while the pointer is below it")
         self.assertGreater(len(self.ed.sel), 20, "the items scrolled into view get selected")
         ui.release_mouse()
+        ui.wait_for(lambda: self.ed._drag_tick is None, "the autoscroll to end")
         stopped = adj.get_value()
-        ui.pump(0.3)
+        ui.frames(6)
         self.assertEqual(adj.get_value(), stopped, "scrolling stops when the button is released")

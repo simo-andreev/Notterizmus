@@ -53,7 +53,7 @@ class LayoutTest(ui.UITestCase):
         ui.pump_until(lambda: ui.cursor_in_view(r.view))
         for _ in range(5):
             ui.type_text(self.ed.cur_view or r.view, " more", wait=0.02)
-            ui.press(self.ed.cur_view or r.view, "Return", wait=0.4)
+            ui.press(self.ed.cur_view or r.view, "Return")
             view = self.ed.cur_view
             self.assertTrue(ui.pump_until(lambda: ui.cursor_in_view(view)),
                             "the cursor is below the visible area after Enter")

@@ -289,7 +289,6 @@ class RulesFileTest(ui.UITestCase):
     def restore(self):
         user_rules_path().unlink(missing_ok=True)
         self.win.lookup_action("reload-rules").activate(None)
-        ui.pump(0.1)
 
     def reload(self, text):
         user_rules_path().parent.mkdir(parents=True, exist_ok=True)
@@ -323,11 +322,11 @@ class RulesFileTest(ui.UITestCase):
         self.reload('[markers.idea]\nsymbol = "→"\ntrigger = ">"\nlabel = "Idea"\n')
         doc = ui.open_chapter([h("Intro", b("why"))])
         item = doc.root.children[0].children[0]
-        ui.type_text(ui.focus(item, 0).view, "> ", wait=0.3)
+        ui.type_text(ui.focus(item, 0).view, "> ")
         self.assertEqual((item.kind, item.marker, item.text), ("bullet", "idea", "why"))
         self.assertEqual(ui.row(item).prefix.get_text(), "     → ")
         self.ed.show_item_menu(ui.row(item))
-        ui.pump(0.2)
+        ui.wait_for(ui.open_popovers, "the item menu")
         labels = [text for _n, text, _r in ui.menu_choices(ui.open_popovers()[0])]
         self.assertIn("→   Idea      >␣", labels)
         self.assertIn("→   Idea", labels, "under Add as well")
@@ -354,7 +353,6 @@ class SpellingSwitchTest(ui.UITestCase):
         action = self.win.lookup_action("spell")
         if not action.get_state().get_boolean():
             action.activate(None)
-            ui.pump(0.1)
 
     def marked(self, view):
         buf = view.get_buffer()
@@ -367,13 +365,11 @@ class SpellingSwitchTest(ui.UITestCase):
         ui.wait_for(lambda: self.marked(view), "the misspelled word to be underlined")
         self.assertEqual(self.win.lang_btn.get_label(), "EN-US")
         self.win.lookup_action("spell").activate(None)
-        ui.pump(0.1)
         self.assertFalse(self.marked(view), "the underlines go at once")
         self.assertFalse(state()["spell"])
         self.assertEqual(self.win.lang_btn.get_label(), "EN-US (off)")
         self.win.lookup_action("spell").activate(None)
-        ui.pump(0.1)
-        self.assertTrue(self.marked(view))
+        ui.wait_for(lambda: self.marked(view), "the underline back")
         self.assertTrue(state()["spell"])
 
     def test_the_language_is_picked_from_the_chapters_text_and_a_choice_is_saved_in_it(self):

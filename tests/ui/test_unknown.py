@@ -92,7 +92,6 @@ class UnknownBlockTest(ui.UITestCase):
     def test_copy_for_topcoding_leaves_it_out(self):
         self.open()
         self.win.lookup_action("copy").activate(None)
-        ui.pump(0.2)
         self.assertNotIn("SECRET", ui.clipboard("text/html"))
         self.assertNotIn("mindmap", ui.clipboard("text/plain"))
 
@@ -101,8 +100,8 @@ class UnknownBlockTest(ui.UITestCase):
         ui.focus(before)
         trash = next(w for w in ui.walk(ui.row(block)) if isinstance(w, ui.Gtk.Button))
         trash.emit("clicked")
-        ui.pump(0.3)
-        self.assertEqual([c.kind for c in self.win.doc.root.children[0].children], ["bullet", "bullet"])
+        ui.wait_for(lambda: [c.kind for c in self.win.doc.root.children[0].children] == ["bullet", "bullet"],
+                    "the block to go")
         ui.press(self.ed.cur_view or ui.row(before).view, "z", ctrl=True)
         kids = self.win.doc.root.children[0].children
         self.assertEqual([c.kind for c in kids], ["bullet", "mindmap", "bullet"])
@@ -134,7 +133,6 @@ class UnknownFileFieldsTest(ui.UITestCase):
         expected = ("notterizmus/2", ["draft"], {"by": "2.0"}, "kept")
         self.assertEqual(unknown(path), expected)
         self.win.apply_chapter_props(path, path.parent, 5, "Renamed")
-        ui.pump(0.2)
         renamed = path.parent / "05 Renamed.notz"
         self.assertEqual(Path(self.win.doc.path), renamed)
         self.assertEqual(unknown(renamed), expected)

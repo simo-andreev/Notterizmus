@@ -15,23 +15,27 @@ class RealKeysTest(ui.UITestCase):
             self.skipTest("real key presses need the Broadway display (the default runner)")
         self.win.findbar.set_search_mode(False)
         self.win.set_zoom(100, save=True, announce=False)
-        ui.pump(0.2)
+        ui.frames()
 
     def tearDown(self):
-        while self.win.get_visible_dialog() is not None:
-            self.win.get_visible_dialog().force_close()
-            ui.pump(0.3)
+        while (dlg := self.win.get_visible_dialog()) is not None:
+            dlg.force_close()
+            ui.wait_for(lambda: self.win.get_visible_dialog() is not dlg, "a dialog to close")
         ui.close_popovers()
         self.win.findbar.set_search_mode(False)
         self.win.set_zoom(100, save=True, announce=False)
         if not self.win.split.get_show_sidebar():
             self.win.lookup_action("sidebar").activate(None)
-        ui.pump(0.2)
+            ui.wait_for(self.win.split.get_show_sidebar, "the chapter list")
+        ui.frames()
+
+    def focused_in(self, widget):
+        """Whether the keyboard focus is in widget (an entry's focus is in its text child)."""
+        f = self.win.get_focus()
+        return f is not None and (f is widget or f.is_ancestor(widget))
 
     def chapter(self, *nodes, **kw):
-        doc = ui.open_chapter(list(nodes), **kw)
-        ui.pump(0.2)
-        return doc
+        return ui.open_chapter(list(nodes), **kw)
 
     def bar_open(self):
         return self.win.findbar.get_search_mode()
@@ -53,7 +57,7 @@ class RealKeysTest(ui.UITestCase):
         ui.focus(self.win.doc.root.children[0].children[0])
         ui.real_key("h", ctrl=True)
         self.win.findbar.replace_entry.grab_focus()
-        ui.pump(0.1)
+        ui.wait_for(lambda: self.focused_in(self.win.findbar.replace_entry), "focus in the replace field")
         ui.real_type("x")
         self.assertEqual(self.win.findbar.replace_entry.get_text(), "x", "typing goes into the replace field")
         ui.real_key("Escape")
@@ -70,7 +74,7 @@ class RealKeysTest(ui.UITestCase):
         ui.focus(self.win.doc.root.children[0].children[0])
         ui.real_key("f", ctrl=True)
         self.win.findbar.case.grab_focus()
-        ui.pump(0.1)
+        ui.wait_for(lambda: self.focused_in(self.win.findbar.case), "focus on the case switch")
         ui.real_key("Escape")
         self.assertFalse(self.bar_open())
 
@@ -89,8 +93,7 @@ class RealKeysTest(ui.UITestCase):
         ui.real_key("f", ctrl=True)
         r = ui.focus(doc.root.children[0].children[0], 0)
         self.ed.add_caret(r.view, 1)
-        ui.pump(0.1)
-        self.assertTrue(self.ed.mc_views)
+        ui.wait_for(lambda: self.ed.mc_views, "a second caret")
         ui.real_key("Escape")
         self.assertFalse(self.ed.mc_views)
         self.assertTrue(self.bar_open(), "the first Escape only clears the extra cursors")
@@ -102,9 +105,8 @@ class RealKeysTest(ui.UITestCase):
         r = ui.focus(doc.root.children[0].children[0], 0)
         r.view.select_range(10, 15)
         ui.real_key("f", ctrl=True)
-        ui.pump(0.3)
         bar = self.win.findbar
-        self.assertEqual(bar.entry.get_text(), "scale")
+        ui.wait_for(lambda: bar.entry.get_text() == "scale" and bar.matches, "the selection searched for")
         self.assertEqual(bar.matches[bar.current], (r.view, 10, 15))
 
     # -- Search Commands --------------------------------------------------------------------------
@@ -185,7 +187,7 @@ class RealKeysTest(ui.UITestCase):
         ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "F2 to open Chapter Properties")
         dlg = self.win.get_visible_dialog()
         self.assertEqual(dlg.get_heading(), "Chapter Properties")
-        ui.pump(0.3)  # the dialog takes the keyboard once it has opened
+        ui.wait_for(lambda: dlg.get_focus() is not None, "the dialog to take the keyboard")
         ui.real_key("Escape")
         ui.wait_for(lambda: self.win.get_visible_dialog() is None, "Escape to close the dialog")
 
@@ -224,18 +226,21 @@ class RealKeysTest(ui.UITestCase):
         self.chapter(h("Intro"))
         ui.focus(self.win.doc.root.children[0])
         shown = self.win.split.get_show_sidebar()
-        ui.real_key("p", ctrl=True, shift=True, wait=0.4)
+        ui.real_key("p", ctrl=True, shift=True)
+        ui.wait_for(lambda: (dlg := self.win.get_visible_dialog()) is not None and dlg.get_focus() is not None,
+                    "Search Commands to take the keyboard")
         ui.real_type("chapter list", wait=0)  # no pause before Enter, as a fast typist
         ui.real_key("Return")
         ui.wait_for(lambda: self.win.get_visible_dialog() is None, "Search Commands to close")
         ui.wait_for(lambda: self.win.split.get_show_sidebar() != shown, "the chapter list to be toggled")
-        ui.pump(0.3)
+        ui.frames(6)  # time for another command, if Enter ran one too, to show its dialog
         self.assertIsNone(self.win.get_visible_dialog(), "no other command (like New Chapter) ran")
 
     def test_enter_right_after_typing_finds_the_typed_text(self):
         doc = self.chapter(h("Intro", b("alpha"), b("omega")))
         ui.focus(doc.root.children[0])
-        ui.real_key("f", ctrl=True, wait=0.4)
+        ui.real_key("f", ctrl=True)
+        ui.wait_for(lambda: self.bar_open() and self.focused_in(self.win.findbar.entry), "focus in the find field")
         ui.real_type("omega", wait=0)
         ui.real_key("Return")
         bar = self.win.findbar

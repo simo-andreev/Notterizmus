@@ -8,7 +8,6 @@ class ClipboardTest(ui.UITestCase):
     def test_copy_for_topcoding_puts_html_and_plain_text_on_the_clipboard(self):
         ui.open_chapter([h("Intro", b((key("bold"), " and plain")), h("Detail"))])
         self.win.lookup_action("copy").activate(None)
-        ui.pump(0.2)
         html = ui.clipboard("text/html")
         self.assertIn("<strong>", html)
         self.assertIn("Ⅰ) ", html)
@@ -21,9 +20,8 @@ class ClipboardTest(ui.UITestCase):
         first = doc.root.children[0]
         r = ui.focus(first, 0)
         self.win.get_clipboard().set("I) Pasted\n  • a note\n  I.1) Sub\nII) Second")
-        ui.pump(0.1)
         r.view.emit("paste-clipboard")
-        ui.pump_until(lambda: len(self.win.doc.root.children) == 2, 3)
+        ui.wait_for(lambda: len(self.win.doc.root.children) == 2, "the paste")
         tops = self.win.doc.root.children
         self.assertEqual([n.text for n in tops], ["Pasted", "Second"])
         self.assertEqual([(c.kind, c.text) for c in tops[0].children], [("bullet", "a note"), ("heading", "Sub")])
@@ -44,7 +42,6 @@ class PasteTest(ui.UITestCase):
         self.win.get_clipboard().set_content(ui.Gdk.ContentProvider.new_union([
             ui.Gdk.ContentProvider.new_for_bytes(mimes[kind], ui.GLib.Bytes.new(text.encode("utf-8")))
             for kind, text in formats.items()]))
-        ui.pump(0.05)
 
     def paste(self, row, until, what="the paste"):
         row.view.emit("paste-clipboard")
@@ -57,7 +54,6 @@ class PasteTest(ui.UITestCase):
         r = ui.focus(first, 0)
         r.view.select_range(3, 10)
         r.view.emit("copy-clipboard")
-        ui.pump(0.1)
         self.assertEqual(ui.clipboard("text/plain"), "in bold")
         self.assertIn("<strong>", ui.clipboard("text/html"))
         self.assertEqual(first.text, "plain bold end", "copying changes nothing")
@@ -71,8 +67,7 @@ class PasteTest(ui.UITestCase):
         r = ui.focus(item, 0)
         r.view.select_range(4, 8)
         r.view.emit("cut-clipboard")
-        ui.pump(0.1)
-        self.assertEqual(item.text, "one three")
+        ui.wait_for(lambda: item.text == "one three", "the cut")
         self.assertEqual(ui.clipboard("text/plain"), "two ")
         ui.press(r.view, "z", ctrl=True)
         self.assertEqual(self.win.doc.root.children[0].children[0].text, "one two three")
@@ -214,7 +209,6 @@ class PasteTest(ui.UITestCase):
                 self.win.get_clipboard().set_content(ui.Gdk.ContentProvider.new_union([
                     ui.Gdk.ContentProvider.new_for_bytes(mime, ui.GLib.Bytes.new(junk)),
                     ui.Gdk.ContentProvider.new_for_bytes("text/plain;charset=utf-8", ui.GLib.Bytes.new(b"plain text"))]))
-                ui.pump(0.05)
                 self.paste(ui.focus(item, 0), lambda: item.text)
                 self.assertEqual(item.text, "plain text")
 

@@ -212,7 +212,9 @@ Each release:
 
 1. Bump the version: `VERSION` in `notterizmus/__init__.py`, a `<release>` with
    notes in `data/dev.simo.Notterizmus.metainfo.xml` (App Center and the About
-   dialog show them), a section in `CHANGELOG.md`, the man page header in
+   dialog show them), a section in `CHANGELOG.md` (an `## Unreleased` section
+   collects changes between releases and becomes it; `scripts/release.sh` refuses
+   to build while one is there), the man page header in
    `debian/notterizmus.1`, and `debian/changelog`:
    `DEBFULLNAME="Simo Andreev" DEBEMAIL="simeon.zlatanov.andreev@pm.me" dch -v 1.2.0 "What changed"`,
    then the same with `dch -r -D resolute ""`. Update `FEATURES.md` if features

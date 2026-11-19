@@ -13,13 +13,11 @@ class SidebarTest(ui.UITestCase):
         super().setUp()
         if not self.win.split.get_show_sidebar():
             self.win.lookup_action("sidebar").activate(None)
-            ui.pump(0.2)
+            ui.wait_for(self.win.split.get_show_sidebar, "the chapter list")
 
     def make_book(self, name, titles):
         """Chapters in their own book; returns their paths, with the last one open."""
-        paths = [ui.open_chapter([h(t, b("note"))], title=t, book=name).path for t in titles]
-        ui.pump(0.2)
-        return paths
+        return [ui.open_chapter([h(t, b("note"))], title=t, book=name).path for t in titles]
 
     def rows_of(self, paths):
         wanted = {Path(p).resolve() for p in paths}
@@ -41,10 +39,12 @@ class SidebarTest(ui.UITestCase):
     def test_ctrl_pgup_and_pgdn_step_through_the_book(self):
         paths = self.make_book("Sidebar keys", ["First", "Second", "Third"])
         view = ui.row(self.win.doc.root.children[0]).view
-        self.assertTrue(ui.press(view, "Page_Up", ctrl=True, wait=0.3))
-        self.assertEqual(Path(self.win.doc.path).resolve(), paths[1].resolve())
-        ui.press(ui.row(self.win.doc.root.children[0]).view, "Page_Up", ctrl=True, wait=0.3)
-        ui.press(ui.row(self.win.doc.root.children[0]).view, "Page_Up", ctrl=True, wait=0.3)
+        self.assertTrue(ui.press(view, "Page_Up", ctrl=True))
+        ui.wait_for(lambda: Path(self.win.doc.path).resolve() == paths[1].resolve(), "the chapter before")
+        ui.press(ui.row(self.win.doc.root.children[0]).view, "Page_Up", ctrl=True)
+        ui.wait_for(lambda: Path(self.win.doc.path).resolve() == paths[0].resolve(), "the first chapter")
+        ui.press(ui.row(self.win.doc.root.children[0]).view, "Page_Up", ctrl=True)
+        ui.frames()
         self.assertEqual(Path(self.win.doc.path).resolve(), paths[0].resolve(), "stops at the first chapter")
         self.win.lookup_action("next-chapter").activate(None)
         ui.settle()
@@ -56,22 +56,18 @@ class SidebarTest(ui.UITestCase):
         paths = self.make_book("Sidebar fold", ["Only"])
         book_row = next(r for r in self.win.sidebar.rows() if r._book == "Sidebar fold")
         self.win.sidebar.list.emit("row-activated", book_row)
-        ui.pump(0.1)
-        self.assertEqual(self.rows_of(paths), [])
+        ui.wait_for(lambda: self.rows_of(paths) == [], "the book to fold")
         book_row = next(r for r in self.win.sidebar.rows() if r._book == "Sidebar fold")
         self.win.sidebar.list.emit("row-activated", book_row)
-        ui.pump(0.1)
-        self.assertEqual(self.rows_of(paths), [("Only", True)])
+        ui.wait_for(lambda: self.rows_of(paths) == [("Only", True)], "the book to unfold")
 
     def test_f9_hides_it_and_the_choice_is_remembered(self):
         self.assertEqual(self.app.get_accels_for_action("win.sidebar"), ["F9"])
         self.win.lookup_action("sidebar").activate(None)
-        ui.pump(0.2)
-        self.assertFalse(self.win.split.get_show_sidebar())
+        ui.wait_for(lambda: not self.win.split.get_show_sidebar(), "the list to hide")
         self.assertFalse(json.loads((config_dir() / "state.json").read_text())["sidebar"])
         self.win.lookup_action("sidebar").activate(None)
-        ui.pump(0.2)
-        self.assertTrue(self.win.split.get_show_sidebar())
+        ui.wait_for(self.win.split.get_show_sidebar, "the list to show")
         self.assertTrue(json.loads((config_dir() / "state.json").read_text())["sidebar"])
 
     def test_a_narrow_window_turns_it_into_an_overlay(self):
@@ -81,13 +77,11 @@ class SidebarTest(ui.UITestCase):
         try:
             self.win.set_default_size(700, 600)
             self.assertTrue(ui.pump_until(lambda: self.win.split.get_collapsed()))
-            ui.pump(0.3)
-            self.assertFalse(self.win.split.get_show_sidebar(), "hidden at first in a narrow window")
+            ui.wait_for(lambda: not self.win.split.get_show_sidebar(), "the list hidden at first in a narrow window")
             self.assertTrue(json.loads((config_dir() / "state.json").read_text()).get("sidebar", True),
                             "collapsing isn't saved as a choice to hide it")
             self.win.lookup_action("sidebar").activate(None)
-            ui.pump(0.3)
-            self.assertTrue(self.win.split.get_show_sidebar())
+            ui.wait_for(self.win.split.get_show_sidebar, "the list over the text")
             row = next(r for r in self.win.sidebar.rows() if r._path and Path(r._path).resolve() == paths[0].resolve())
             self.win.sidebar.list.emit("row-activated", row)
             ui.settle()
@@ -96,8 +90,7 @@ class SidebarTest(ui.UITestCase):
         finally:
             self.win.set_default_size(1100, 800)
             ui.pump_until(lambda: not self.win.split.get_collapsed())
-            ui.pump(0.3)
-        self.assertTrue(self.win.split.get_show_sidebar(), "back beside the text in a wide window")
+        ui.wait_for(self.win.split.get_show_sidebar, "the list back beside the text in a wide window")
 
     def test_getting_started_is_not_listed(self):
         self.make_book("Sidebar guide", ["Mine"])
@@ -110,17 +103,16 @@ class SidebarTest(ui.UITestCase):
         paths = self.make_book("Sidebar focus", ["Kept"])
         row = next(r for r in self.win.sidebar.rows() if r._path and Path(r._path).resolve() == paths[0].resolve())
         row.grab_focus()
-        ui.pump(0.1)
+        focused_on_kept = lambda: (self.win.sidebar.focused_row() is not None  # noqa: E731
+                                   and Path(self.win.sidebar.focused_row()._path).resolve() == paths[0].resolve())
+        ui.wait_for(focused_on_kept, "focus on the chapter's row")
         self.win._reload_sidebar()  # what happens when the window becomes active again
-        ui.pump(0.1)
-        focused = self.win.sidebar.focused_row()
-        self.assertIsNotNone(focused)
-        self.assertEqual(Path(focused._path).resolve(), paths[0].resolve())
+        ui.wait_for(focused_on_kept, "focus still on the chapter's row")
         (paths[0].parent / "99 Added outside.notz").write_text(paths[0].read_text(encoding="utf-8"), encoding="utf-8")
         self.win._reload_sidebar()  # the folder changed: rebuilt, focus stays on the same chapter
-        ui.pump(0.1)
-        self.assertIn("Added outside", [label for label, _p, _s in self.win.sidebar.chapter_rows()])
-        self.assertEqual(Path(self.win.sidebar.focused_row()._path).resolve(), paths[0].resolve())
+        ui.wait_for(lambda: "Added outside" in [label for label, _p, _s in self.win.sidebar.chapter_rows()],
+                    "the new chapter in the list")
+        ui.wait_for(focused_on_kept, "focus still on the same chapter")
 
 
 class SidebarWidthTest(ui.UITestCase):
@@ -129,11 +121,12 @@ class SidebarWidthTest(ui.UITestCase):
         if not self.win.split.get_show_sidebar():
             self.win.lookup_action("sidebar").activate(None)
         self.win.set_sidebar_width(260, save=True)
-        ui.pump(0.3)
+        ui.wait_for(lambda: self.win.sidebar.get_width() == 260, "the list at 260 pixels")
 
     def tearDown(self):
         self.win.set_sidebar_width(260, save=True)
-        ui.pump(0.2)
+        ui.wait_for(lambda: not self.win.split.get_show_sidebar() or self.win.sidebar.get_width() == 260,
+                    "the list back at 260 pixels")
 
     def drag(self, dx):
         """Drag the handle by dx, as the overlay's drag gesture reports it."""
@@ -141,9 +134,9 @@ class SidebarWidthTest(ui.UITestCase):
         ok, box = self.win.handle.compute_bounds(self.win._overlay)
         self.win._handle_drag_begin(gesture, box.origin.x + 3, 200)
         self.win._handle_drag_update(gesture, dx, 0)
-        ui.pump(0.2)
+        ui.frames()
         self.win._handle_drag_end(gesture, dx, 0)
-        ui.pump(0.3)
+        ui.frames()
 
     @staticmethod
     def ctrls(widget):
@@ -161,7 +154,7 @@ class SidebarWidthTest(ui.UITestCase):
 
     def test_dragging_the_edge_resizes_the_list_and_is_remembered(self):
         self.drag(80)
-        self.assertEqual(self.win.sidebar.get_width(), 340)
+        ui.wait_for(lambda: self.win.sidebar.get_width() == 340, "the list at 340 pixels")
         self.assertEqual(self.saved(), 340)
         self.assertFalse(self.win.split.get_collapsed())
         again = type(self.win)(self.app)  # a new window starts at the saved width
@@ -172,10 +165,10 @@ class SidebarWidthTest(ui.UITestCase):
 
     def test_dragging_stops_at_the_limits(self):
         self.drag(-500)
-        self.assertEqual(self.win.sidebar.get_width(), 180)
+        ui.wait_for(lambda: self.win.sidebar.get_width() == 180, "the list at its narrowest")
         self.drag(3000)
-        room = self.win.get_width() - self.win._text_min_width() - 21
-        self.assertEqual(self.win.sidebar.get_width(), min(520, room))
+        widest = lambda: min(520, self.win.get_width() - self.win._text_min_width() - 21)  # noqa: E731
+        ui.wait_for(lambda: self.win.sidebar.get_width() == widest(), "the list at its widest")
         self.assertFalse(self.win.split.get_collapsed(), "dragging never pushes the text out")
 
     def test_a_drag_that_starts_elsewhere_does_nothing(self):
@@ -183,15 +176,14 @@ class SidebarWidthTest(ui.UITestCase):
         self.win._handle_drag_begin(gesture, 700, 200)  # in the text, not on the handle
         self.win._handle_drag_update(gesture, 100, 0)
         self.win._handle_drag_end(gesture, 100, 0)
-        ui.pump(0.2)
+        ui.frames()
         self.assertEqual(self.win.sidebar.get_width(), 260)
 
     def test_double_click_on_the_handle_restores_the_default(self):
         self.drag(100)
         click = next(c for c in self.ctrls(self.win.handle) if isinstance(c, ui.Gtk.GestureClick))
         click.emit("pressed", 2, 3, 100)
-        ui.pump(0.3)
-        self.assertEqual(self.win.sidebar.get_width(), 260)
+        ui.wait_for(lambda: self.win.sidebar.get_width() == 260, "the default width")
         self.assertEqual(self.saved(), 260)
 
     def test_a_wide_list_turns_into_an_overlay_sooner(self):
@@ -205,8 +197,7 @@ class SidebarWidthTest(ui.UITestCase):
         finally:
             self.win.set_default_size(1100, 800)
             ui.pump_until(lambda: not self.win.split.get_collapsed())
-            ui.pump(0.3)
-        self.assertTrue(self.win.handle.get_visible())
+        ui.wait_for(self.win.handle.get_visible, "the handle back")
 
     def test_a_click_without_moving_changes_nothing(self):
         gesture = next(c for c in self.ctrls(self.win._overlay) if isinstance(c, ui.Gtk.GestureDrag))
@@ -214,6 +205,6 @@ class SidebarWidthTest(ui.UITestCase):
         self.win._handle_drag_begin(gesture, box.origin.x + 3, 200)
         self.win._handle_drag_update(gesture, 1, 0)  # a wobble, not a drag
         self.win._handle_drag_end(gesture, 1, 0)
-        ui.pump(0.2)
+        ui.frames()
         self.assertEqual(self.win.sidebar.get_width(), 260)
         self.assertFalse(self.win.handle.has_css_class("dragging"))

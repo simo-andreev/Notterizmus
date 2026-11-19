@@ -47,15 +47,13 @@ class ChaptersTest(ui.UITestCase):
         super().setUp()
         if not self.win.split.get_show_sidebar():
             self.win.lookup_action("sidebar").activate(None)
-            ui.pump(0.2)
+            ui.wait_for(self.win.split.get_show_sidebar, "the chapter list")
 
     def book(self, name, titles):
-        paths = [ui.open_chapter([h(t, b(f"{t} notes"))], title=t, book=name).path for t in titles]
-        ui.pump(0.2)
-        return paths
+        return [ui.open_chapter([h(t, b(f"{t} notes"))], title=t, book=name).path for t in titles]
 
     def dialog(self):
-        ui.pump_until(lambda: self.win.get_visible_dialog() is not None)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "the dialog")
         return self.win.get_visible_dialog()
 
     def respond(self, dlg, response):
@@ -63,8 +61,7 @@ class ChaptersTest(ui.UITestCase):
         dlg.force_close()
         # wait until it's gone: a closing dialog still counts as visible, and it hands
         # focus back to the widget that had it when its animation ends
-        ui.pump_until(lambda: self.win.get_visible_dialog() is None)
-        ui.pump(0.2)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is None, "the dialog to close")
 
     def field(self, dlg, cls, title=None):
         return next(w for w in ui.walk(dlg) if isinstance(w, cls) and (title is None or w.get_title() == title))
@@ -128,8 +125,8 @@ class ChaptersTest(ui.UITestCase):
         a, b2 = self.book("Alt keys", ["Aa", "Bb"])
         row = self.sidebar_row(path=a)
         row.grab_focus()
-        ui.pump(0.1)
-        self.assertTrue(ui.press(self.win.sidebar.list, "Down", alt=True, wait=0.4))
+        ui.wait_for(lambda: self.win.sidebar.focused_row() is row, "focus on the chapter's row")
+        self.assertTrue(ui.press(self.win.sidebar.list, "Down", alt=True))
         na, nb = number(a), number(b2)
         self.assertEqual(names(a.parent), [f"{na:02d} Bb.notz", f"{nb:02d} Aa.notz"])
         focused = self.win.sidebar.focused_row()
@@ -140,7 +137,6 @@ class ChaptersTest(ui.UITestCase):
         x, y, z = self.book("Drag", ["X", "Y", "Z"])
         nums = sorted(number(p) for p in (x, y, z))
         self.assertTrue(self.win.sidebar.drop_chapter(str(z), x, after=False))
-        ui.pump(0.3)
         self.assertEqual(names(x.parent), [f"{nums[0]:02d} Z.notz", f"{nums[1]:02d} X.notz", f"{nums[2]:02d} Y.notz"])
         self.assertFalse(self.win.sidebar.drop_chapter(str(x.parent / f"{nums[0]:02d} Z.notz"),
                                                        ui.scratch() / "elsewhere.notz"))
@@ -151,7 +147,6 @@ class ChaptersTest(ui.UITestCase):
         self.win.toast = lambda msg, button=None, cb=None: toasts.append((msg, button, cb))
         try:
             self.win.lookup_action("chapter-trash").activate(ui.GLib.Variant.new_string(str(path)))
-            ui.pump(0.3)
             self.assertFalse(path.exists())
             self.assertIsNone(self.win.doc)
             self.assertEqual(self.win.stack.get_visible_child_name(), "empty")
@@ -327,14 +322,20 @@ class ChaptersTest(ui.UITestCase):
         self.assertEqual(self.win.wtitle.get_subtitle(), "New title")
         self.assertEqual(Path(self.win.doc.path).parent.name, "New title")
         self.assertIn("New title", [r._book for r in self.win.sidebar.rows() if r._book])
-        self.assertEqual(len(self.win.sidebar.chapter_rows()) >= 2, True)
+        self.assertGreaterEqual(len(self.win.sidebar.chapter_rows()), 2)
 
     def test_the_list_menu_has_numbered_choices(self):
         path = self.book("Menu", ["Only"])[0]
         # with the Menu key, on the focused row: the list scrolls to the row first (a menu
         # for a row that is out of sight has nowhere to appear)
-        self.sidebar_row(path=path).grab_focus()
-        ui.pump(0.2)
+        row = self.sidebar_row(path=path)
+        row.grab_focus()
+        sw = row.get_ancestor(ui.Gtk.ScrolledWindow)
+
+        def in_sight():
+            top = ui.point_in(row, sw)
+            return top is not None and 0 <= top[1] and top[1] + row.get_height() <= sw.get_height()
+        ui.wait_for(lambda: self.win.sidebar.focused_row() is row and in_sight(), "the list to scroll to the row")
         self.assertTrue(ui.press(self.win.sidebar.list, "Menu"))
         ui.wait_for(ui.open_popovers, "the chapter's menu")
         choices = [(n, t) for n, t, _r in ui.menu_choices(ui.open_popovers()[0])]
@@ -357,7 +358,6 @@ class ChaptersTest(ui.UITestCase):
         self.win.toast = lambda msg, button=None, cb=None: toasts.append(msg)
         try:
             self.assertTrue(self.win.sidebar.drop_chapter(str(broken), a, after=False))  # dragged to the top
-            ui.pump(0.2)
         finally:
             del self.win.toast
         self.assertEqual(toasts, ["Could not reorder the chapters: this isn't a Notterizmus chapter file"])
@@ -370,7 +370,6 @@ class ChaptersTest(ui.UITestCase):
     def test_renaming_a_book_takes_a_file_that_is_not_a_chapter_along(self):
         a, b2, broken = self.broken_book("Broken rename")
         self.win.apply_book_rename(a.parent, "Renamed with it")
-        ui.pump(0.2)
         new = a.parent.parent / "Renamed with it"
         self.assertFalse(a.parent.exists())
         self.assertEqual(names(new), [a.name, b2.name, "03 Broken.notz"])

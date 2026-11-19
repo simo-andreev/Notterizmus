@@ -30,7 +30,7 @@ class MenusTest(ui.UITestCase):
         doc = ui.open_chapter([h("Intro", b("keep"), b("pro or con"))])
         item = doc.root.children[0].children[1]
         self.ed.show_item_menu(ui.row(item))
-        ui.pump(0.2)
+        ui.wait_for(ui.open_popovers, "the item menu")
         choices = ui.menu_choices(ui.open_popovers()[0])
         self.assertEqual([n for n, _t, _r in choices][:10], list("1234567890"))
         self.assertEqual(choices[10][0], "", "only the first ten choices get a number")

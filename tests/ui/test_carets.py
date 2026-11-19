@@ -35,8 +35,7 @@ class CaretsTest(ui.UITestCase):
         self.ed.add_caret(r.view, 1)
         for key in ("N", "o", "minus"):
             self.assertTrue(ui.press(r.view, key, wait=0))
-        ui.pump(0.1)
-        self.assertEqual(self.texts(), ["No-one", "No-two", "No-three"])
+        ui.wait_for(lambda: self.texts() == ["No-one", "No-two", "No-three"], "the keys typed at every cursor")
         ui.press(r.view, "BackSpace")
         self.assertEqual(self.texts(), ["Noone", "Notwo", "Nothree"])
         ui.press(r.view, "z", ctrl=True)

@@ -14,11 +14,9 @@ class ZoomTest(ui.UITestCase):
         super().setUp()
         self.win.set_zoom(100, save=True, announce=False)
         self.doc = ui.open_chapter([h("Size", b("short"), b(LONG), table([["a", "b"]]))])
-        ui.pump(0.3)
 
     def tearDown(self):
         self.win.set_zoom(100, save=True, announce=False)
-        ui.pump(0.3)
 
     def zoom(self, action, times=1):
         for _ in range(times):
@@ -62,7 +60,7 @@ class ZoomTest(ui.UITestCase):
         # Rows added while editing get one line's height as their minimum; give these the
         # same, so a minimum left over from another size would show.
         self.ed.size_new_views(list(self.ed.all_views()))
-        ui.pump(0.2)
+        ui.settle()
         long_view = ui.row(self.doc.root.children[0].children[1]).view
         before = long_view.get_height()
         self.zoom("zoom-in", 6)

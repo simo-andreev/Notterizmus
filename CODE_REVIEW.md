@@ -705,22 +705,85 @@ chapters).
 
 ### Phase 6: Test suite (S–M)
 
-- [ ] **CR51. Every confirmed bug has its test.** The tests are written with the fixes in
+- [x] **CR51. Every confirmed bug has its test.** The tests are written with the fixes in
   phases 1–5. Here, check the list is complete: CR2–CR8, CR11–CR16 and CR18 each have a
   regression test that fails without the fix, and `test_freeing.py` covers the sidebar.
-- [ ] **CR50. Wait for conditions.**
+- [x] **CR50. Wait for conditions.**
   - Fix: replace `ui.pump(0.x)` followed by an assert with `ui.wait_for(cond, "...")`, and
     drop the pumps after synchronous actions. Replace `time.sleep(1.1)` in
     `tests/ui/test_backups.py` by giving the backup a time. Add a test that fails on new
     `ui.pump(0.` calls outside `tests/ui/support.py`.
   - Verify: the suite's duration before and after; five runs in a row and the load check
     without a failure.
-- [ ] **CR52. Precise assertions and release checks.**
+- [x] **CR52. Precise assertions and release checks.**
   - Fix: `assertGreaterEqual`. `test_release.py` also checks README's title
     ("Notterizmus 1.5"). Allow a "## Unreleased" section above the newest release in
     CHANGELOG.md, and have `scripts/release.sh` refuse to build while it is there.
   - Verify: the unit tests; `scripts/release.sh deb` on a commit with "## Unreleased"
     refuses.
+
+#### Phase 6 results
+
+Done 2026-11-19.
+
+- CR50: no UI test waits for a fixed time any more. All 85 `ui.pump(…)` waits in 16
+  files (the review counted 80) and the `time.sleep(1.1)` are gone, and so are 14 fixed
+  pauses passed to the helpers (`wait=0.3`, `wait=0.4`). Where the state comes later, the test waits for it with
+  `ui.wait_for`, for example a dialog closed, a row scrolled into sight, a command run
+  after Search Commands closed, or an underline back. The pumps that followed synchronous
+  actions are dropped: file operations, actions, clipboard writes, a popover's `popup()`.
+  Where a test checks that nothing changed, or a layout no state reports, it waits for
+  painted frames with the new `ui.frames(n)`. `test_backups` no longer waits for the clock
+  to pass a second: it dates the first copy back by the interval, which also exercises
+  the real interval instead of setting it to 0. `test_mouse` waits only for what is left
+  of GTK's double-click time since the last real press (`ui.past_double_click()`).
+  `tests/test_ui_waits.py` fails on any `ui.pump(` or `time.sleep(` in `tests/ui` outside
+  `support.py`, `broadway_input.py` and `measure_drawings.py`.
+- CR50, durations: the UI suite's 279 tests take 170–172 s (five runs in a row,
+  none failed) instead of 222–224 s; with the real Excalidraw 180 s instead of 233, and in
+  the load check (on one CPU beside two busy loops) 232 s instead of 288, without a
+  failure.
+- CR51: each issue's regression test, and whether it failed on the code from just before
+  its fixing commit (the fix's tests run on its parent, in a scratch clone). A file named
+  without a folder is in `tests/ui`.
+
+  | Issue | Test | Fails without the fix |
+  |---|---|---|
+  | CR2 | `test_selection`: `test_shift_click_extends_a_selection_however_it_was_made` | yes: the `ValueError` itself |
+  | CR3 | `test_clipboard`: `test_the_toasts_button_leaves_an_outline_paste_alone_once_something_changed` | yes |
+  | CR4 | `test_chapters`: `test_a_chapter_opened_from_files_saves_the_open_one_first` | yes |
+  | CR5 | `tests/test_backups.py`: `SwapTest` (2 tests) | yes |
+  | CR6 | `tests/test_library.py`: `InterruptedChangeTest`; `test_chapters`: `test_a_chapter_left_hidden_by_an_interrupted_change_can_be_restored` | yes, as errors: the fix added `restore_stranded` and `_offer_stranded`, which they call |
+  | CR7 | `tests/test_library.py`: `test_a_book_name_never_becomes_a_hidden_folder_or_leaves_the_notes_folder`; `test_chapters`: `test_a_book_whose_name_starts_with_a_dot_is_listed` | yes, both |
+  | CR8 | `test_chapters`: `test_titles_in_toasts_are_shown_as_they_are`; `test_window`: `test_your_own_marker_names_are_shown_as_they_are` | the toast test yes; the marker-names test passed before the fix too (a guard for the dialogs, not the bug) |
+  | CR11 | `tests/test_model.py`: `test_a_top_level_item_cannot_become_a_bullet`; `test_editing`: `test_a_top_level_item_stays_numbered_and_a_refused_trigger_stays_typed`; `test_clipboard`: `test_bullets_pasted_at_the_top_level_become_numbered_items` | yes, all three |
+  | CR12 | `tests/test_unknown_blocks.py`: `test_the_editors_order_leaves_out_its_children`; `test_unknown`: `test_keys_next_to_one_with_sub_items_leave_them_alone` | yes, both |
+  | CR13 | `test_unknown`: `test_delete_block_removes_it_with_its_sub_items` | yes |
+  | CR14 | `tests/test_drawing.py`: `test_data_of_the_wrong_shape_gives_nothing_and_never_raises` (well-formed JSON with the wrong types, as this review asked); `test_clipboard`: `test_unreadable_editor_data_on_the_clipboard_falls_back_to_the_text` | yes, both |
+  | CR15 | `tests/test_library.py`: `test_long_names_fit_the_file_name_limit`; `test_chapters`: `test_new_chapter_with_a_long_title_or_where_it_cannot_be_written` | yes, both |
+  | CR16 | `test_chapters`: `test_new_chapter_10_is_not_chapter_100` | yes |
+  | CR18 | `test_freeing`: `test_the_chapter_list_frees_its_rows_when_it_is_rebuilt` | yes |
+
+- CR52: `assertGreaterEqual` in `test_chapters`. `test_release.py` lets an
+  `## Unreleased` section stand above the newest release in CHANGELOG.md, and checks the
+  "Notterizmus X.Y" titles of README.md and FEATURES.md. `scripts/release.sh` refuses to
+  build while `## Unreleased` is there. The README's release steps and PROJECT_CONTEXT's
+  version rule say so. CHANGELOG.md has that section now, for what is done since 1.6.0
+  (phase 5 and CR28). Checked: `scripts/release.sh deb` on a clean commit with the section,
+  in a scratch clone, stops with that message and builds nothing.
+- Found on the way, fixed after: a real key press in `RealKeysTest` timed out when the test
+  ran right after some other modules, without the full suite's earlier mouse tests
+  (`scripts/ui-tests.sh -k test_command_search -k test_clipboard -k test_window -k
+  test_zoom …`, which picks up `test_zoom_keys`). HEAD before phase 6 did the same. Cause:
+  Broadway sends a key to the surface it last gave keyboard focus, and
+  `test_drawings.EvenSizeTest` presents plain windows with no transient parent and
+  destroys them, so the focus stayed on a surface that was gone until a real click
+  (`test_mouse`, in the full suite) moved it. `support.real_key`/`real_type` now present
+  the main window first, and wait until it is active, when it isn't and no other window
+  of ours is open (`_keys_to_window`). With it, that command passes (163 tests), and so do
+  a full run (172 s), the WebKit run (180 s) and the load check (233 s).
+- Results: unit suite 415 tests pass, with and without PyGObject (35 skipped
+  without it). UI suite 279 tests: see the durations above.
 
 ### Phase 7: Code health, no change in behaviour (L)
 

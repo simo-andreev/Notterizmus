@@ -20,6 +20,10 @@ if [ "$VERSION" != "$APPVER" ]; then
     echo "Version mismatch: debian/changelog says $VERSION, notterizmus/__init__.py says $APPVER." >&2
     exit 1
 fi
+if grep -q '^## Unreleased' "$ROOT/CHANGELOG.md"; then
+    echo "CHANGELOG.md has an \"## Unreleased\" section: give it this version and the date first." >&2
+    exit 1
+fi
 if [ -n "$(git status --porcelain)" ]; then
     echo "Uncommitted changes: commit first, packages are built from the last commit." >&2
     exit 1

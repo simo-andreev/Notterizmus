@@ -10,8 +10,9 @@ in the next frames, input through the display server), so nothing here assumes h
 that takes. The helpers wait for what they started: press(), type_text() and focus() until
 the editor has put the cursor where it wants it, real_key() and real_drag() until the
 app has received the input, settle() until the outline has stopped moving. In a test,
-wait for a condition with wait_for() or pump_until() rather than for a time with pump(); a
-fixed pause passes on a fast machine and fails on a busy one.
+wait for a condition with wait_for(), settle() or frames() rather than for a time with
+pump(); a fixed pause passes on a fast machine and fails on a busy one, and
+tests/test_ui_waits.py fails on one (CR50).
 
 Every test starts from the same window state (UITestCase.setUp), fails if the app raised
 an exception in one of its callbacks (GTK only prints those), and is stopped with a
@@ -69,7 +70,7 @@ _chapter_no = collections.defaultdict(lambda: itertools.count(1))  # the next ch
 _app_errors = []  # exceptions the app raised in callbacks since the current test began
 # Real input: the time stamp of the newest event the app has received, and how far the
 # stamps the app sees are from the ones sent (see _watch_input).
-_input = {"seen": 0, "offset": 0}
+_input = {"seen": 0, "offset": 0, "pressed": 0.0}
 
 
 def _check_scratch():
@@ -329,6 +330,22 @@ def settle(extra=0.05, frames=4, timeout=10.0):
     pump(extra)
 
 
+def frames(n=3, timeout=10.0):
+    """Wait until n more frames have been painted: the layout of a change just made (a
+    width, a widget shown) is done then, where no state says so, and a check that nothing
+    changed has given it the chance to."""
+    win = app().win
+    count = [0]
+    clock = win.get_frame_clock()
+    hid = clock.connect("after-paint", lambda _clock: count.__setitem__(0, count[0] + 1))
+    tick = win.add_tick_callback(lambda *_: True)  # keep frames coming while we count
+    try:
+        pump_until(lambda: count[0] >= n, timeout)
+    finally:
+        clock.disconnect(hid)
+        win.remove_tick_callback(tick)
+
+
 def row(node):
     return app().win.editor.rows[node.id]
 
@@ -388,8 +405,24 @@ def real_key(name, ctrl=False, shift=False, alt=False, wait=0.15):
 
 def _press(keyval, **mods):
     """Press one real key and wait until the app has handled the press."""
+    _keys_to_window()
     _watch_modals()
     _arrived(_keyboard.key(keyval, **mods), "a real key press")
+
+
+def _keys_to_window():
+    """Make sure Broadway sends real keys to the app's window. The server sends a key to
+    the surface it last gave keyboard focus, which only a mouse press, a modal window or a
+    present() changes. A window of our own that was presented and then destroyed (one
+    with no transient parent, as test_drawings.EvenSizeTest makes) keeps the focus after
+    it is gone, and every key after it reached nothing until a real click. So when the
+    window isn't active and no other window of ours is open to take the keys, it asks for
+    the focus again, as the app does when it starts (gdk_toplevel_focus)."""
+    win = app().win
+    if win.is_active() or any(w is not win and w.get_visible() for w in Gtk.Window.list_toplevels()):
+        return
+    win.present()
+    wait_for(win.is_active, "the window to get the keyboard back")
 
 
 def _watch_modals():
@@ -404,6 +437,7 @@ def real_type(text, wait=0.05):
     the app run in between, as a fast typist's arrive: together with the key after them."""
     if _keyboard is None:
         raise unittest.SkipTest("real key presses need the Broadway display (the default runner)")
+    _keys_to_window()
     _watch_modals()
     for ch in text:
         if wait:
@@ -444,6 +478,7 @@ def real_drag(*points, steps=6, wait=0.02, hold=False):
     _keyboard.enter(x, y)
     move(x, y)
     _arrived(_keyboard.button(x, y, True), "the mouse button press")
+    _input["pressed"] = time.monotonic()  # GTK's double-click timer started by now
     pump(0.05)
     for p in points[1:]:
         tx, ty = where(p)  # resolved now: the outline may have scrolled under the drag
@@ -452,6 +487,15 @@ def real_drag(*points, steps=6, wait=0.02, hold=False):
         x, y = tx, ty
     if not hold:
         release_mouse()
+
+
+def past_double_click():
+    """Wait until a press is a click of its own, not the second of a double click: GTK
+    counts a press within its double-click time (gtk-double-click-time) of the one before
+    together with it. Only what is left of that time since the last real press."""
+    ms = Gtk.Settings.get_default().get_property("gtk-double-click-time")
+    wait_for(lambda: time.monotonic() - _input["pressed"] >= ms / 1000, "the double-click time to pass")
+    pump_until(lambda: True)  # and GTK's timer, due by now, has run
 
 
 def release_mouse():

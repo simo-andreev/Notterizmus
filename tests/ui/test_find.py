@@ -29,13 +29,11 @@ class FindTest(ui.UITestCase):
 
     def tearDown(self):
         self.bar.set_search_mode(False)
-        ui.pump(0.1)
 
     def find(self, text, replace=False):
         self.win.lookup_action("replace" if replace else "find").activate(None)
         self.bar.entry.set_text(text)
         ui.wait_for(lambda: self.bar._found_for == text, "the find bar to search for the text")
-        ui.pump(0.05)
 
     def test_keys(self):
         accels = {a: self.app.get_accels_for_action(f"win.{a}") for a in ("find", "replace", "find-next", "find-prev")}
@@ -69,10 +67,8 @@ class FindTest(ui.UITestCase):
     def test_match_case_and_whole_words(self):
         self.find("scale")
         self.bar.case.set_active(True)
-        ui.pump(0.1)
         self.assertEqual(len(self.bar.matches), 4)  # not "Scaling" or "Scale"
         self.bar.whole.set_active(True)
-        ui.pump(0.1)
         self.assertEqual(len(self.bar.matches), 3)  # not "rescaled"
         self.bar.case.set_active(False)
         self.bar.whole.set_active(False)
@@ -86,8 +82,7 @@ class FindTest(ui.UITestCase):
         r = ui.focus(self.intro.children[0], 0)
         r.view.select_range(10, 15)
         self.win.lookup_action("find").activate(None)
-        ui.pump(0.3)
-        self.assertEqual(self.bar.entry.get_text(), "scale")
+        ui.wait_for(lambda: self.bar.entry.get_text() == "scale" and self.bar.matches, "the selection searched for")
         self.assertEqual(self.bar.matches[self.bar.current][1:], (10, 15))
 
     def test_replace_keeps_bold_and_is_one_undo_step(self):
@@ -97,7 +92,6 @@ class FindTest(ui.UITestCase):
         self.bar.current = idx
         self.bar.replace_entry.set_text("size")
         self.bar.replace_current()
-        ui.pump(0.2)
         self.assertEqual([(r.text, r.bold) for r in bold.runs], [("size", True), (" in bold", False)])
         self.assertEqual(len(self.bar.matches), 4)
         ui.press(ui.row(bold).view, "z", ctrl=True)
@@ -111,7 +105,6 @@ class FindTest(ui.UITestCase):
             self.find("scale", replace=True)
             self.bar.replace_entry.set_text("size")
             self.bar.replace_all()
-            ui.pump(0.3)
         finally:
             self.bar.toast = self.win.toast
         self.assertEqual(toasts, ["Replaced 5 matches"])
@@ -134,7 +127,6 @@ class FindTest(ui.UITestCase):
         self.find("bold")
         view, s, e = self.bar.matches[self.bar.current]
         self.bar.entry.emit("stop-search")
-        ui.pump(0.2)
         self.assertFalse(self.bar.get_search_mode())
         self.assertEqual(tagged(view, view.tag_found), [])
         self.assertEqual(view.selection_offsets(), (s, e))
