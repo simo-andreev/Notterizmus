@@ -230,7 +230,7 @@ class FindBar(Gtk.SearchBar):
             return
         view, s, e = self.matches[self.current]
         text = clean_replacement(self.replace_entry.get_text())
-        with self.editor._op():
+        with self.editor.change():
             view.replace_range(s, e, text)
         self.refresh(after=(view, s + len(text)))
 
@@ -239,7 +239,7 @@ class FindBar(Gtk.SearchBar):
             return
         text = clean_replacement(self.replace_entry.get_text())
         count = len(self.matches)
-        with self.editor._op():  # one undo step for all of them
+        with self.editor.change():  # one undo step for all of them
             for view, s, e in sorted(self.matches, key=lambda m: -m[1]):
                 view.replace_range(s, e, text)
         self.refresh(select=False)

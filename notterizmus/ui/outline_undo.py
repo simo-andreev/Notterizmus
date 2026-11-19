@@ -96,6 +96,11 @@ class UndoMixin:
             if self._suspend == 0:
                 self._commit(group)
 
+    def change(self, group=None):
+        """For code outside the editor (a table row, the find bar): what is changed inside
+        `with editor.change():` is one undo step, saved once it ends."""
+        return self._op(group)
+
     def undo_mark(self):
         """A token for the chapter as it is now (see unchanged_since)."""
         return self._cur, len(self._undo)
@@ -161,11 +166,9 @@ class UndoMixin:
         self.refresh(focus=target, offset=-1 if off is None else off)
         self.emit("changed")
 
-    def mark_changed(self, node, structural=False):
-        if structural:
-            self._commit(None)
-        else:
-            self._commit(self._text_group(node, self.cur_view))
+    def mark_changed(self, node):
+        """Typing in a view that isn't a row's own (a table cell)."""
+        self._commit(self._text_group(node, self.cur_view))
 
     def _text_group(self, node, view):
         """Undo granularity for typing: one step per word (plus the spaces after it).

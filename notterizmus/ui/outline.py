@@ -4,7 +4,33 @@ selection, clipboard, menus and multi-cursor editing.
 This module keeps the widget itself: building and refreshing rows, focus and scrolling.
 The rest lives in mixins next to it, one theme each: outline_undo, outline_keys,
 outline_items, outline_selection, outline_clipboard, outline_menus, outline_assist and
-outline_carets. They share this object's state (rows, current, sel, doc, ...)."""
+outline_carets. They share this object's state, all of it set in __init__ (CR39 in
+CODE_REVIEW.md). Read freely; change it only through the module named first:
+
+- doc, rules: the chapter and the formatting rules (outline; the window sets them).
+- rows: node id -> row widget; current, cur_view: the item and text view with the cursor
+  (outline: refresh and focus; undo when it restores a snapshot).
+- sel, sel_anchor, sel_head: the item selection (selection: set_selection; items, keys
+  and menus clear it or set its ends).
+- _wstack: the scopes Ctrl+W went through (selection; keys clears it).
+- _menu_node: the item a menu acts on while it runs (menus; items reads it).
+- _ctx: (view, start, end) of the word the spelling menu or Ctrl+Space replaces
+  (assist and menus).
+- _click_time: when the last click came (menus: on_click), so that scrolling to the
+  cursor right after it keeps the text under the pointer (outline).
+- mc_views: the views with extra carets (carets; undo clears it).
+- _suspend: >0 inside an operation, so changes aren't committed one by one (undo).
+- _focus_hint: the item and offset a refresh is about to focus (outline), which a
+  snapshot taken before it lands records (undo).
+- spelling: the views' spell checking (assist: set_spelling, which the window calls).
+- spell_menu, on_escape: set by the window, read by menus and keys.
+- Kept to one module: history (_undo, _redo, _cur, _last_group, _last_time, _tg, _tg_n)
+  in undo; _assist_pop, _assist_counts and _book_words in assist;
+  _ctrl_time and _ctrl_armed in keys; _drawing_win in items; _drag and _drag_tick in
+  selection.
+
+Every change to the document goes through `with self._op():` (or editor.change() from
+outside the editor, e.g. a table row), so it is one undo step and is saved."""
 from __future__ import annotations
 
 import time

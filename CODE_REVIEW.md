@@ -813,7 +813,7 @@ verification, plus the checks named.
   environment set explicitly when the app starts (done with CR1). A test checks that
   importing `drawing_web` no longer changes `os.environ` (done with CR1:
   `tests/test_gpu.py` checks that only `ui/app.py` calls `gpu.prefer_gpu()` when imported).
-- [ ] **CR39.** Kind changes and table edits happen inside `with self._op():`; the
+- [x] **CR39.** Kind changes and table edits happen inside `with self._op():`; the
   attributes the mixins share are listed at the top of `outline.py`. UI tests: each is one
   undo step.
 - [ ] **CR46.** One context manager for programmatic buffer changes instead of three flags
@@ -896,6 +896,23 @@ verification, plus the checks named.
   `_renderer` the one hidden preview page; `completion._DICT_CACHE` holds a dictionary's
   words, which don't change while the app runs. Unit suite 418 tests, with and without
   PyGObject; UI suite 280 tests in 170 s.
+- CR39: `change_kind` and `cycle_kind` call `set_kind` inside `_op()`, as the typed
+  trigger already did; a refused change still makes no undo step. The table's
+  `add_row`, `add_col`, `del_row`, `del_col` and the header switch change the data and
+  rebuild the cells inside one operation, through the new public `editor.change()`,
+  instead of changing first and committing afterwards (`_changed_struct` and
+  `mark_changed`'s `structural` flag are gone). The find bar uses `editor.change()` too,
+  so nothing outside the editor calls its private `_op()`. `outline.py`'s docstring lists
+  the state the mixins share and which module changes each. New UI tests, both passing
+  before the change as well (they guard it): `test_tables`:
+  `test_each_change_to_the_tables_shape_is_one_undo_step` and `test_editing`:
+  `test_changing_an_items_type_is_one_undo_step`, each undoing and redoing the change
+  whole. Unit suite 418 tests, with and without PyGObject; UI suite 282 tests in 172 s.
+- Found while writing CR39's tests, not changed: undo puts the cursor where it was at the
+  last commit before the change, not where the change was. Moving the cursor commits
+  nothing, so after clicking item B and changing its type, Ctrl+Z restores the type and
+  puts the cursor back on item A, where the last typing was. Many editors put it on the
+  change; say if you want that.
 
 ### With you
 

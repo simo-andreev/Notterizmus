@@ -322,46 +322,50 @@ class TableRow(_PrefixRow):
             return True
         return False
 
-    def _changed_struct(self, focus):
-        self.build(focus=focus)
-        self.editor.mark_changed(self.node, structural=True)
+    # Each change to the table's shape is one editor operation: the data and the cells
+    # rebuilt from it, saved and undone together (CR39 in CODE_REVIEW.md).
 
     def add_row(self):
-        r, c = self.cur
-        ncols = len(self.rows[0]) if self.rows else 1
-        self.rows.insert(r + 1, [[] for _ in range(ncols)])
-        self.cur = (r + 1, 0)
-        self._changed_struct((r + 1, 0))
+        with self.editor.change():
+            r, c = self.cur
+            ncols = len(self.rows[0]) if self.rows else 1
+            self.rows.insert(r + 1, [[] for _ in range(ncols)])
+            self.cur = (r + 1, 0)
+            self.build(focus=self.cur)
 
     def add_col(self):
-        r, c = self.cur
-        for row in self.rows:
-            row.insert(c + 1, [])
-        self.cur = (r, c + 1)
-        self._changed_struct((r, c + 1))
+        with self.editor.change():
+            r, c = self.cur
+            for row in self.rows:
+                row.insert(c + 1, [])
+            self.cur = (r, c + 1)
+            self.build(focus=self.cur)
 
     def del_row(self):
         if len(self.rows) <= 1:
             return
-        r, c = self.cur
-        del self.rows[r]
-        self.cur = (min(r, len(self.rows) - 1), c)
-        self._changed_struct(self.cur)
+        with self.editor.change():
+            r, c = self.cur
+            del self.rows[r]
+            self.cur = (min(r, len(self.rows) - 1), c)
+            self.build(focus=self.cur)
 
     def del_col(self):
         if not self.rows or len(self.rows[0]) <= 1:
             return
-        r, c = self.cur
-        for row in self.rows:
-            del row[c]
-        self.cur = (r, min(c, len(self.rows[0]) - 1))
-        self._changed_struct(self.cur)
+        with self.editor.change():
+            r, c = self.cur
+            for row in self.rows:
+                del row[c]
+            self.cur = (r, min(c, len(self.rows[0]) - 1))
+            self.build(focus=self.cur)
 
     def _toggle_header(self, btn):
         if bool(self.node.data.get("header")) == btn.get_active():
             return
-        self.node.data["header"] = btn.get_active()
-        self._changed_struct(None)
+        with self.editor.change():
+            self.node.data["header"] = btn.get_active()
+            self.build()
 
 
 class _Preview(GObject.Object, Gdk.Paintable):

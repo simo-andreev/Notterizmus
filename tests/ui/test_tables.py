@@ -39,6 +39,30 @@ class TableTest(ui.UITestCase):
     def current_table(self):
         return next(n for n in self.win.doc.root.walk() if n.kind == "table")
 
+    def content(self):
+        return json.dumps([c.to_json() for c in self.win.doc.root.children], ensure_ascii=False)
+
+    def test_each_change_to_the_tables_shape_is_one_undo_step(self):
+        """Rows, columns and the header row change the table inside one editor operation,
+        so Ctrl+Z takes each back whole and Ctrl+Shift+Z brings it again (CR39)."""
+        self.chapter()
+        for label in ("+ Row", "+ Column", "− Row", "− Column", "Header row"):
+            with self.subTest(label):
+                self.row = ui.row(self.current_table())
+                self.at(0, 0)
+                before = self.content()
+                if label == "Header row":
+                    btn = self.row.header_btn
+                    btn.set_active(not btn.get_active())
+                else:
+                    self.click(label)
+                after = self.content()
+                self.assertNotEqual(after, before)
+                self.ed.undo()
+                self.assertEqual(self.content(), before)
+                self.ed.redo()
+                self.assertEqual(self.content(), after)
+
     def test_tab_moves_through_the_cells_and_adds_a_row_at_the_end(self):
         self.chapter()
         cell = self.at(0, 0)

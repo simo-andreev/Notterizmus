@@ -21,24 +21,25 @@ class ItemsMixin:
         return opts
 
     def change_kind(self, node, kind, marker):
-        err = set_kind(node, kind, marker)
+        with self._op():
+            err = set_kind(node, kind, marker)
+            if err is None:
+                self.refresh(focus=node)
         if err:
             self.emit("message", err)
             return False
-        with self._op():
-            self.refresh(focus=node)
         return True
 
     def cycle_kind(self, node):
         opts = self.kind_options(node)
         cur = next((i for i, (k, m, *_) in enumerate(opts)
                     if k == node.kind and (k != "bullet" or m == node.marker)), -1)
-        for step in range(1, len(opts)):
-            k, m, *_ = opts[(cur + step) % len(opts)]
-            if set_kind(node, k, m) is None:
-                with self._op():
+        with self._op():
+            for step in range(1, len(opts)):
+                k, m, *_ = opts[(cur + step) % len(opts)]
+                if set_kind(node, k, m) is None:
                     self.refresh(focus=node)
-                return
+                    return
 
     def _set_kind_cmd(self, target):
         node = self._menu_node or self.current

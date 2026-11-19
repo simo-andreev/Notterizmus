@@ -1,4 +1,6 @@
 """Keys that change the outline, driven through the real editor."""
+import json
+
 from notterizmus.guide import b, h, key, table
 
 from . import support as ui
@@ -43,6 +45,35 @@ class EditingTest(ui.UITestCase):
         self.assertTrue(ui.press(ui.focus(intro).view, "space", ctrl=True, shift=True))
         self.assertEqual(intro.kind, "heading", "Ctrl+Shift+Space leaves out bullets at the top level")
         self.assertEqual({k for k, *_ in self.ed.kind_options(intro)}, {"heading"}, "and so does the menu")
+
+    def test_changing_an_items_type_is_one_undo_step(self):
+        """Ctrl+Shift+Space and the item-type menu change the kind inside one editor
+        operation (CR39)."""
+        ui.open_chapter([h("Intro", b("one"))])
+
+        def content():
+            return json.dumps([c.to_json() for c in self.win.doc.root.children], ensure_ascii=False)
+
+        def item():
+            return self.win.doc.root.children[0].children[0]
+
+        for how in ("Ctrl+Shift+Space", "menu"):
+            with self.subTest(how):
+                ui.settle()  # an undo puts the cursor back a moment later
+                before = content()
+                if how == "menu":
+                    ui.focus(item())
+                    self.ed.actions.lookup_action("set-kind").activate(ui.GLib.Variant.new_string("heading"))
+                    self.assertEqual(item().kind, "heading")
+                else:
+                    self.assertTrue(ui.press(ui.focus(item()).view, "space", ctrl=True, shift=True))
+                after = content()
+                self.assertNotEqual(after, before)
+                self.ed.undo()
+                self.assertEqual(content(), before)
+                self.ed.redo()
+                self.assertEqual(content(), after)
+                self.ed.undo()
 
     def test_bold_or_italic_with_nothing_selected_survives_the_cursor_set_in_place(self):
         """Ctrl+I with nothing selected formats what is typed next, but any setting of the
