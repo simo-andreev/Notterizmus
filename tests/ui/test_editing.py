@@ -29,6 +29,37 @@ class EditingTest(ui.UITestCase):
                          [("bullet", "important", "remember"), ("bullet", "question", "check")])
         self.assertEqual([ui.row(n).prefix.get_text() for n in (important, question)], ["     ! ", "     ? "])
 
+    def test_a_top_level_item_stays_numbered_and_a_refused_trigger_stays_typed(self):
+        """Top-level items are always numbered, but "* " typed at the start of one made a
+        bullet (CR11). A trigger that can't apply, "# " under a bullet, was deleted anyway
+        before the refusal (CR20)."""
+        doc = ui.open_chapter([h("Intro", b("outer", b("inner")))])
+        intro = doc.root.children[0]
+        inner = intro.children[0].children[0]
+        ui.type_text(ui.focus(intro, 0).view, "* ", wait=0.3)
+        self.assertEqual((intro.kind, intro.text), ("heading", "* Intro"))
+        ui.type_text(ui.focus(inner, 0).view, "# ", wait=0.3)
+        self.assertEqual((inner.kind, inner.text), ("bullet", "# inner"))
+        self.assertTrue(ui.press(ui.focus(intro).view, "space", ctrl=True, shift=True))
+        self.assertEqual(intro.kind, "heading", "Ctrl+Shift+Space leaves out bullets at the top level")
+        self.assertEqual({k for k, *_ in self.ed.kind_options(intro)}, {"heading"}, "and so does the menu")
+
+    def test_bold_or_italic_with_nothing_selected_survives_the_cursor_set_in_place(self):
+        """Ctrl+I with nothing selected formats what is typed next, but any setting of the
+        cursor dropped that, and an input method sets it again in place before it types
+        (R32, CR9)."""
+        doc = ui.open_chapter([h("Intro", b("plain "))])
+        item = doc.root.children[0].children[0]
+        r = ui.focus(item)
+        self.assertTrue(ui.press(r.view, "i", ctrl=True))
+        buf = r.view.get_buffer()
+        buf.place_cursor(buf.get_iter_at_offset(len("plain ")))  # the same place
+        ui.type_text(r.view, "xyz")
+        self.assertEqual([(run.text, run.italic) for run in item.runs], [("plain ", False), ("xyz", True)])
+        buf.place_cursor(buf.get_iter_at_offset(2))  # somewhere else: typing takes its format from there
+        ui.type_text(r.view, "Q")
+        self.assertFalse(next(run for run in item.runs if "Q" in run.text).italic)
+
     def test_ctrl_enter_adds_the_next_numbered_item(self):
         doc = ui.open_chapter([h("Intro", h("One", b("note")))])
         one = doc.root.children[0].children[0]
@@ -153,7 +184,8 @@ class EditingTest(ui.UITestCase):
             ui.type_text(ui.focus(inner, 0).view, "# ", wait=0.3)
         finally:
             del self.win.toast
-        self.assertEqual((inner.kind, inner.text), ("bullet", "inner"), "the trigger is removed, the type stays")
+        self.assertEqual((inner.kind, inner.text), ("bullet", "# inner"),
+                         "the type stays, and so does what was typed (it used to be deleted: CR20)")
         self.assertEqual(said, ["A numbered item can't sit under a bullet."])
 
     def test_enter_at_the_start_of_an_item_adds_an_empty_one_above(self):

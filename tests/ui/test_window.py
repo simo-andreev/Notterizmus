@@ -308,6 +308,17 @@ class RulesFileTest(ui.UITestCase):
         self.assertEqual(self.toasts, ["Formatting rules reloaded"])
         self.assertEqual(to_plain(layout(doc.root, self.win.rules)).split("\n")[0], "1. Intro", "exports follow")
 
+    def test_your_own_marker_names_are_shown_as_they_are(self):
+        """Text from rules.toml in the Shortcuts dialog and the menus isn't markup (CR8):
+        the run fails on the warning GTK prints for markup that doesn't parse."""
+        self.reload('[markers.idea]\nsymbol = "&"\ntrigger = "<"\nlabel = "Pros & cons <x>"\n')
+        self.win.lookup_action("shortcuts").activate(None)
+        ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "the Shortcuts dialog")
+        dlg = self.win.get_visible_dialog()
+        ui.settle()
+        dlg.force_close()
+        ui.wait_for(lambda: self.win.get_visible_dialog() is None, "the dialog to close")
+
     def test_your_own_marker_can_be_typed_and_is_offered_in_the_menus(self):
         self.reload('[markers.idea]\nsymbol = "→"\ntrigger = ">"\nlabel = "Idea"\n')
         doc = ui.open_chapter([h("Intro", b("why"))])

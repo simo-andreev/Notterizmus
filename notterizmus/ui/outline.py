@@ -62,6 +62,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         # item selection
         self.sel = []
         self.sel_anchor = self.sel_head = None
+        self._drawing_win = None  # the drawing window it opened last (drawing_window())
         self._wstack = []
         self._setup_drag_select()
         # history
@@ -356,10 +357,11 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
 
     def _apply_trigger(self, row, nchars, kind, marker):
         with self._op():
-            buf = row.view.get_buffer()
-            buf.delete(buf.get_start_iter(), buf.get_iter_at_offset(nchars))
             err = set_kind(row.node, kind, marker)
-            if err:
-                self.emit("message", err)
-            self.refresh(focus=row.node, offset=0)
+            if err is None:  # a trigger that can't apply stays as it was typed (CR20)
+                buf = row.view.get_buffer()
+                buf.delete(buf.get_start_iter(), buf.get_iter_at_offset(nchars))
+                self.refresh(focus=row.node, offset=0)
+        if err:
+            self.emit("message", err)
         return False

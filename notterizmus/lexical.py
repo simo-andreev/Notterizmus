@@ -267,7 +267,8 @@ class _Reader:
                 if not rows and cell.get("headerState"):
                     header = True
                 inner = _Reader()
-                for child in cell.get("children") or []:
+                children = cell.get("children")
+                for child in children if isinstance(children, list) else []:
                     inner.read(child)
                 runs = []
                 for item in inner.end():  # a cell's lines are joined, as its HTML's are
@@ -303,13 +304,15 @@ def pasted_items(mime, data):
     is no drawing or the data can't be read: the HTML beside it then says everything,
     and is what the paste has always used."""
     reader = read_web_custom_data if mime == CHROME_CUSTOM_MIME else read_moz_custom_data
+    # Any app can put data under these names: anything that doesn't read as expected,
+    # however it fails, leaves the paste to the HTML (CR14 in CODE_REVIEW.md).
     try:
         text = reader(bytes(data)).get(LEXICAL_MIME)
         payload = json.loads(text) if text else None
-    except (ValueError, struct.error, UnicodeDecodeError):
-        return None
-    nodes = payload.get("nodes") if isinstance(payload, dict) else None
-    if not isinstance(nodes, list):
-        return None
-    items = to_items(nodes)
+        nodes = payload.get("nodes") if isinstance(payload, dict) else None
+        if not isinstance(nodes, list):
+            return None
+        items = to_items(nodes)
+    except (ValueError, TypeError, AttributeError, KeyError, IndexError, struct.error, RecursionError):
+        return None  # (UnicodeDecodeError and JSONDecodeError are ValueErrors)
     return items if any(it[0] == "drawing" for it in items) else None

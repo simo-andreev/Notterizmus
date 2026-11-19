@@ -40,6 +40,21 @@ def _decode(raw):
         return raw.decode("utf-16", errors="replace").rstrip("\x00")
     return raw.decode("utf-8", errors="replace").rstrip("\x00")
 
+
+def _own_json(mime, text):
+    """The items (NODES_MIME) or runs (RUNS_MIME) in this app's own clipboard JSON, or None
+    if it isn't what this version writes. Any app can put data under these names, and
+    it used to be read with no guard (CR14 in CODE_REVIEW.md)."""
+    try:
+        data = json.loads(text)
+        if mime == RUNS_MIME:
+            return runs_from_json(data) if isinstance(data, list) else None
+        nodes = data.get("nodes") if isinstance(data, dict) else None
+        return [fresh_ids(Node.from_json(d)) for d in nodes] if isinstance(nodes, list) and nodes else None
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        return None
+
+
 class ClipboardMixin:
     """Mixed into OutlineEditor (outline.py); uses its state."""
 
@@ -149,6 +164,13 @@ class ClipboardMixin:
                 self.emit("message", f"Paste failed: {e.message}")
             return
         raw = out.steal_as_bytes().get_data() or b""
+        if mime in (NODES_MIME, RUNS_MIME):
+            own = _own_json(mime, _decode(raw))
+            if own is None:  # another app's data under this name, or a newer version's
+                self._read_clip(cb, mimes[1:], ctx, plain)
+            else:
+                self._pasted(ctx, mime, None, plain, own)
+            return
         if mime in EDITOR_MIMES:
             items = lexical.pasted_items(mime, raw)
             if items is None:
@@ -171,13 +193,12 @@ class ClipboardMixin:
             v.select_range(*selo)
         else:
             v.set_cursor(off)
-        if mime == NODES_MIME:
-            nodes = [fresh_ids(Node.from_json(d)) for d in json.loads(text).get("nodes", [])]
-            self.insert_forest(node, nodes)
+        if mime == NODES_MIME:  # items: as _own_json() read them
+            self.insert_forest(node, items)
             return
         if mime == RUNS_MIME:
             with self._op():
-                v.insert_runs(runs_from_json(json.loads(text)))
+                v.insert_runs(items)
             return
         if items is None:
             items = html_items(text) if mime == "text/html" else text_items(text)
@@ -307,6 +328,8 @@ class ClipboardMixin:
                 if not can_contain(p, n):
                     p, i = root, len(root.children)
                     pos[:] = [p, i]
+                if p is root and n.kind == "bullet":
+                    n.kind = "heading"  # top-level items are always numbered, as outdent makes them (CR11)
                 p.insert(i, n)
                 pos[1] += 1
                 if other[0] is p and other[1] >= i:

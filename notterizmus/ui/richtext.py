@@ -44,6 +44,7 @@ class RichText(Gtk.TextView):
         self.tag_found = buf.create_tag("found", background_rgba=found)
         self.tag_found_current = buf.create_tag("found-current", background_rgba=current)
         self._pending = None  # {"bold":..,"italic":..} after Ctrl+B/I with no selection
+        self._pending_at = None  # ... at this offset: moving the cursor elsewhere drops it
         self._loading = False
         self._inserting = False
         self._raw = False
@@ -206,7 +207,7 @@ class RichText(Gtk.TextView):
         else:
             cur = dict(self._pending or self._typing_format(self.cursor_iter()))
             cur[name] = not cur[name]
-            self._pending = cur
+            self._pending, self._pending_at = cur, self.cursor_offset()
 
     def _typing_format(self, it):
         prev = it.copy()
@@ -233,6 +234,8 @@ class RichText(Gtk.TextView):
                 fmt = self._fmt_at(end_iter)
             else:
                 fmt = {"bold": False, "italic": False}
+        if self._pending is not None:
+            self._pending_at = end_iter.get_offset()  # it goes on from the end of what was typed
         buf.remove_tag(self.tag_bold, start, end_iter)
         buf.remove_tag(self.tag_italic, start, end_iter)
         if fmt["bold"]:
@@ -242,8 +245,11 @@ class RichText(Gtk.TextView):
         self._inserting = False
         self._emit()
 
-    def _on_mark_set(self, buf, _it, mark):
-        if mark == buf.get_insert() and not self._loading and not self._inserting:
+    def _on_mark_set(self, buf, it, mark):
+        # Only a move elsewhere drops a pending format: an input method sets the cursor
+        # again in place before it types (R32, CR9 in CODE_REVIEW.md).
+        if mark == buf.get_insert() and not self._loading and not self._inserting \
+                and it.get_offset() != self._pending_at:
             self._pending = None
 
     def _on_changed(self, _buf):

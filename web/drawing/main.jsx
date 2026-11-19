@@ -3,6 +3,7 @@
 //   save()                  the edited scene plus a PNG preview, as a JSON string
 //   changed()               whether the scene differs from the one opened
 //   render(scene, options)  a PNG preview of a scene without showing the editor
+//   elements(), updateScene(changes)  for the UI tests: the scene, and changing it
 // options.preview is the largest preview PNG, [width, height] (drawing.PREVIEW_PIXELS);
 // options.dark asks open() for the dark theme.
 import React from "react";
@@ -16,7 +17,8 @@ const PREVIEW_SCALE = 2;
 const PREVIEW_PADDING = 12;
 
 let api = null;
-let openedVersion = 0;
+let openedVersion = 0;   // the scene's version at open(), over every element, deleted ones too
+let openedAppState = "";  // and the kept view state (keptAppState), as JSON
 let previewMax = null;  // from open(): save() makes its preview no larger
 
 const live = (elements) => elements.filter((e) => !e.isDeleted);
@@ -113,12 +115,26 @@ window.ntz = {
       }
       await new Promise((resolve) => setTimeout(resolve, 30));
     }
-    openedVersion = getSceneVersion(live(api.getSceneElements()));
+    openedVersion = getSceneVersion(api.getSceneElementsIncludingDeleted());
+    openedAppState = JSON.stringify(keptAppState(api.getAppState()));
     return true;
   },
 
+  // Whether Cancel would lose anything. Over the elements still there, a deletion took its
+  // element's version out of the sum, so a few edits elsewhere could bring the sum back to
+  // its opening value; with deleted ones counted the sum only grows. A new background
+  // changes no element at all (CR17 in CODE_REVIEW.md).
   changed() {
-    return api !== null && getSceneVersion(live(api.getSceneElements())) !== openedVersion;
+    return api !== null && (getSceneVersion(api.getSceneElementsIncludingDeleted()) !== openedVersion
+      || JSON.stringify(keptAppState(api.getAppState())) !== openedAppState);
+  },
+
+  // For the UI tests: the scene as Excalidraw holds it, and changes to it as edits make them.
+  elements() {
+    return JSON.stringify(api.getSceneElementsIncludingDeleted());
+  },
+  updateScene(changes) {
+    api.updateScene(changes);
   },
 
   async save() {

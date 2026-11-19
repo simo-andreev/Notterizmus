@@ -93,8 +93,14 @@ def neighbor(books, path, delta):
 # (each returns {old path: new path}); otherwise autosave would bring the old file back.
 
 def safe_name(name):
-    """A book name as a folder name."""
-    return "".join("_" if c in "/\\\0" else c for c in name).strip() or "Unsorted"
+    """A book name as a folder name: without "/", "\\" or NUL, never hidden (scan() skips
+    hidden folders, so ".NET" becomes "_NET"), never "." or ".." (they would put chapters in
+    the notes folder itself, or above it), and short enough for a file name (CR7, CR15)."""
+    from .model import fit_name
+    folder = "".join("_" if c in "/\\\0" else c for c in name).strip()
+    if folder in ("", ".", ".."):
+        return "Unsorted"
+    return fit_name("_" + folder[1:] if folder.startswith(".") else folder)
 
 
 def book_name(book_dir):

@@ -10,8 +10,12 @@ from . import drawing_web
 class ItemsMixin:
     """Mixed into OutlineEditor (outline.py); uses its state."""
 
-    def kind_options(self):
+    def kind_options(self, node=None):
+        """(kind, marker, label, trigger) of each item type; for node, those it can have where
+        it is: a top-level item is always numbered (CR11 in CODE_REVIEW.md)."""
         opts = [("heading", None, "Numbered Item", self.rules["heading"]["trigger"])]
+        if node is not None and node.parent is not None and node.parent.kind == "root":
+            return opts
         for name, m in self.rules["markers"].items():
             opts.append(("bullet", name, f"{m['symbol']}   {m.get('label', name)}", m.get("trigger", "")))
         return opts
@@ -26,7 +30,7 @@ class ItemsMixin:
         return True
 
     def cycle_kind(self, node):
-        opts = self.kind_options()
+        opts = self.kind_options(node)
         cur = next((i for i, (k, m, *_) in enumerate(opts)
                     if k == node.kind and (k != "bullet" or m == node.marker)), -1)
         for step in range(1, len(opts)):
@@ -96,8 +100,15 @@ class ItemsMixin:
         return next((n for n in self.doc.root.walk() if n.id == nid), None) if self.doc else None
 
     def _open_drawing(self, data, done):
-        if drawing_web.edit(self.get_root(), data, done) is None:
+        self._drawing_win = drawing_web.edit(self.get_root(), data, done)
+        if self._drawing_win is None:
             self.emit("message", drawing_web.MISSING)
+
+    def drawing_window(self):
+        """The drawing window, while one is open: another chapter mustn't open meanwhile,
+        or the drawing would go back to the wrong chapter (CR19 in CODE_REVIEW.md)."""
+        win = self._drawing_win
+        return win if win is not None and win.get_visible() else None
 
     def insert_drawing(self, node=None):
         """Open the drawing window on an empty drawing; it becomes a block after `node`
@@ -105,9 +116,11 @@ class ItemsMixin:
         node = node or self.current
         if node is None or self.doc is None:
             return
-        anchor = node.id
+        anchor, doc = node.id, self.doc
 
         def done(data):
+            if self.doc is not doc:  # never into another chapter (CR19)
+                return
             target = self._node_by_id(anchor) or self.current
             if target is None or drawing.is_empty(data):
                 return
@@ -127,9 +140,11 @@ class ItemsMixin:
     def edit_drawing(self, node):
         if node is None or node.kind != "drawing":
             return
-        nid = node.id
+        nid, doc = node.id, self.doc
 
         def done(data):
+            if self.doc is not doc:  # never into another chapter (CR19)
+                return
             n = self._node_by_id(nid)
             if n is None or drawing.scene(data) == drawing.scene(n.data):
                 return
@@ -145,8 +160,13 @@ class ItemsMixin:
         self._open_drawing(node.data, done)
 
     def delete_node(self, node):
-        """Delete one item; its sub-items move up into its place."""
+        """Delete one item; its sub-items move up into its place. A block goes whole: a
+        table or drawing has no sub-items, and a block from a newer version keeps its own
+        (CR13 in CODE_REVIEW.md)."""
         if node is None:
+            return
+        if not is_text(node):
+            self.delete_items([node])
             return
         with self._op():
             target = self._prev_text_node(node)
@@ -167,6 +187,7 @@ class ItemsMixin:
             remove_items(nodes)
             self._ensure_nonempty()
             self.sel = []
+            self.sel_anchor = self.sel_head = None
             order = self._order()
             target = next((n for n in reversed(order[:max(first, 1)]) if is_text(n)), None) \
                 or next((n for n in order if is_text(n)), order[0])

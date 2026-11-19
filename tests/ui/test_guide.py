@@ -61,5 +61,31 @@ class GuideTest(ui.UITestCase):
         self.assertEqual(marked(), {"misspeled"})
 
 
+class GuideWordsTest(ui.UITestCase):
+    def test_the_guides_own_words_are_flagged_again_in_other_chapters(self):
+        """Opening Getting Started put its words (Ctrl, TopCoding, …) on Enchant's list
+        for the whole run, so they went unflagged in every chapter opened after it (CR21)."""
+        if not self.win.speller.available or "en_US" not in self.win.languages:
+            self.skipTest("no en_US dictionary")
+        self.win.lookup_action("guide").activate(None)
+        ui.settle()
+        doc = ui.open_chapter([guide.h("Intro", guide.b("TopCoding Ctrl"))])
+        view = ui.row(doc.root.children[0].children[0]).view
+
+        def marked():
+            buf = view.get_buffer()
+            words, it = set(), buf.get_start_iter()
+            while True:
+                if it.starts_tag(view.tag_spell):
+                    end = it.copy()
+                    end.forward_to_tag_toggle(view.tag_spell)
+                    words.add(buf.get_text(it, end, True))
+                    it = end
+                if not it.forward_to_tag_toggle(view.tag_spell):
+                    return words
+
+        ui.wait_for(lambda: marked() == {"TopCoding", "Ctrl"}, "both words underlined")
+
+
 def ui_h(text):
     return guide.h(text)

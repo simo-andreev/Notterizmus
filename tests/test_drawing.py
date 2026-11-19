@@ -317,6 +317,30 @@ class LexicalPasteTest(unittest.TestCase):
                            (lexical.CHROME_CUSTOM_MIME, lexical.web_custom_data({"text/uri-list": "x"}))):
             self.assertIsNone(lexical.pasted_items(mime, data), data[:20])
 
+    def test_data_of_the_wrong_shape_gives_nothing_and_never_raises(self):
+        """Clipboard data comes from any app. A table cell whose children is a number
+        (TypeError) or nesting too deep to read (RecursionError) escaped, so Ctrl+V did
+        nothing instead of using the HTML beside it (CR14)."""
+        cell = {"type": "tablecell", "children": 5}
+        shapes = [
+            [{"type": "table", "children": [{"type": "tablerow", "children": [cell]}]}, editor_drawing()],
+            [editor_paragraph({"type": "text", "text": 5, "format": "bold"}), editor_drawing()],
+            [{"type": "paragraph", "children": "text"}, editor_drawing()],
+            [{"type": "list", "children": [{"type": "listitem", "children": {"a": 1}}]}, editor_drawing()],
+            [{"type": "excalidraw", "data": 5}, editor_drawing()],
+            [None, 5, "x", [], {"type": 7}, editor_drawing()],
+        ]
+        for nodes in shapes:
+            for browser in ("chrome", "firefox"):
+                with self.subTest(nodes=json.dumps(nodes)[:60], browser=browser):
+                    items = lexical.pasted_items(*editor_copy(nodes, browser))
+                    self.assertTrue(items is None or isinstance(items, list))
+        deep = '{"type": "paragraph", "children": [' * 10000 + '{"type": "text", "text": "x"}' + "]}" * 10000
+        text = '{"namespace": "SummaryEditor", "nodes": [' + deep + ", " + json.dumps(editor_drawing()) + "]}"
+        for mime, data in ((lexical.CHROME_CUSTOM_MIME, lexical.web_custom_data({lexical.LEXICAL_MIME: text})),
+                           (lexical.FIREFOX_CUSTOM_MIME, lexical.moz_custom_data({lexical.LEXICAL_MIME: text}))):
+            self.assertIsNone(lexical.pasted_items(mime, data), "nested 10,000 deep")
+
     def test_padding_after_the_data_is_allowed(self):
         mime, data = editor_copy([editor_drawing()])
         self.assertIsNotNone(lexical.pasted_items(mime, data + b"\0\0\0\0"))

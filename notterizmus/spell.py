@@ -58,6 +58,7 @@ class Speller:
         self.lang = None
         self._dicts = {}   # tag -> EnchantDict*
         self._alt = {}     # script -> tag used for words in the other alphabet
+        self._open_ignores = frozenset()  # words passed while one chapter is open (ignore_while_open)
         self._cache = {}
         try:
             lib = ctypes.CDLL("libenchant-2.so.2")
@@ -131,8 +132,15 @@ class Speller:
     def _b(word):
         return word.replace("’", "'").encode()
 
+    def ignore_while_open(self, words):
+        """Pass these words while the chapter now opening is open (Getting Started's own
+        words: Ctrl, TopCoding, …). ignore() lasts for the whole run, which left them
+        unflagged in every chapter opened after the guide (CR21 in CODE_REVIEW.md)."""
+        self._open_ignores = frozenset(words)
+        self._cache.clear()
+
     def check(self, word):
-        if not self.dict:
+        if not self.dict or word in self._open_ignores:
             return True
         hit = self._cache.get(word)
         if hit is None:

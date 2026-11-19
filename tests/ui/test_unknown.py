@@ -68,6 +68,21 @@ class UnknownBlockTest(ui.UITestCase):
         self.win.save(quiet=True)
         self.assertEqual(saved_block(doc.path), with_items)
 
+    def test_delete_block_removes_it_with_its_sub_items(self):
+        """The item menu's Delete Block moved the sub-items of a block from a newer version
+        up into the chapter; its trash button removed it whole (CR13)."""
+        with_items = {"kind": "mindmap", "id": "d3", "children": [
+            {"kind": "bullet", "id": "c3", "runs": [{"t": "inside"}], "marker": "dot"}]}
+        doc = ui.open_chapter([h("Intro", b("before"), Node.from_json(json.loads(json.dumps(with_items))),
+                                 b("after"))])
+        self.ed.delete_node(doc.root.children[0].children[1])  # what Delete Block in its menu runs
+        ui.wait_editor()
+        self.assertEqual([c.text for c in self.win.doc.root.children[0].children], ["before", "after"])
+        self.ed.undo()
+        intro = self.win.doc.root.children[0]
+        self.assertEqual([c.kind for c in intro.children], ["bullet", "mindmap", "bullet"])
+        self.assertEqual(intro.children[1].children[0].text, "inside")
+
     def test_editing_around_it_keeps_its_data_in_the_file(self):
         doc, _intro, before, _block, _after = self.open()
         ui.type_text(ui.focus(before).view, " edited")

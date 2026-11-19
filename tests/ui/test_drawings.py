@@ -9,10 +9,11 @@ import gc
 import json
 import os
 import unittest
+from pathlib import Path
 
 from notterizmus import drawing
 from notterizmus.guide import b, h
-from notterizmus.model import Node
+from notterizmus.model import Document, Node
 
 from ..test_drawing import BR, editor_copy, editor_drawing, editor_paragraph, editor_text
 from . import support as ui
@@ -51,19 +52,44 @@ def block(data=None):
     return Node("drawing", data=copy.deepcopy(data or scene()))
 
 
+class _FakeWindow:
+    """Stands in for the drawing window: open until Done, or until the test ends."""
+
+    def __init__(self):
+        self.open = True
+        self.presented = 0
+
+    def get_visible(self):
+        return self.open
+
+    def present(self):
+        self.presented += 1
+
+
 class _FakeWeb:
     """Stands in for notterizmus.ui.drawing_web: edit() and render() only record."""
 
     def __init__(self):
-        self.edits = []    # (data, on_done)
+        self.edits = []    # (data, done: what the window's Done does)
         self.renders = []  # (data, done)
+        self.windows = []
         self.can_edit = True
 
     def edit(self, _parent, data, on_done):
         if not self.can_edit:
             return None
-        self.edits.append((copy.deepcopy(data), on_done))
-        return object()
+        win = _FakeWindow()
+
+        def done(new):
+            win.open = False
+            on_done(new)
+        self.windows.append(win)
+        self.edits.append((copy.deepcopy(data), done))
+        return win
+
+    def close_all(self):
+        for win in self.windows:
+            win.open = False
 
     def render(self, data, done):
         self.renders.append((copy.deepcopy(data), done))
@@ -77,6 +103,7 @@ class DrawingTestCase(ui.UITestCase):
         real = drawing_web.edit, drawing_web.render
         drawing_web.edit, drawing_web.render = self.web.edit, self.web.render
         self.addCleanup(lambda: (setattr(drawing_web, "edit", real[0]), setattr(drawing_web, "render", real[1])))
+        self.addCleanup(self.web.close_all)
 
     def kinds(self):
         return [c.kind for c in self.win.doc.root.children[0].children]
@@ -104,6 +131,28 @@ class AddDrawingTest(DrawingTestCase):
         self.assertEqual(drawing.scene(self.drawings()[0].data), scene())
         from notterizmus.ui.rows import DrawingRow
         self.assertIsInstance(ui.row(self.drawings()[0]), DrawingRow)
+
+    def test_a_file_opened_while_the_drawing_window_is_open_waits(self):
+        """A chapter opened from Files while the drawing window was open replaced the one
+        the drawing came from, and Done then put the drawing into the other chapter (CR19)."""
+        doc, before, _after = self.open()
+        ui.press(ui.focus(before).view, "d", ctrl=True)
+        other = ui.scratch() / "elsewhere-for-a-drawing.notz"
+        Document.new("Elsewhere", 1, "Other", other).save()
+        ui.app().do_open([ui.Gio.File.new_for_path(str(other))], 1, "")
+        self.assertEqual(Path(self.win.doc.path), Path(doc.path), "the chapter stays")
+        self.assertEqual(self.web.windows[0].presented, 1, "the drawing window comes to the front")
+        self.web.edits[0][1](scene())
+        ui.settle()
+        self.assertEqual(self.kinds(), ["bullet", "drawing", "bullet"])
+
+    def test_done_never_puts_a_drawing_into_another_chapter(self):
+        _doc, before, _after = self.open()
+        ui.press(ui.focus(before).view, "d", ctrl=True)
+        other = ui.open_chapter([h("Other", b("text"))], title="Other")  # however it came to be open
+        self.web.edits[0][1](scene())
+        ui.settle()
+        self.assertEqual([n.kind for n in other.root.walk() if n.kind == "drawing"], [])
 
     def test_the_cursor_stays_in_the_item_it_was_added_from(self):
         _doc, before, _after = self.open()
@@ -551,6 +600,36 @@ class RealDrawingWindowTest(ui.UITestCase):
         self.assertEqual(kept["elements"][1]["text"], "edited in Excalidraw")
         self.assertTrue(drawing.preview_path(kept).read_bytes().startswith(b"\x89PNG"))
         ui.wait_for(lambda: not win.get_visible(), "the drawing window to close")
+
+    def page(self, win, body):
+        """Run JavaScript in the drawing window's page; its result as text."""
+        got = []
+        self.web._call(win.view, self.web._JS_READY + body, lambda text, error: got.append((text, error)))
+        ui.wait_for(lambda: got, "the page's answer", timeout=30)
+        self.assertIsNone(got[0][1])
+        return got[0][0]
+
+    def test_cancel_notices_every_change(self):
+        """changed() summed the versions of the elements still there: deleting one took its
+        version out, so edits elsewhere could bring the sum back, and Cancel then discarded
+        without asking. A new background alone was never noticed (CR17)."""
+        edits = {
+            "a deletion and an edit": """
+                const [first, second] = JSON.parse(window.ntz.elements());
+                window.ntz.updateScene({elements: [{...first, isDeleted: true, version: first.version + 1},
+                                                   {...second, version: second.version + first.version}]});""",
+            "a new background": 'window.ntz.updateScene({appState: {viewBackgroundColor: "#ffeeaa"}});',
+        }
+        for what, js in edits.items():
+            win = self.web.edit(self.win, scene(what), lambda _data: None)
+            self.addCleanup(win.destroy)
+            ui.wait_for(lambda: win.done_btn.get_sensitive(), "Excalidraw to start", timeout=60)
+            self.assertEqual(self.page(win, "return window.ntz.changed();"), "false", what)
+            self.page(win, js)
+            self.assertEqual(self.page(win, "return window.ntz.changed();"), "true", what)
+            win._closing = True  # no question: nothing here is to be kept
+            win.close()
+            ui.wait_for(lambda: not win.get_visible(), "the drawing window to close")
 
     def test_a_preview_is_made_at_twice_the_size_it_is_shown_at(self):
         """Twice the drawing's own size made PNGs of 5000 px and more for large drawings,

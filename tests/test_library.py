@@ -171,6 +171,28 @@ class NamesTest(unittest.TestCase):
         self.assertEqual(safe_name("   "), "Unsorted")
         self.assertEqual(safe_name(""), "Unsorted")
 
+    def test_a_book_name_never_becomes_a_hidden_folder_or_leaves_the_notes_folder(self):
+        """".NET in Action" became a hidden folder the list skips, and the books "." and ".."
+        put chapters loose in the notes folder or in Documents (CR7)."""
+        self.assertEqual(safe_name(".NET in Action"), "_NET in Action")
+        for name in (".", "..", " .. "):
+            self.assertEqual(safe_name(name), "Unsorted")
+        self.assertEqual(safe_name("..."), "_..")
+        self.assertEqual(safe_name("a.b"), "a.b")
+
+    def test_long_names_fit_the_file_name_limit(self):
+        """A file name has at most 255 bytes, so New Chapter failed for a title of about 128
+        Cyrillic letters (CR15). The name is shortened; the title inside stays whole."""
+        title = "Архитектура " * 20  # 240 letters, 460 bytes
+        for number in (7, 100):
+            name = chapter_filename(number, title)
+            self.assertLessEqual(len(name.encode()), 255)
+            shown = parse_name(name[:-len(".notz")])
+            self.assertEqual(shown[0], number)
+            self.assertTrue(title.startswith(shown[1]))
+        self.assertLessEqual(len(safe_name("Книга " * 60).encode()), 255)
+        self.assertEqual(chapter_filename(7, "short"), "07 short.notz", "short names are as they were")
+
     def test_a_chapter_file_name_round_trips_through_the_list(self):
         for number, title in ((1, "Intro"), (12, "Чиста архитектура"), (7, ""), (3, "a: b? c!"), (100, "x")):
             name = chapter_filename(number, title)
@@ -242,6 +264,15 @@ class MoreChangesTest(ChangeTest):
         with self.assertRaises(FileExistsError):
             set_chapter(x, 1, "Y")
         self.assertEqual(self.state(), [("01 X.notz", 1, "X", "Book", "x text"), ("01 Y.notz", 1, "Y", "Book", "y text")])
+
+    def test_a_long_title_is_shortened_only_in_the_file_name(self):
+        title = " ".join(["Архитектура"] * 20)
+        p = self.chapter("Book", 1, "Short", "notes")
+        moved = set_chapter(p, 2, title)
+        new = moved[p]
+        self.assertTrue(new.exists())
+        self.assertEqual(Document.load(new).chapter_title, title)
+        self.assertEqual(set_chapter(new, 3, title)[new].name, chapter_filename(3, title), "and it can change again")
 
     def test_removing_the_title_leaves_just_the_number(self):
         p = self.chapter("Book", 4, "Titled", "t")

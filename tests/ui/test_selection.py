@@ -4,7 +4,50 @@ from notterizmus.guide import b, h, table
 from . import support as ui
 
 
+class _ShiftClick:
+    """A left click with Shift held, as a row's click gesture reports it."""
+
+    def get_current_button(self):
+        return 1
+
+    def get_current_event_state(self):
+        return ui.Gdk.ModifierType.SHIFT_MASK
+
+    def set_state(self, _state):
+        pass
+
+
 class SelectionTest(ui.UITestCase):
+    def shift_click(self, node):
+        r = ui.row(node)
+        self.ed.on_click(r, r.view, _ShiftClick(), 5, 5)
+
+    def test_shift_click_extends_a_selection_however_it_was_made(self):
+        """Ctrl+W up to whole items, a click on a drawing, or deleting the item a selection
+        began at, left it without an anchor, and Shift+click raised ValueError (CR2)."""
+        self.chapter()
+        r = ui.focus(self.a, 2)
+        for _ in range(3):
+            ui.press(r.view, "w", ctrl=True)
+        self.assertEqual(self.selected(), ["alpha beta"])
+        self.shift_click(self.d)
+        self.assertEqual(self.selected(), ["alpha beta", "gamma", "delta"])
+        self.ed.delete_node(self.a)  # the item the selection began at
+        ui.wait_editor()
+        self.shift_click(self.other.children[0])
+        self.assertEqual(self.selected()[-2:], ["Other", "omega"])
+
+    def test_shift_click_after_clicking_a_drawing(self):
+        from notterizmus import drawing
+        from notterizmus.model import Node
+        doc = ui.open_chapter([h("Intro", b("alpha"), Node("drawing", data=drawing.new_data()), b("omega"))])
+        alpha, picture, omega = doc.root.children[0].children
+        ui.focus(alpha)
+        ui.row(picture)._clicked(None, 1, 0, 0)  # what a click on it does
+        self.assertEqual([n.kind for n in self.ed.sel], ["drawing"])
+        self.shift_click(omega)
+        self.assertEqual([n.kind for n in self.ed.sel], ["drawing", "bullet"])
+
     def chapter(self):
         doc = ui.open_chapter([h("Intro", b("alpha beta"), b("gamma"), b("delta")), h("Other", b("omega"))])
         self.intro, self.other = doc.root.children

@@ -61,7 +61,7 @@ class MenusMixin:
         cur = "heading" if node.kind == "heading" else f"bullet:{node.marker}"
         self.actions.lookup_action("set-kind").set_state(GLib.Variant.new_string(cur))
         m = Gio.Menu()
-        for kind, marker, label, trig in self.kind_options():
+        for kind, marker, label, trig in self.kind_options(node):
             m.append_item(_mi(f"{label}      {trig}␣" if trig else label, "ed.set-kind",
                               "heading" if kind == "heading" else f"bullet:{marker}"))
         return m
@@ -247,9 +247,12 @@ class MenusMixin:
         if btn == 1 and state & Gdk.ModifierType.SHIFT_MASK and self.current is not None \
                 and self.current is not row.node:
             order = self._order()
-            self.sel_anchor = self.sel_anchor if self.sel else self.current
-            self.sel_head = row.node
-            a, b = sorted((order.index(self.sel_anchor), order.index(row.node)))
+            at = {id(n): i for i, n in enumerate(order)}
+            anchor = self.sel_anchor if self.sel and id(self.sel_anchor) in at else self.current
+            if id(anchor) not in at:  # (the item it began at is gone)
+                anchor = row.node
+            self.sel_anchor, self.sel_head = anchor, row.node
+            a, b = sorted((at[id(anchor)], at[id(row.node)]))
             self.set_selection(order[a:b + 1])
             gesture.set_state(Gtk.EventSequenceState.CLAIMED)
             return

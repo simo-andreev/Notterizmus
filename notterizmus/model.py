@@ -340,6 +340,8 @@ def set_kind(node, kind, marker=None):
         return "A numbered item can't sit under a bullet."
     if kind == "bullet" and any(c.kind == "heading" for c in node.children):
         return "This item has numbered sub-items, so it can't become a bullet."
+    if kind == "bullet" and node.parent is not None and node.parent.kind == "root":
+        return "A top-level item is always numbered."  # (CR11 in CODE_REVIEW.md)
     node.kind = kind
     if marker:
         node.marker = marker
@@ -491,6 +493,20 @@ def _disk_state(path):
     return st.st_ino, st.st_mtime_ns, st.st_size
 
 
+NAME_MAX = 255  # bytes in a file or folder name
+
+
+def fit_name(text, limit=NAME_MAX):
+    """text shortened to at most limit bytes of UTF-8, on a character boundary."""
+    data = text.encode("utf-8")
+    return text if len(data) <= limit else data[:limit].decode("utf-8", "ignore").rstrip()
+
+
 def chapter_filename(chapter_no, title):
+    """'NN Title.notz', shortened to fit a file name (CR15 in CODE_REVIEW.md); the whole
+    title stays inside the file."""
     safe = "".join("_" if ch in '/\\\0' else ch for ch in title).strip()
-    return f"{int(chapter_no):02d} {safe}.notz" if safe else f"{int(chapter_no):02d}.notz"
+    number = f"{int(chapter_no):02d}"
+    if not safe:
+        return f"{number}.notz"
+    return f"{number} {fit_name(safe, NAME_MAX - len(number) - len(' .notz'))}.notz"

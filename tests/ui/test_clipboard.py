@@ -202,6 +202,29 @@ class PasteTest(ui.UITestCase):
         ui.type_text(self.ed.cur_view, " typed")
         ui.wait_for(lambda: gone, "the toast to go")
 
+    def test_unreadable_editor_data_on_the_clipboard_falls_back_to_the_text(self):
+        """The app's own clipboard formats were read with no guard: anything of the wrong
+        shape under their names made Ctrl+V do nothing (CR14)."""
+        for mime, junk in (("application/x-notterizmus-nodes+json", b'{"nodes": 5}'),
+                           ("application/x-notterizmus-runs+json", b'[{"t": 5}]'),
+                           ("application/x-notterizmus-nodes+json", b"\xff not json")):
+            with self.subTest(mime=mime, junk=junk):
+                doc = ui.open_chapter([h("Intro", b(""))])
+                item = doc.root.children[0].children[0]
+                self.win.get_clipboard().set_content(ui.Gdk.ContentProvider.new_union([
+                    ui.Gdk.ContentProvider.new_for_bytes(mime, ui.GLib.Bytes.new(junk)),
+                    ui.Gdk.ContentProvider.new_for_bytes("text/plain;charset=utf-8", ui.GLib.Bytes.new(b"plain text"))]))
+                ui.pump(0.05)
+                self.paste(ui.focus(item, 0), lambda: item.text)
+                self.assertEqual(item.text, "plain text")
+
+    def test_bullets_pasted_at_the_top_level_become_numbered_items(self):
+        """Top-level items are always numbered (CR11)."""
+        doc = ui.open_chapter([h("")])
+        self.put(plain="- one\n- two")
+        self.paste(ui.focus(doc.root.children[0], 0), lambda: len(self.win.doc.root.children) == 2)
+        self.assertEqual([(n.kind, n.text) for n in self.win.doc.root.children], [("heading", "one"), ("heading", "two")])
+
     def test_an_outline_pasted_into_an_item_with_text_goes_after_it(self):
         doc = ui.open_chapter([h("Intro", b("mine"), h("Sub")), h("Last")])
         intro = doc.root.children[0]

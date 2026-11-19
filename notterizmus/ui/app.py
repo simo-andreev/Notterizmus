@@ -71,8 +71,17 @@ class App(Adw.Application):
 
     def do_open(self, files, _n, _hint):
         self.do_activate()
-        if files:
-            self.win.open_path(files[0].get_path())
+        if not files:
+            return
+        drawing = self.win.editor.drawing_window()
+        if drawing is not None:  # the drawing would go back into the other chapter (CR19)
+            drawing.present()
+            toasts = getattr(drawing, "toasts", None)
+            if toasts is not None:
+                toasts.add_toast(Adw.Toast(title=f"{files[0].get_basename()} wasn't opened: finish the drawing first",
+                                           use_markup=False))
+            return
+        self.win.open_path(files[0].get_path())
 
     def _snapshot(self, path):
         """Debug helper: render the window content to a PNG and quit."""

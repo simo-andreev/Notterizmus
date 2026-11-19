@@ -405,20 +405,20 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
 
 ### Phase 3: Broken or surprising behaviour (M)
 
-- [ ] **CR2. Shift+click after any kind of item selection.**
+- [x] **CR2. Shift+click after any kind of item selection.**
   - Fix: `set_selection` sets `sel_anchor` and `sel_head` (the first and last of the nodes
     in outline order) unless they are given. `on_click` falls back to `self.current` when
     the anchor isn't in the outline, as `extend_selection` does. `delete_items` and
     `clear_selection` reset the anchor.
   - Test (UI): Ctrl+W three times, then Shift+click another item: the range is selected and
     nothing raises. The same after clicking a drawing, and after deleting the anchor item.
-- [ ] **CR8. Toasts show text as it is.**
+- [x] **CR8. Toasts show text as it is.**
   - Fix: `use_markup=False` on the `Adw.Toast` in `Window.toast` and on the zoom toast.
     Check the other widgets that show user text and default to markup: `Adw.ActionRow`
     and `Adw.ComboRow` titles, and `Adw.ShortcutsItem`.
   - Test (UI): trash a chapter titled `Q&A <1>`. The toast's title is exactly that text,
     and the runner's warning check shows no markup error.
-- [ ] **CR7. Book names that stay inside the notes folder and visible.**
+- [x] **CR7. Book names that stay inside the notes folder and visible.**
   - Fix: `library.safe_name` never returns a hidden name, ".", or "..". Replace a leading
     dot (".NET in Action" becomes "_NET in Action") and map "." and ".." to "Unsorted".
     The dialogs show the folder name that will be used. `scan()` keeps skipping dot-folders
@@ -427,7 +427,7 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
     books ".NET in Action", "." and "..", end up in a listed book folder inside the notes
     folder.
   - Test (UI): New Chapter in book ".NET in Action" appears in the list.
-- [ ] **CR15. New Chapter reports what goes wrong, and long names fit.**
+- [x] **CR15. New Chapter reports what goes wrong, and long names fit.**
   - Fix: catch `OSError` around New Chapter's `doc.save()` (a toast, and the dialog's
     values kept). `chapter_filename` and `safe_name` shorten names to 255 bytes of UTF-8;
     the full title stays inside the file, and the list shows the shortened name.
@@ -435,10 +435,10 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
     that round-trips through `parse_name`.
   - Test (UI): New Chapter with that title creates the chapter; an unwritable notes folder
     gives a toast.
-- [ ] **CR16. "Already exists" by chapter number.**
+- [x] **CR16. "Already exists" by chapter number.**
   - Fix: `library.chapter_numbered(folder, n)` instead of the glob.
   - Test: with only `100 Appendix.notz` in the book, New Chapter 10 creates chapter 10.
-- [ ] **CR11 and CR20. Top-level items stay numbered.**
+- [x] **CR11 and CR20. Top-level items stay numbered.**
   - Decide first (see [With you](#with-you)): keep the rule (README, the guide) or allow
     top-level bullets. Phase 0 shows whether your chapters already have any.
   - Fix, if the rule stays: `set_kind` refuses a bullet at the top level. The trigger code
@@ -450,12 +450,12 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
   - Test (UI): "* " at the start of a top-level item keeps it numbered and keeps the text;
     "# " under a bullet keeps the typed "# "; pasting bullets into an empty first item
     gives numbered items. `test_guide` is unchanged.
-- [ ] **CR13. Delete Block deletes the whole block.**
+- [x] **CR13. Delete Block deletes the whole block.**
   - Fix: the item menu's Delete Block uses `delete_items([node])` for blocks, like the
     trash button.
   - Test (UI): on a block from a newer version with sub-items, Delete Block removes it with
     its sub-items, and Ctrl+Z brings them back.
-- [ ] **CR14. Foreign clipboard data can't break a paste.**
+- [x] **CR14. Foreign clipboard data can't break a paste.**
   - Fix: `lexical.pasted_items` returns None on any error reading the data (add
     `TypeError`, `AttributeError` and `RecursionError`), and `_Reader.table` checks that
     `children` is a list. `_pasted` guards the app's own `…nodes+json` and `…runs+json`
@@ -464,7 +464,7 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
     nesting give None, without an exception.
   - Test (UI): with a bogus `application/x-notterizmus-nodes+json` on the clipboard,
     Ctrl+V pastes the plain-text alternative.
-- [ ] **CR17. The drawing window notices every change.**
+- [x] **CR17. The drawing window notices every change.**
   - Fix (`web/drawing/main.jsx`): at open, remember a version over all elements, deleted
     ones included (`getSceneVersion(api.getSceneElementsIncludingDeleted())`), and the kept
     appState; `changed()` compares both. Rebuild the page.
@@ -472,13 +472,13 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
     element's version by the deleted one's version: `changed()` is true. A background
     change alone: true.
   - Manual: Cancel after such edits asks before discarding.
-- [ ] **CR19. Drawings land in the chapter they came from.**
+- [x] **CR19. Drawings land in the chapter they came from.**
   - Fix: while a drawing window is open, `App.do_open` doesn't switch chapters (it presents
     the drawing window and says why), and the done-callbacks act only on the chapter they
     were opened from.
   - Test (UI, with the tests' stand-in drawing window): open one, call `do_open` with
     another file, press Done. The drawing is in the original chapter, never in the other.
-- [ ] **CR21. Getting Started's words stay with the guide.**
+- [x] **CR21. Getting Started's words stay with the guide.**
   - Fix: keep those words in an ignore set inside `Speller` that applies only while the
     guide is open, instead of Enchant's session list.
   - Test (UI, skipped without an en_US dictionary): open Getting Started, then a chapter
@@ -495,6 +495,48 @@ Done 2026-11-19. All eight are fixed, each with tests that failed before the fix
   - Manual: the guide's "Formatting and undo" exercise on the desktop.
 
 Done when all tests pass and the manual checks for CR8, CR9 and CR17 are done.
+
+#### Phase 3 results
+
+Done 2026-11-19, except the checks at your desk. Each fix has tests that failed before it.
+
+- CR2: `set_selection()` gives every selection ends (its first and last items) unless the
+  caller set them inside it, and Shift+click falls back to the current item when the
+  anchor is gone; `clear_selection()` and `delete_items()` reset them. UI tests: after
+  Ctrl+W, after deleting the item a selection began at, and after clicking a drawing.
+- CR8: toasts (the window's, the zoom toast, the drawing window's) have
+  `use_markup=False`. The other rows that show your text are plain labels, or escape it;
+  a book named `Q&A <1>` in Chapter Properties and a marker labelled `Pros & cons <x>` in
+  the Shortcuts dialog showed no warning.
+- CR7: `safe_name()` never returns a hidden name, "." or ".." (".NET in Action" becomes
+  "_NET in Action"; the chapters keep the name you typed). I didn't add the folder name
+  to the dialogs: the list shows it.
+- CR15: names are shortened to 255 bytes in the file name only (`model.fit_name`), and
+  New Chapter reports a file it can't write and asks again with what you typed.
+- CR16: "already exists" goes by `library.chapter_numbered()`.
+- CR11 and CR20: the rule stays, as README and the guide state it (your decision is open
+  below; it is easy to reverse). `set_kind` refuses a top-level bullet, the menu and
+  Ctrl+Shift+Space leave bullets out there, a paste turns top-level bullets into
+  numbered items, and a typed trigger is deleted only when it applies.
+- CR13: Delete Block goes through `delete_items()`, so a newer block keeps its sub-items.
+- CR14: `lexical.pasted_items()` gives None on any error reading the data (10,000-deep
+  nesting included), its table reader checks its lists, and the app's own clipboard JSON
+  is read before it is used, falling back to the next format.
+- CR17: `changed()` counts deleted elements too, and the kept view state. The page was
+  rebuilt with the build script's steps but not its `npm ci` (no download; `node_modules`
+  matched the lockfile); only `main.js` changed. The WebKit test failed against a build
+  with the old `changed()`.
+- CR19: the editor knows its drawing window; `App.do_open` brings it to the front and says
+  why instead of opening the file, and Done acts only on the chapter it was opened from.
+- CR21: `Speller.ignore_while_open()` passes the guide's words only while it is open.
+- CR9: the pending format is dropped only when the cursor moves to another offset. Not
+  reproduced on the desktop first, as planned (the screen was locked), so the box stays
+  open until the manual check: the fix covers the likely cause, an input method setting
+  the cursor again in place, which the UI test does.
+- Results: unit suite 400 tests pass. UI suite 273 tests (222 s), all of them with the
+  real Excalidraw (229 s) and in the load check (283 s); one old test expected CR20's
+  behaviour (a refused trigger deleted) and now expects the fix.
+- Left for your desk: the manual checks for CR8, CR9 and CR17 (Manual checks, below).
 
 ### Phase 4: Robustness and configuration (M)
 
@@ -649,8 +691,8 @@ verification, plus the checks named.
   with `headerState` 3 in the first column. They need a TopCoding page you choose:
   chapters 11, 12 and 15 hold real work, so ask first, as PROJECT_CONTEXT says. Then a unit
   test for the header cells in `lexical.to_nodes`, and manual pastes in Chrome and Firefox.
-- [ ] Top-level bullets: are they allowed at all? The answer decides the CR11 fix in
-  phase 3.
+- [ ] Top-level bullets: are they allowed at all? Phase 3 kept the rule README and the
+  guide state (top-level items are always numbered); say if you want bullets there.
 - [ ] The version numbers of the releases, and whether one should follow phase 1 at once:
   the PPA still serves 1.4.0 (phase 0).
 - [ ] The SDI notes in chapter 10's oldest copy (phase 0): copy them out before

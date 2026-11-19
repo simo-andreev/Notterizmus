@@ -222,6 +222,79 @@ class ChaptersTest(ui.UITestCase):
         finally:
             del self.win.toast
 
+    def test_titles_in_toasts_are_shown_as_they_are(self):
+        """Toasts read their text as markup: a chapter titled "Q&A" gave a "moved to Trash"
+        toast with no text, and a GTK warning (CR8)."""
+        doomed, other = self.book("Q&A <1>", ["Q&A <1>", "Other"])
+        made, real = [], self.win.toast
+        self.win.toast = lambda *args: made.append(real(*args)) or made[-1]
+        try:
+            self.win.lookup_action("chapter-trash").activate(ui.GLib.Variant.new_string(str(doomed)))
+            ui.wait_for(lambda: made, "the toast")
+            self.assertEqual(made[-1].get_title(), "“Q&A <1>” moved to Trash")
+            self.assertFalse(made[-1].get_use_markup())
+        finally:
+            del self.win.toast
+        self.win.on_chapter_props(other)  # the book's name in a list row (the run fails on a warning)
+        self.respond(self.dialog(), "cancel")
+
+    def new_chapter(self, book, number, title, fails=False):
+        self.win.lookup_action("new").activate(None)
+        dlg = self.dialog()
+        self.field(dlg, ui.Adw.EntryRow, "Book").set_text(book)
+        self.field(dlg, ui.Adw.SpinRow).set_value(number)
+        self.field(dlg, ui.Adw.EntryRow, "Chapter title (optional)").set_text(title)
+        if not fails:
+            self.respond(dlg, "create")
+            return None
+        dlg.emit("response", "create")
+        dlg.force_close()
+        ui.wait_for(lambda: self.win.get_visible_dialog() not in (None, dlg), "the dialog to come back")
+        return self.win.get_visible_dialog()
+
+    def test_a_book_whose_name_starts_with_a_dot_is_listed(self):
+        """".NET in Action" became a hidden folder, so the chapter never showed in the
+        list (CR7)."""
+        from notterizmus import library
+        from notterizmus.ui.window import notes_root
+        self.new_chapter(".NET in Action", 1, "Intro")
+        self.assertEqual(names(notes_root() / "_NET in Action"), ["01 Intro.notz"])
+        self.assertIn("_NET in Action", [b.name for b in library.scan(notes_root())])
+        self.assertEqual(self.win.doc.book, ".NET in Action", "the name inside is the one typed")
+
+    def test_new_chapter_with_a_long_title_or_where_it_cannot_be_written(self):
+        """A title of more than about 127 Cyrillic letters is too long for a file name, and
+        New Chapter closed with nothing done; so did an unwritable folder (CR15)."""
+        from notterizmus.ui.window import notes_root
+        title = " ".join(["Архитектура"] * 20)
+        self.new_chapter("Long titles", 1, title)
+        self.assertEqual(self.win.doc.chapter_title, title)
+        self.assertLessEqual(len(Path(self.win.doc.path).name.encode()), 255)
+        locked = notes_root() / "Locked"
+        locked.mkdir()
+        locked.chmod(0o555)
+        self.addCleanup(locked.chmod, 0o755)
+        toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: toasts.append(msg)
+        try:
+            dlg = self.new_chapter("Locked", 1, "Nope", fails=True)  # asked again, with what was typed
+            self.assertTrue(toasts[-1].startswith("Could not create the chapter: "), toasts[-1])
+            self.assertEqual(self.field(dlg, ui.Adw.EntryRow, "Book").get_text(), "Locked")
+            self.assertEqual(self.field(dlg, ui.Adw.EntryRow, "Chapter title (optional)").get_text(), "Nope")
+            self.respond(dlg, "cancel")
+        finally:
+            del self.win.toast
+
+    def test_new_chapter_10_is_not_chapter_100(self):
+        """"Already exists" took any file name that starts with the number: chapter 10
+        opened chapter 100 (CR16)."""
+        from notterizmus.ui.window import notes_root
+        hundred = notes_root() / "Hundreds" / "100 Appendix.notz"
+        Document.new("Hundreds", 100, "Appendix", hundred).save()
+        self.new_chapter("Hundreds", 10, "Ten")
+        self.assertEqual(Path(self.win.doc.path).name, "10 Ten.notz")
+        self.assertEqual(names(hundred.parent), ["10 Ten.notz", "100 Appendix.notz"])
+
     def test_rename_book_renames_the_folder_and_its_chapters(self):
         a, _b = self.book("Old title", ["Ch A", "Ch B"])
         self.book("Taken title", ["Other"])

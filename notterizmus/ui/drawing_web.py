@@ -293,7 +293,8 @@ class DrawingWindow(Adw.Window):
         if self.view is None:  # closed meanwhile
             return
         if error is not None:
-            self.toasts.add_toast(Adw.Toast(title=f"The drawing editor didn't start: {error}", timeout=0))
+            self.toasts.add_toast(Adw.Toast(title=f"The drawing editor didn't start: {error}", timeout=0,
+                                            use_markup=False))
             return
         self._ready = True
         self.done_btn.set_sensitive(True)
@@ -303,6 +304,7 @@ class DrawingWindow(Adw.Window):
         self._ready = False
         self.done_btn.set_sensitive(False)
         self.toasts.add_toast(Adw.Toast(title="The drawing editor stopped working. Cancel and open it again.",
+                                        use_markup=False,
                                         timeout=0))
 
     def finish(self):
@@ -321,7 +323,7 @@ class DrawingWindow(Adw.Window):
             png = _shot(reply)[0]
         except (ValueError, TypeError, KeyError, AttributeError) as e:
             self.done_btn.set_sensitive(True)
-            self.toasts.add_toast(Adw.Toast(title=f"The drawing couldn't be read: {e}"))
+            self.toasts.add_toast(Adw.Toast(title=f"The drawing couldn't be read: {e}", use_markup=False))
             return
         if png:
             drawing.store_preview(data, png)

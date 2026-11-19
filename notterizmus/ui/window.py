@@ -261,7 +261,7 @@ class Window(Adw.ApplicationWindow):
     # -- helpers ------------------------------------------------------------------
 
     def toast(self, msg, button=None, callback=None):
-        t = Adw.Toast(title=msg, timeout=6 if button else 3)
+        t = Adw.Toast(title=msg, timeout=6 if button else 3, use_markup=False)  # titles and errors, not markup (CR8)
         if button:
             t.set_button_label(button)
             t.connect("button-clicked", lambda *_: callback())
@@ -350,13 +350,11 @@ class Window(Adw.ApplicationWindow):
         self.doc = doc
         self.editor.load(doc)
         if self.speller.available:
+            self.speller.ignore_while_open(guide.SPELL_IGNORE if self._is_guide(doc) else ())
             text = " ".join(n.text for n in doc.root.walk())
             self._apply_spelling(self._pick_lang(doc.lang, text))
-            if self._is_guide(doc) and self.speller.dict:
-                for word in guide.SPELL_IGNORE:
-                    self.speller.ignore(word)
-                for v in self.editor.all_views():
-                    v.recheck_spelling()
+            for v in self.editor.all_views():
+                v.recheck_spelling()
         self.stack.set_visible_child_name("editor")
         self.findbar.schedule_refresh()  # new chapter, new text views
         for act in DOC_ACTIONS:
@@ -867,16 +865,21 @@ class Window(Adw.ApplicationWindow):
         self.toast("Copied — paste into TopCoding with Ctrl+V")
 
     def on_new(self, *_):
+        last = self.state.get("last_book", "")
+        number = self.doc.chapter_no + 1 if self.doc and self.doc.book == last else 1
+        self._new_chapter_dialog(last, number, "")
+
+    def _new_chapter_dialog(self, book_text, number, title_text):
         dlg = Adw.AlertDialog(heading="New Chapter",
                               body="Each book + chapter is saved as its own file.")
         lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, css_classes=["boxed-list"])
         book = Adw.EntryRow(title="Book")
-        book.set_text(self.state.get("last_book", ""))
+        book.set_text(book_text)
         num = Adw.SpinRow.new_with_range(1, 999, 1)
         num.set_title("Chapter number")
-        if self.doc and self.doc.book == book.get_text():
-            num.set_value(self.doc.chapter_no + 1)
+        num.set_value(number)
         title = Adw.EntryRow(title="Chapter title (optional)")
+        title.set_text(title_text)
         for r in (book, num, title):
             lb.append(r)
         dlg.set_extra_child(lb)
@@ -893,13 +896,18 @@ class Window(Adw.ApplicationWindow):
             n = int(num.get_value())
             t = title.get_text().strip()
             folder = notes_root() / library.safe_name(b)
-            existing = sorted(folder.glob(f"{n:02d}*.notz")) if folder.exists() else []
+            existing = library.chapter_numbered(folder, n)  # by number: 10 isn't 100 (CR16)
             if existing:
-                self.open_path(existing[0])
+                self.open_path(existing.path)
                 self.toast("That chapter already exists — opened it")
                 return
             doc = Document.new(b, n, t, folder / chapter_filename(n, t))
-            doc.save()
+            try:
+                doc.save()
+            except OSError as e:  # an unwritable folder, a full disk (CR15)
+                self.toast(f"Could not create the chapter: {e.strerror or e}")
+                dlg.connect("closed", lambda *_: self._new_chapter_dialog(b, n, t))  # asked again, as typed
+                return
             self.set_doc(doc)
 
         dlg.connect("response", on_resp)
@@ -961,7 +969,7 @@ class Window(Adw.ApplicationWindow):
         if announce:
             if self._zoom_toast is not None:
                 self._zoom_toast.dismiss()
-            self._zoom_toast = Adw.Toast(title=f"Text size {pct}%", timeout=1)
+            self._zoom_toast = Adw.Toast(title=f"Text size {pct}%", timeout=1, use_markup=False)
             self.toasts.add_toast(self._zoom_toast)
 
     def scroll_zoom(self, ctrl, dy):

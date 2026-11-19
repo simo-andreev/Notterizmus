@@ -61,14 +61,20 @@ class SelectionMixin:
 
     def set_selection(self, nodes):
         self.sel = list(dict.fromkeys(nodes))
+        if self.sel and not (any(n is self.sel_anchor for n in self.sel) and any(n is self.sel_head for n in self.sel)):
+            # Selected other than from one end (Ctrl+W, a click on a drawing, undo): Shift+click
+            # and Shift+arrows go on from its first item and its last (CR2 in CODE_REVIEW.md).
+            pos = {id(n): i for i, n in enumerate(self._order())}
+            ends = sorted(self.sel, key=lambda n: pos.get(id(n), -1))
+            self.sel_anchor, self.sel_head = ends[0], ends[-1]
         if self.sel and self.cur_view is not None and self.cur_view.has_selection():
             self.cur_view.set_cursor(self.cur_view.cursor_offset())  # drop the text selection
         self._apply_sel_css()
 
     def clear_selection(self):
+        self.sel_anchor = self.sel_head = None
         if self.sel:
             self.sel = []
-            self.sel_anchor = self.sel_head = None
             self._apply_sel_css()
 
     def select_all(self):
