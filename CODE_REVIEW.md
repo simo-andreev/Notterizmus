@@ -820,7 +820,7 @@ verification, plus the checks named.
   (together with CR9).
 - [x] **CR49.** An `AssistPopover` class, a menu-list builder and a `VersionsDialog` class
   out of the long functions.
-- [ ] **CR38.** Split `window.py` as R14 split the editor (dialogs, chapter files, zoom and
+- [x] **CR38.** Split `window.py` as R14 split the editor (dialogs, chapter files, zoom and
   sidebar sizing), methods moved unchanged; `git diff --color-moved` shows only moves.
 
 #### Phase 7 results
@@ -958,6 +958,23 @@ verification, plus the checks named.
   whole key ("Ctrl+S" isn't found in "Ctrl+Shift+Z"); it found Ctrl+S and Ctrl+Q missing,
   now added. `test_guide` fails if the guide teaches a key combination the table doesn't
   have. Unit suite 427 tests, with and without PyGObject; UI suite 284 tests in 174 s.
+- CR38: `window.py` is 1,131 lines to 428, as R14 split the editor: mixins, one theme each,
+  their methods moved unchanged. `window_saving` (autosave, saving before a file
+  operation, Earlier Versions copies, a change on disk), `window_chapters` (new, open,
+  Getting Started, previous and next, Chapter Properties, renaming a book, reorder and
+  Trash, with `_trash_file` and `_restore_from_trash`), `window_dialogs` (Search
+  Commands, Earlier Versions, Plain Text, rules, notes folder, About, Shortcuts),
+  `window_zoom` and `window_sizing` (the chapter list's width and handle). What stays is
+  the open chapter, spelling, toasts, copy and find, and an `__init__` of 30 lines that
+  calls `_build_header`, `_build_editor`, `_build_stack`, `_build_sidebar` and the
+  `_add_…_actions` methods, each a block of the old `__init__` as it was. `notes_root`,
+  `load_state` and `save_state` moved to `helpers.py`. Checked that every line taken out
+  of `window.py` comes back in a new module, except ten: the imports, the class line,
+  four old section headings, and three lines the builders replace
+  (`self.editor.spell_menu = spell` reads `self.spell_menu`, which the header sets).
+  `test_chapters` swaps the Trash functions on `window_chapters` now. Unit suite 427
+  tests, with and without PyGObject; UI suite 284 tests in 173 s, and the load check in
+  238 s.
 
 ### With you
 

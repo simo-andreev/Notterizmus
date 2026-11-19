@@ -25,7 +25,7 @@ class ChaptersTest(ui.UITestCase):
     def setUpClass(cls):
         super().setUpClass()
         # A stand-in Trash inside the scratch folder: the real one would show test files in Files.
-        from notterizmus.ui import window as w
+        from notterizmus.ui import window_chapters as w
         cls.w, cls.saved = w, (w._trash_file, w._restore_from_trash)
         cls.trash = ui.scratch() / "Trash"
         cls.trash.mkdir(exist_ok=True)

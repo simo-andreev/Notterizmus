@@ -191,7 +191,8 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table, drawing) and the rich-text view |
 | `notterizmus/drawing.py`, `notterizmus/ui/drawing_web.py` | Drawing blocks: the scene, its export and the preview cache (no GTK); the Excalidraw window and preview renderer (WebKitGTK) |
 | `web/drawing/`, `scripts/build-drawing-editor.sh`, `notterizmus/drawing_web/` | Source of the embedded Excalidraw page, its build script (Node.js), and the built page that ships with the app |
-| `notterizmus/ui/window.py`, `app.py` | Window, header bar, dialogs, file handling, spelling menu |
+| `notterizmus/ui/window.py`, `app.py` | Window: building it, the open chapter, spelling, copy and find; the app and its accelerators |
+| `notterizmus/ui/window_*.py` | The window's mixins: `saving` (autosave, changes on disk), `chapters` (new, open, rename, reorder, Trash), `dialogs`, `zoom`, `sizing` (the chapter list's width) |
 | `data/` | Icons, desktop entry, AppStream metadata, `.notz` MIME type |
 | `debian/`, `scripts/release.sh` | Ubuntu packaging and the PPA release script |
 

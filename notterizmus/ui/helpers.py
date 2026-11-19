@@ -5,6 +5,8 @@ import weakref
 
 from gi.repository import GLib
 
+from .. import paths, state
+
 
 def run_once(fn, *args):
     """Call fn(*args) and return GLib.SOURCE_REMOVE, so that a GLib.idle_add or
@@ -47,3 +49,18 @@ def set_class(widget, name, on):
         widget.add_css_class(name)
     else:
         widget.remove_css_class(name)
+
+
+def notes_root():
+    return paths.notes_root(glib_documents=GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS))
+
+
+def load_state():
+    return state.load()
+
+
+def save_state(settings):
+    try:
+        state.save(settings)
+    except OSError:
+        pass  # not remembered this time; nothing else depends on it
