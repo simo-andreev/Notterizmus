@@ -51,6 +51,19 @@ class BackupsTest(ui.UITestCase):
         self.win.save(quiet=True)
         self.assertEqual(self.texts(), ["v1 v2", "v1"])
 
+    def test_earlier_versions_shows_at_once_and_fills_in_each_copy(self):
+        """Every copy was read and compared before the dialog showed: 0.9 s for 54 copies of
+        a 4 MB chapter (CR32). The details come a moment later now."""
+        doc = ui.open_chapter([h("now", b("a note"))], book="Backups details")
+        self.win.on_versions()
+        dlg = self.win.get_visible_dialog()
+        lb = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.ListBox))
+        row = lb.get_row_at_index(0)
+        self.assertEqual(row.get_subtitle(), "…", "shown before its copy is read")
+        ui.wait_for(lambda: row.get_subtitle() != "…", "the copy's details")
+        self.assertEqual(row.get_subtitle(), "2 items · same as now")
+        self.assertEqual(Path(row._backup.path).read_bytes(), Path(doc.path).read_bytes())
+
     def test_restoring_an_earlier_version_and_undoing_it(self):
         doc = ui.open_chapter([h("now")], book="Backups restore")
         folder = self.folder()

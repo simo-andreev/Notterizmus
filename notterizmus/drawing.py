@@ -98,7 +98,13 @@ def cache_dir(env=None):
 
 
 def preview_path(data, env=None):
-    return cache_dir(env) / f"{preview_key(data)}.png"
+    return preview_file(preview_key(data), env)
+
+
+def preview_file(key, env=None):
+    """The preview for a key from preview_key(): hashing a scene with pictures is several
+    MB of work, so a caller that has the key already passes it (CR35)."""
+    return cache_dir(env) / f"{key}.png"
 
 
 def store_preview(data, png, env=None):

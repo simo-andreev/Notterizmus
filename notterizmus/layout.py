@@ -85,12 +85,12 @@ class _Layout:
         last_head = heads[-1] if heads else -1
         n = 0
         marker_col = label_col + self.r["bullets"]["indent"]
+        prev = None  # the nearest earlier sibling that is shown: blocks from a newer version
+        #              aren't exported, so they don't count (kept as it goes: CR36)
         for i, c in enumerate(kids):
             if c.kind == "heading":
                 n += 1
                 is_last = i == last_head
-                # blocks from a newer version aren't exported, so they don't count here
-                prev = next((k for k in reversed(kids[:i]) if k.kind in BLOCK_KINDS), None)
                 if self.t["spacer_lines"] and (
                         prev is None or prev.kind == "heading" or self.t["spacer_after_leaf"]):
                     self.out.append(Line("spacer", [self.conn(inner + self.t["trunk"])]))
@@ -100,6 +100,8 @@ class _Layout:
             else:
                 trunk_str = inner + self.t["trunk"] if i < last_head else inner
                 self.leaf(c, trunk_str, True, marker_col)
+            if c.kind in BLOCK_KINDS:
+                prev = c
 
     def leaf(self, c, trunk_str, _owned, marker_col):
         base = trunk_str

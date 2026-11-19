@@ -59,22 +59,25 @@ def text_items(text):
 def join_lines(lines):
     """Lines (lists of runs) -> one run list: line breaks become spaces, blank lines
     are dropped, and words hyphenated across a line break are re-joined."""
-    out = []
+    out, tail = [], ""  # tail: the last two characters so far (joining it all again for each
+    #                     line made a paste of 5,000 lines take 17 s: CR36)
     for runs in lines:
         runs = strip_runs([Run(r.text.replace("\n", " "), r.bold, r.italic) for r in runs])
         if runs:
             runs[0] = Run(runs[0].text.lstrip(), runs[0].bold, runs[0].italic)
-        if not runs_text(runs):
+        nxt = runs_text(runs)
+        if not nxt:
             continue
         if out:
-            prev = runs_text(out)
-            nxt = runs_text(runs)
-            if re.search(r"[^\W\d_]-$", prev) and nxt[:1].islower():
+            if re.search(r"[^\W\d_]-$", tail) and nxt[:1].islower():
                 last = out[-1]
                 out[-1] = Run(last.text[:-1], last.bold, last.italic)
+                tail = tail[:-1]
             else:
                 out.append(Run(" "))
+                tail += " "
         out += runs
+        tail = (tail + nxt)[-2:]
     return normalize_runs(out)
 
 

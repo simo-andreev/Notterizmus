@@ -201,7 +201,7 @@ class FindBar(Gtk.SearchBar):
             self.entry.remove_css_class("error")
         else:
             self.entry.add_css_class("error")
-        for v, s, e in self.matches:
+        for v in dict.fromkeys(v for v, _s, _e in self.matches):  # each view once, not once per match (CR36)
             buf = v.get_buffer()
             buf.remove_tag(v.tag_found_current, *buf.get_bounds())
         if not (0 <= self.current < len(self.matches)):

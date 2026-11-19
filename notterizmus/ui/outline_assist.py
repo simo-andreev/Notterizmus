@@ -66,12 +66,17 @@ class AssistMixin:
         sp = SPELL["speller"]
         comps = []
         if prefix:
-            current = count_words(node_texts(self.doc.root))
-            current[word] -= 1  # the word being typed doesn't count as a source
-            path = self.doc.path
-            book = self._book_words.counts(path.parent, exclude=path) if path else None
+            if self._assist_counts is None:
+                # Once per popup: while it is open only the word being typed changes, and that
+                # word isn't counted. Every key used to count the chapter's words again and look
+                # at every other chapter of the book (CR34 in CODE_REVIEW.md).
+                current = count_words(node_texts(self.doc.root))
+                current[word] -= 1  # the word being typed doesn't count as a source
+                path = self.doc.path
+                self._assist_counts = (+current, self._book_words.counts(path.parent, exclude=path) if path else None)
+            current, book = self._assist_counts
             words = dictionary_words(sp.tag_for(prefix)) if sp is not None else []
-            comps = complete(prefix, +current, book, words)
+            comps = complete(prefix, current, book, words)
         sections = []
         if comps:
             sections.append(("Complete", [(c, lambda c=c: self._replace_word(c)) for c in comps]))
@@ -197,6 +202,7 @@ class AssistMixin:
             GLib.idle_add(lambda: (p.unparent(), False)[1])
 
         pop.connect("closed", closed)
+        self._assist_counts = None  # counted afresh for this popup
         first, _ = fill()
         pop.popup()
         if first is not None:

@@ -134,6 +134,26 @@ Fine as it is:
 - Earlier Versions keeps about 54 copies of a chapter edited 2 hours a day for 30 days:
   9.5 MB for chapter 10, 215 MB for the chapter with 3 pictures.
 
+#### Code review phase 5 measurements
+
+Measured 2026-11-19 for phase 5 of CODE_REVIEW.md, before and after each change, with
+`tests/ui/measure_drawings.py` (its chapters and its new sections) on the UI tests'
+display, and plain Python for the helpers:
+
+| What | Before | After |
+|---|---|---|
+| Earlier Versions with 54 copies of the 4 MB chapter: until the dialog shows (CR32) | 893 ms | 67 ms, details filled in over the next 0.9 s |
+| The same with 8 drawings (825 KB) | 557 ms | 46 ms |
+| A chapter of 500 items: text views re-measured by Enter, Tab or undo (CR33) | about 500 | 0–3 |
+| Ctrl+Space in a book of 30 chapters: each key typed while the popup is open (CR34) | 2.8 ms | 0.09 ms |
+| Opening the chapter with three 1 MB pictures, blocked (CR35) | 243 ms | 218 ms |
+| Joining a paste of 5,000 lines (CR36) | 16.8 s | 98 ms |
+| Counting the words of a 100,000-word text (CR36) | 1.4 s | 75 ms |
+| Chapter rows freed after the chapter list is rebuilt (CR18) | 0 of 2 | 2 of 2 |
+
+The 500-item chapter settles in the same 320 ms either way on the test display, whose
+frame pacing dominates; the saving is CPU.
+
 To fix, in the order R29a, R29c, R29b, R29d, then R29e (R29f and R29g were found later):
 
 | ID | Finding | Fix | Size |

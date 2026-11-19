@@ -8,6 +8,19 @@ from gi.repository import Adw, Gdk, Gio, GLib, GObject, Graphene, Gtk, Pango
 from .. import library
 
 
+
+# A chapter row's drag handlers find the row through their controller when a drag starts.
+# Holding it (or its chapter) made a cycle through GTK, where Python's garbage collector can't
+# see it, and every rebuild of the list left the chapter rows behind (CR18 in CODE_REVIEW.md).
+
+def _drag_prepare(source, _x, _y):
+    return Gdk.ContentProvider.new_for_value(str(source.get_widget()._path))
+
+
+def _drag_begin(source, _drag):
+    source.set_icon(Gtk.WidgetPaintable.new(source.get_widget()), 20, 10)
+
+
 class ChapterSidebar(Adw.Bin):
     __gtype_name__ = "NtzChapterSidebar"
     __gsignals__ = {"open-chapter": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
@@ -124,8 +137,8 @@ class ChapterSidebar(Adw.Bin):
         row._folder = ch.path.parent
         row._path = ch.path
         drag = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
-        drag.connect("prepare", lambda *_: Gdk.ContentProvider.new_for_value(str(ch.path)))
-        drag.connect("drag-begin", lambda src, _d: src.set_icon(Gtk.WidgetPaintable.new(row), 20, 10))
+        drag.connect("prepare", _drag_prepare)
+        drag.connect("drag-begin", _drag_begin)
         row.add_controller(drag)
         return row
 

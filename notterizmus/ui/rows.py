@@ -109,7 +109,12 @@ class _PrefixRow(Gtk.Box):
         self.append(self.prefix)
 
     def set_prefix(self, segs):
-        self.prefix.set_markup(_prefix_markup(segs))
+        """Show the prefix; True if it changed (OutlineEditor.refresh re-measures those rows)."""
+        markup = _prefix_markup(segs)
+        if markup == self.prefix.get_label():
+            return False
+        self.prefix.set_markup(markup)
+        return True
 
     def views(self):
         return []
@@ -133,13 +138,14 @@ class TextRow(_PrefixRow):
         level) narrows it: tell the view, so that frame already has the re-wrapped height."""
         markup = _prefix_markup(segs)
         if markup == self._markup:
-            return
+            return False
         self._markup = markup
         laid_out = self.view.get_width() > 1
         before = self.prefix.measure(Gtk.Orientation.HORIZONTAL, -1)[1] if laid_out else 0
         self.prefix.set_markup(markup)
         if laid_out:
             self.view.expect_width_change(before - self.prefix.measure(Gtk.Orientation.HORIZONTAL, -1)[1])
+        return True
 
     def _on_changed(self, _v):
         self.node.runs = self.view.get_runs()
@@ -412,6 +418,7 @@ class DrawingRow(_PrefixRow):
         box.append(self.note)
         self.append(box)
         self._key = None
+        self._data = None  # the scene shown: a scene is never changed in place (R29d)
         self.reload()
 
     def _clicked(self, _gesture, n_press, _x, _y):
@@ -423,7 +430,11 @@ class DrawingRow(_PrefixRow):
             self.editor.set_selection([self.node])
 
     def reload(self):
-        key = drawing.preview_key(self.node.data)
+        data = self.node.data
+        if data is self._data:  # the same dict is the same scene, and the same picture
+            return
+        self._data = data
+        key = drawing.preview_key(data)  # once: it was worked out twice per reload (CR35)
         if key == self._key:
             return
         self._key = key
@@ -436,7 +447,7 @@ class DrawingRow(_PrefixRow):
 
     def _show(self):
         try:
-            texture = Gdk.Texture.new_from_filename(str(drawing.preview_path(self.node.data)))
+            texture = Gdk.Texture.new_from_filename(str(drawing.preview_file(self._key)))
         except GLib.Error:
             return False
         preview = _Preview(texture)

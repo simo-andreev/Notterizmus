@@ -29,6 +29,7 @@ import gc
 import json
 import os
 import random
+import shutil
 import struct
 import sys
 import tempfile
@@ -520,6 +521,66 @@ class MeasureDrawings(ui.UITestCase):
             rows.append(self.measure_chapter(name, content, kept))
         RESULTS["chapters"] = rows
 
+    def test_5_a_long_chapter(self):
+        """R15, CR33: a chapter of about 500 items. How long Enter, Tab, Alt+↓ and undo take
+        until the outline has settled, and how many text views each one re-measures."""
+        from notterizmus.guide import b, h
+        from notterizmus.ui.richtext import RichText
+        rnd = random.Random(5)
+        doc = ui.open_chapter([h(words(rnd, 3), *[b(words(rnd, rnd.randint(4, 14))) for _ in range(9)])
+                               for _ in range(50)], title="Long", book=BOOK)
+        ui.settle()
+        counted, real = [0], RichText.queue_resize
+
+        def counting(view):
+            counted[0] += 1
+            return real(view)
+        RichText.queue_resize = counting
+        self.addCleanup(setattr, RichText, "queue_resize", real)
+        ui.focus(doc.root.children[25].children[4])
+        rows = []
+        for name, key, mods in (("Enter", "Return", {}), ("Tab", "Tab", {}), ("Alt+↓", "Down", {"alt": True}),
+                                ("undo", "z", {"ctrl": True}), ("undo", "z", {"ctrl": True})):
+            counted[0] = 0
+            t = time.perf_counter()
+            ui.press(self.ed.cur_view, key, **mods)
+            ui.settle()
+            rows.append({"action": name, "until settled": (time.perf_counter() - t) * 1000,
+                         "views re-measured": counted[0], "views": sum(1 for _ in self.ed.all_views())})
+        RESULTS["a chapter of 500 items"] = rows
+
+    def test_6_completion_in_a_book_of_30_chapters(self):
+        """CR34: how long each key typed into the Ctrl+Space popup takes to refill it, in a
+        book of 30 chapters of about 100 items each."""
+        from notterizmus.guide import b, h
+        from notterizmus.ui.window import notes_root
+        rnd = random.Random(6)
+
+        def content():
+            return [h(words(rnd, 3), *[b(words(rnd, rnd.randint(4, 14))) for _ in range(9)]) for _ in range(10)]
+        book = "Completion book"
+        for i in range(29):
+            Document(Node("root", children=content()), book, 100 + i, f"Other {i}",
+                     notes_root() / book / chapter_filename(100 + i, f"Other {i}")).save()
+        doc = ui.open_chapter(content() + [h("Typing", b(""))], title="Typing", book=book)
+        view = ui.focus(doc.root.children[-1].children[0]).view
+        ui.type_text(view, "re")
+        took, real = [], self.ed._assist_sections
+
+        def timed(v):
+            t = time.perf_counter()
+            out = real(v)
+            took.append(time.perf_counter() - t)
+            return out
+        self.ed._assist_sections = timed
+        self.addCleanup(lambda: self.ed.__dict__.pop("_assist_sections", None))
+        pop = self.ed.show_assist(view)
+        for ch in "plica":
+            ui.press(pop, ch)
+        pop.popdown()
+        ui.settle()
+        RESULTS["Ctrl+Space in a book of 30 chapters"] = [{"popup opens": took[0] * 1000, "each key": stats(took[1:])}]
+
     def measure_chapter(self, name, content, kept):
         win, ed = self.win, self.ed
         path = save_chapter(content, f"Chapter {name}")
@@ -591,7 +652,34 @@ class MeasureDrawings(ui.UITestCase):
         ui.wait_editor()
         r["versions kept (30 days, 2 h a day)"] = kept
         r["their size MB"] = kept * path.stat().st_size / 2 ** 20
+        r.update(self.measure_versions_dialog(path, kept))
         return r
+
+    def measure_versions_dialog(self, path, kept):
+        """Earlier Versions with as many copies as a month of editing keeps: how long until
+        the dialog shows, and until every copy's details are in (CR32)."""
+        win = self.win
+        folder = win._backup_folder()
+        folder.mkdir(parents=True, exist_ok=True)
+        start = datetime(2026, 1, 5, 18, 0)
+        for i in range(kept):
+            shutil.copy2(path, folder / f"{(start + timedelta(hours=i)).strftime(backups._STAMP)}.notz")
+        t = time.perf_counter()
+        win.on_versions()
+        shown = (time.perf_counter() - t) * 1000
+        dlg = win.get_visible_dialog()
+        lb = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.ListBox))
+        rows, child = [], lb.get_first_child()
+        while child is not None:
+            if isinstance(child, ui.Adw.ActionRow):
+                rows.append(child)
+            child = child.get_next_sibling()
+        ui.wait_for(lambda: all(r.get_subtitle() not in ("", "…") for r in rows), "every copy's details", timeout=120)
+        filled = (time.perf_counter() - t) * 1000
+        dlg.force_close()
+        ui.wait_for(lambda: win.get_visible_dialog() is None, "Earlier Versions to close")
+        shutil.rmtree(folder)
+        return {"versions dialog shown": shown, "versions details in": filled}
 
 
 # --- the report ------------------------------------------------------------------------------

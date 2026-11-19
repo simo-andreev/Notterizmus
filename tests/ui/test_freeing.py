@@ -87,3 +87,25 @@ class FreedRowsTest(ui.UITestCase):
         tr.add_row()
         ui.wait_editor()
         w.wait(self)
+
+
+class FreedSidebarRowsTest(ui.UITestCase):
+    def test_the_chapter_list_frees_its_rows_when_it_is_rebuilt(self):
+        """Each rebuild of the chapter list (a chapter switch, folding a book, a changed
+        folder) leaked the chapter rows it showed: their drag handlers held them, the same
+        cycle through GTK the editor's rows had (CR18)."""
+        if not self.win.split.get_show_sidebar():
+            self.win.lookup_action("sidebar").activate(None)
+            self.addCleanup(self.win.lookup_action("sidebar").activate, None)
+        ui.open_chapter([h("One")], title="One", book="Freed list")
+        ui.open_chapter([h("Two")], title="Two", book="Freed list")
+        sidebar = self.win.sidebar
+        sidebar.expanded.add("Freed list")
+        sidebar._rebuild()
+        w = Watch()
+        for i, row in enumerate(r for r in sidebar.rows() if r._path is not None):
+            w.add(f"chapter row {i}", row)
+        self.assertGreaterEqual(len(w.names), 2)
+        row = None  # (no local name may keep the last one)
+        sidebar._rebuild()
+        w.wait(self)

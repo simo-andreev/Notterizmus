@@ -38,8 +38,10 @@ def count_words(texts):
             w = m.group()
             if len(w) < MIN_WORD:
                 continue
-            before = t[:m.start()].rstrip(" \t\u00a0\"'“‘(")
-            if w[:1].isupper() and w[1:].islower() and (not before or before[-1] in ".!?:"):
+            j = m.start()  # back over what may stand between a sentence's end and its first word
+            while j > 0 and t[j - 1] in " \t\u00a0\"'“‘(":  # (not a slice of all before it: CR36)
+                j -= 1
+            if w[:1].isupper() and w[1:].islower() and (j == 0 or t[j - 1] in ".!?:"):
                 w = w.lower()
             c[w] += 1
     return c

@@ -634,40 +634,74 @@ Done 2026-11-19, except the snap (CR30). Each fix has tests that failed before i
 Measure first, on the same machine and chapters, change, and measure again. Record the
 numbers in ROADMAP.md as R29 did.
 
-- [ ] **CR18. Free the sidebar's rows.**
+- [x] **CR18. Free the sidebar's rows.**
   - Fix: the drag handlers find their row through the controller's widget when the event
     comes, without holding `row` or `ch`.
   - Test (UI, `tests/ui/test_freeing.py`): every chapter row is freed after `_rebuild()`,
     and the drag-to-reorder tests still pass.
-- [ ] **CR32. Earlier Versions opens at once.**
+- [x] **CR32. Earlier Versions opens at once.**
   - Fix: show the list at once, and fill in the item counts and "same as now" from an
     idle callback, or from a thread that only reads files and hands its results to the
     main thread.
   - Measure: open time for a 4 MB chapter with 54 copies (0.66 s today before anything
     shows; target under 0.1 s).
   - Test (UI): the subtitles appear (`wait_for`), and Restore still works.
-- [ ] **CR33. Re-measure only what changed.**
+- [x] **CR33. Re-measure only what changed.**
   - Fix: one pending re-measure at a time, only for rows that are new or whose prefix
     width changed.
   - Measure (R15): in a 500-item chapter, time Enter, Tab, Alt+↓ and undo, and count the
     re-measured views.
   - Test: the "nothing jumps" UI tests (`test_layout.py`, `test_window.py`) still pass.
-- [ ] **CR34. Count words once per popup.**
+- [x] **CR34. Count words once per popup.**
   - Fix: count the chapter's and the book's words when the popup opens; while typing,
     only the current word changes.
   - Measure: time per keystroke with a book of 30 chapters.
   - Test: the completion unit tests and the Ctrl+Space UI tests are unchanged.
-- [ ] **CR35. Hash a scene once.**
+- [x] **CR35. Hash a scene once.**
   - Fix: compute the preview key once per `reload()` and pass the path on; cache it per
     scene dict, since scenes are never changed in place (R29d).
   - Measure: `tests/ui/measure_drawings.py` with the chapter of 1 MB pictures.
-- [ ] **CR36. Linear helpers.**
+- [x] **CR36. Linear helpers.**
   - Fix: replace slices in loops with index tracking or precomputed neighbours, and make
     `FindBar._show_current` clear each view once.
   - Measure: micro-benchmarks before and after (a 2,000-item layout, a 5,000-line paste,
     1,000 find matches); the unit tests are unchanged.
 
 Done when the numbers are recorded, with no regression in the R29 drawing measurements.
+
+#### Phase 5 results
+
+Done 2026-11-19. The numbers, before and after, are in ROADMAP.md under "Code review phase
+5 measurements"; `tests/ui/measure_drawings.py` has three new measurements for them
+(Earlier Versions with 54 copies, a chapter of 500 items, Ctrl+Space in a book of 30
+chapters).
+
+- CR18: the chapter list's drag handlers find their row through the controller, so every
+  chapter row is freed after a rebuild (0 of 2 before). UI test in `test_freeing.py`.
+- CR32: Earlier Versions shows its list at once (67 ms instead of 893 ms for 54 copies of
+  the 4 MB chapter) and fills in each copy's details from an idle callback, stopping if
+  the dialog closes. UI test: "…" at first, then the details.
+- CR33: after a refresh, only rows that are new or whose prefix changed are re-measured,
+  with one pending timeout (0–3 views instead of about 500 per Enter, Tab or undo in a
+  500-item chapter). The layout tests ("nothing jumps") pass unchanged.
+- CR34: the chapter's and the book's word counts are taken once per popup (0.09 ms a key
+  instead of 2.8 ms). A first measurement read 2.7 s a key: my mistake in its units, which
+  a profile of one keystroke showed.
+- CR35: a drawing row hashes a scene once, and only when its data is a new dict (opening
+  the chapter with pictures blocks 218 ms instead of 243).
+- CR36: the five helpers are linear. Joining 5,000 pasted lines takes 98 ms instead of
+  16.8 s, and counting 100,000 words 75 ms instead of 1.4 s. The layout of 2,000 items
+  was 6.5 ms either way (other work dominates at that size), and Find's change isn't
+  measured.
+- The full measurement run after the whole phase, against the one before it (the end of
+  phase 4), shows no regression in the R29 drawing measurements: Done brings the drawing
+  back into the chapter in 127–176 ms (134–179 before), opening a chapter with drawings or
+  pictures blocks 191–284 ms (205–289), and typing, undo, autosave and backups are
+  unchanged. The 8-drawing chapter's load read 10 ms instead of 7.7, in `Document.load`,
+  which phase 5 didn't change: noise between runs.
+- Results: unit suite 412 tests pass, with and without PyGObject. UI suite 279 tests on
+  this commit's tree (224 s); with the real Excalidraw (233 s) and in the load check
+  (288 s) on the working tree, which also had the first, test-only changes of phase 6.
 
 ### Phase 6: Test suite (S–M)
 

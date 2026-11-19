@@ -1030,21 +1030,13 @@ class Window(Adw.ApplicationWindow):
                 description="A copy is kept when you open a chapter, and every 10 minutes while you edit it."))
         else:
             lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE, css_classes=["navigation-sidebar"])
-            try:
-                now = Path(self.doc.path).read_bytes()
-            except OSError:
-                now = None
+            rows = []
             for b in found:
-                try:
-                    items = sum(1 for n in Document.load(b.path).root.walk() if n.kind != "root")
-                    subtitle = f"{items} item{'s' if items != 1 else ''}"
-                    if now is not None and b.path.read_bytes() == now:
-                        subtitle += " · same as now"
-                except (OSError, ValueError, KeyError):
-                    subtitle = "can't be read"
-                row = Adw.ActionRow(title=f"{b.when:%H:%M}", subtitle=subtitle, tooltip_text=_when(b.when))
+                row = Adw.ActionRow(title=f"{b.when:%H:%M}", subtitle="…", tooltip_text=_when(b.when))
                 row._backup = b
                 lb.append(row)
+                rows.append(row)
+            self._fill_versions(dlg, rows)
 
             def day_header(row, before):
                 # a heading above the first copy of each day: Today, Yesterday, 2026-11-02
@@ -1089,6 +1081,27 @@ class Window(Adw.ApplicationWindow):
             lb.connect("row-activated", lambda *_: do_restore())
         dlg.set_child(tv)
         dlg.present(self)
+
+    def _fill_versions(self, dlg, rows):
+        """Each copy's item count, and whether it is the chapter as it is now, a row at a time
+        once Earlier Versions shows: read before it, 54 copies of a 4 MB chapter kept it from
+        showing for 0.9 s (CR32 in CODE_REVIEW.md)."""
+        try:
+            now = Path(self.doc.path).read_bytes()
+        except OSError:
+            now = None
+        pending = iter(rows)
+        open_ = [True]
+        dlg.connect("closed", lambda *_: open_.__setitem__(0, False))
+
+        def next_row():
+            row = next(pending, None) if open_[0] else None
+            if row is None:
+                return GLib.SOURCE_REMOVE
+            row.set_subtitle(_copy_summary(row._backup.path, now))
+            return GLib.SOURCE_CONTINUE
+
+        GLib.idle_add(next_row)
 
     def restore_version(self, path):
         """Put an earlier version's content in the editor; Ctrl+Z takes it back."""
@@ -1256,6 +1269,16 @@ def _day(day):
     if day == date.today() - timedelta(days=1):
         return "Yesterday"
     return f"{day:%Y-%m-%d}"
+
+
+def _copy_summary(path, now):
+    """'12 items', '12 items · same as now' (now: the chapter file's bytes) or "can't be read"."""
+    try:
+        data = Path(path).read_bytes()
+        items = sum(1 for n in Document.from_json(json.loads(data)).root.walk() if n.kind != "root")
+    except (OSError, ValueError, RecursionError):
+        return "can't be read"
+    return f"{items} item{'s' if items != 1 else ''}" + (" · same as now" if data == now else "")
 
 
 def _when(dt):

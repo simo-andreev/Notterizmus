@@ -73,15 +73,22 @@ class ClipboardMixin:
             return
         ids = {n.id for n in nodes}
         lines = layout(self.doc.root, self.rules)
+        # The item on the line before and after each line, found in two passes rather than by
+        # looking back and ahead from every spacer line (CR36).
+        before, after, last = [], [None] * len(lines), None
+        for ln in lines:
+            before.append(last)
+            last = ln.node if ln.node is not None else last
+        last = None
+        for i in range(len(lines) - 1, -1, -1):
+            after[i] = last
+            last = lines[i].node if lines[i].node is not None else last
         keep = []
         for i, ln in enumerate(lines):
             if ln.node is not None:
                 if ln.node.id in ids:
                     keep.append(ln)
-                continue
-            before = next((l.node for l in reversed(lines[:i]) if l.node is not None), None)
-            after = next((l.node for l in lines[i + 1:] if l.node is not None), None)
-            if before is not None and after is not None and before.id in ids and after.id in ids:
+            elif before[i] is not None and after[i] is not None and before[i].id in ids and after[i].id in ids:
                 keep.append(ln)
         data = json.dumps({"nodes": selected_json(nodes)}, ensure_ascii=False)
         self._set_clipboard([(NODES_MIME, data), *export_formats(keep, self.rules)])

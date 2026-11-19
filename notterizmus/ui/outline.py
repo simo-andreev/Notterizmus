@@ -63,6 +63,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         self.sel = []
         self.sel_anchor = self.sel_head = None
         self._drawing_win = None  # the drawing window it opened last (drawing_window())
+        self._remeasure, self._remeasure_src = [], None  # rows to re-measure soon (refresh)
         self._wstack = []
         self._setup_drag_select()
         # history
@@ -82,6 +83,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         self._assist_pop = None
         self.spell_menu = None  # set by the window (language list)
         self._book_words = BookWords()
+        self._assist_counts = None  # the open popup's word counts (outline_assist)
         self._setup_actions()
 
     # -- actions --------------------------------------------------------------------
@@ -151,6 +153,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
             row = cls(self, node)
             self.rows[node.id] = row
             self.size_new_views(row.views())
+            self._remeasure.append(row)
         return row
 
     def size_new_views(self, views):
@@ -194,7 +197,8 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         for ln in layout(self.doc.root, self.rules):
             if ln.kind in ("item", "table", "drawing", "unknown"):
                 row = self._row(ln.node)
-                row.set_prefix(ln.prefix)
+                if row.set_prefix(ln.prefix):
+                    self._remeasure.append(row)
                 for k in ("heading", "bullet"):
                     (row.add_css_class if ln.node.kind == k else row.remove_css_class)(f"kind-{k}")
                 live.add(ln.node.id)
@@ -236,14 +240,28 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
         self.sel = [n for n in self.sel if n.id in live]
         self._apply_sel_css()
         # New text views measure their height before they know their width (so a long
-        # line wraps as if very narrow) and GTK doesn't re-measure them by itself.
-        GLib.timeout_add(20, self._requeue_views)
+        # line wraps as if very narrow) and GTK doesn't re-measure them by itself. Only
+        # those, and rows whose prefix changed, and one pending timeout for any number of
+        # refreshes: every view of the chapter, once per refresh, cost a 500-item chapter
+        # 500 re-measures for each Enter or Tab, more with key repeat (CR33).
+        if self._remeasure and self._remeasure_src is None:
+            self._remeasure_src = GLib.timeout_add(20, self._remeasure_rows)
         if focus is not None:
             self.current = focus
             self._focus_hint = (focus.id, offset)
             GLib.idle_add(self._focus_node, focus, offset)
 
+    def _remeasure_rows(self):
+        self._remeasure_src = None
+        rows, self._remeasure = self._remeasure, []
+        for row in rows:
+            if self.rows.get(row.node.id) is row:  # still shown
+                for v in row.views():
+                    v.queue_resize()
+        return False
+
     def _requeue_views(self):
+        """Re-measure every text view: after the text size changed."""
         for v in self.all_views():
             v.queue_resize()
         return False
