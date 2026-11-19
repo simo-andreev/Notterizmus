@@ -3,15 +3,20 @@
 <head>
 <meta charset="utf-8">
 <!-- Nothing here may reach the network: the page is served from the app's own files. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Drawing</title>
 <link rel="stylesheet" href="main.css">
 <style>
   html, body, #root { height: 100%; margin: 0; }
   body { overflow: hidden; }
   /* Excalidraw's shape library keeps its items in the browser's storage, which this page
-     doesn't have: without this it would forget them each time. */
+     doesn't have: without this it would forget them each time. (A class of Excalidraw's,
+     not a test id: tests/ui/test_drawings.py checks that it still hides the library.) */
   .default-sidebar-trigger { display: none !important; }
+  /* In "More tools", Mermaid to Excalidraw needs a library this page leaves out
+     (mermaid-stub.js), and Web Embed shows web pages, which this page may not load (CR29).
+     Excalidraw gives both this test id. */
+  [data-testid="toolbar-embeddable"] { display: none !important; }
 </style>
 </head>
 <body>

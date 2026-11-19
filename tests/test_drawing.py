@@ -413,8 +413,20 @@ class BundleTest(unittest.TestCase):
     def test_the_page_may_not_reach_the_network(self):
         page = (self.WEB / "index.html").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy", page)
-        self.assertIn("default-src 'self' data: blob:", page)
-        self.assertNotIn("http", page.split("Content-Security-Policy", 1)[1].split(">", 1)[0])
+        csp = page.split("Content-Security-Policy", 1)[1].split(">", 1)[0]
+        self.assertNotIn("http", csp)
+        self.assertEqual(page, (self.WEB.parents[1] / "web" / "drawing" / "index.html").read_text(encoding="utf-8"),
+                         "the shipped page is the source's")
+
+    def test_the_page_may_not_frame_post_or_embed_anything(self):
+        """default-src 'self' data: blob: also let frames and connections use data: and blob:
+        (CR31)."""
+        page = (self.WEB / "index.html").read_text(encoding="utf-8")
+        csp = page.split('content="', 1)[1].split('"', 1)[0]
+        rules = dict((part.split()[0], part.split()[1:]) for part in csp.split(";") if part.strip())
+        self.assertEqual(rules["default-src"], ["'self'"])
+        for directive in ("frame-src", "object-src", "base-uri", "form-action"):
+            self.assertEqual(rules.get(directive), ["'none'"], directive)
 
 
 if __name__ == "__main__":

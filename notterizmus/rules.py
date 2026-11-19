@@ -140,6 +140,19 @@ def _problem(data):
     levels = data["numbering"]["levels"]
     if not levels or not all(isinstance(name, str) for name in levels):
         return "numbering.levels must name at least one format"
+    unknown = [name for name in levels if name not in FORMATS]
+    if unknown:  # (it used to become Arabic numbers silently: CR23)
+        return f'numbering.levels: "{unknown[0]}" isn\'t a format; the formats are {", ".join(FORMATS)}'
+    numbered, seen = data["heading"]["trigger"], {}
+    for name, spec in data["markers"].items():
+        trigger = spec.get("trigger", "")
+        if not trigger:
+            continue
+        if trigger == numbered:
+            return f'markers.{name}.trigger "{trigger}" is the numbered item\'s (heading.trigger)'
+        if trigger in seen:
+            return f'markers.{seen[trigger]} and markers.{name} have the same trigger "{trigger}"'
+        seen[trigger] = name
     return None
 
 

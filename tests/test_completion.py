@@ -202,6 +202,14 @@ class DictionaryWordsTest(unittest.TestCase):
         self.dictionary("xx_XX", ["ab", "x1y", "3rd", "word/A", "word/B", "", "o'clock"])
         self.assertEqual([w for _k, w in dictionary_words("xx_XX")], ["o'clock", "word"])
 
+    def test_an_aff_file_naming_no_or_an_unknown_encoding_is_skipped_safely(self):
+        """A bare SET raised IndexError, and an encoding Python doesn't know LookupError
+        (CR27)."""
+        self.dictionary("xx_XX", ["word"], aff="SET \n")
+        self.assertEqual([w for _k, w in dictionary_words("xx_XX")], ["word"], "taken as UTF-8")
+        self.dictionary("yy_YY", ["word"], aff="SET no-such-encoding-9\n")
+        self.assertEqual(dictionary_words("yy_YY"), [])
+
     def test_the_encoding_comes_from_the_aff_file(self):
         self.dictionary("bg_XX", ["котка/AB", "куче", "Кирил/X"], encoding="cp1251",
                         aff="# Bulgarian\nSET microsoft-cp1251\nTRY abc\n")

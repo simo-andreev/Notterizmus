@@ -24,6 +24,13 @@ class ReleaseTest(unittest.TestCase):
                        if l.startswith("## "))
         self.assertTrue(heading.startswith(f"## {VERSION} "), heading)
 
+    def test_the_package_recommends_dictionaries_for_both_languages(self):
+        """Bulgarian is one of the app's two languages (CR30)."""
+        control = (ROOT / "debian" / "control").read_text(encoding="utf-8")
+        recommends = control.split("Recommends:", 1)[1].split("\nDescription:", 1)[0]
+        self.assertIn("hunspell-en-us", recommends)
+        self.assertIn("hunspell-bg", recommends)
+
     def test_man_page(self):
         th = (ROOT / "debian" / "notterizmus.1").read_text(encoding="utf-8").splitlines()[0]
         self.assertIn(f'"notterizmus {VERSION}"', th)

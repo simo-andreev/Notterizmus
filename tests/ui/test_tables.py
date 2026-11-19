@@ -1,4 +1,6 @@
 """Tables: moving between cells, adding and removing rows and columns, the header row."""
+import json
+
 from notterizmus.export import to_html
 from notterizmus.guide import b, h, table
 from notterizmus.layout import layout
@@ -101,6 +103,24 @@ class TableTest(ui.UITestCase):
         self.click("− Row")
         self.assertEqual(cells(self.table), [["a", "b"], ["c", "d"]])
         self.assertEqual(len(self.row.cells), 4)
+
+    def test_a_column_of_a_table_that_was_ragged_in_the_file_can_be_deleted(self):
+        """A table whose rows have different lengths (a hand-edited file, a newer version)
+        made Delete Column raise and Tab skip cells (CR47)."""
+        path = self.win.notes_root_path() / "Ragged tables" / "01 Ragged.notz"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rows = [[[{"t": "a"}], [{"t": "b"}], [{"t": "c"}]], [[{"t": "d"}]]]
+        path.write_text(json.dumps({"book": "Ragged tables", "chapter": {"number": 1, "title": "Ragged"},
+                                    "content": [{"kind": "heading", "id": "h", "runs": [{"t": "Intro"}], "children": [
+                                        {"kind": "table", "id": "t", "data": {"rows": rows}}]}]}), encoding="utf-8")
+        self.win.open_path(path)
+        ui.settle()
+        self.table = self.current_table()
+        self.row = ui.row(self.table)
+        self.assertEqual(cells(self.table), [["a", "b", "c"], ["d", "", ""]], "read square")
+        self.at(0, 2)
+        self.click("− Column")
+        self.assertEqual(cells(self.table), [["a", "b"], ["d", ""]])
 
     def test_the_last_row_and_column_cannot_be_removed(self):
         self.chapter(rows=(("only",),))

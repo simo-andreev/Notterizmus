@@ -14,8 +14,18 @@ from html.parser import HTMLParser
 from .model import Node, Run, normalize_runs, runs_text
 
 _ROMAN = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫⅬⅭⅮⅯⅰⅱⅲⅳⅴⅵⅶⅷⅸⅹⅺⅻⅼⅽⅾⅿ"
-_PART = rf"(?:[{_ROMAN}]+|\d+|[A-Za-z]{{1,4}})"
-LABEL_RE = re.compile(rf"({_PART}(?:\.{_PART})*)\)(?:[ \t ]+|$)")
+_LATIN_ROMAN = (r"(?=[IVXLCDMivxlcdm])(?:M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})"
+                r"|m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))")
+_CYRILLIC = "а-яА-ЯёЁ"
+_END = r"\)(?:[ \t ]+|$)"  # the bracket, then spaces (no-break ones too) or the end
+# A part of a dotted label ("Ⅱ.1.ab)"): the dots make it one, letters and all.
+_PART = rf"(?:[{_ROMAN}]+|\d+|[A-Za-z]{{1,4}}|[{_CYRILLIC}])"
+# A label of one part is a number, a roman numeral or a single letter, never a word:
+# any one to four letters made "Yes) that is right" a numbered item (CR24 in CODE_REVIEW.md).
+_ONE = rf"(?:[{_ROMAN}]+|\d+|{_LATIN_ROMAN}|[A-Za-z{_CYRILLIC}])"
+LABEL_RE = re.compile(rf"({_PART}(?:\.{_PART})+|{_ONE}){_END}")
+# ... unless the rules number the top level with letters: then "aa)" is the 27th item.
+_LETTERS_RE = re.compile(rf"([A-Za-z]{{1,4}}){_END}")
 PREFIX_RE = re.compile(r"[ \t │├└┃┣┗┠┖╎┆|]*")
 EXTRA_MARKERS = {"*": "dot", "·": "dot", "▪": "dot", "◦": "dot", "‣": "dot", "–": "minus", "—": "minus"}
 
@@ -205,6 +215,7 @@ def _marker_map(rules):
 def parse(items, rules):
     """Returns a list of root nodes, or None when nothing looks structured."""
     markers = sorted(_marker_map(rules).items(), key=lambda kv: -len(kv[0]))
+    letters = rules["numbering"]["levels"][0] in ("alpha_lower", "alpha_upper")
     parsed = []
     for it in items:
         if it[0] in ("table", "drawing"):
@@ -216,7 +227,7 @@ def parse(items, rules):
         rest = text[pre:]
         if not rest.strip():
             continue  # blank or connector-only spacer line
-        lm = LABEL_RE.match(rest)
+        lm = LABEL_RE.match(rest) or (letters and _LETTERS_RE.match(rest))
         if lm:
             depth = lm.group(1).count(".") + 1
             parsed.append(("heading", depth, strip_runs(drop_chars(runs, pre + lm.end()))))

@@ -177,6 +177,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
 | `notterizmus/gpu.py` | Drawing with the GPU on NVIDIA's driver: what WebKit and GTK are told before they start |
 | `notterizmus/files.py` | Writing a file in one step: on the disk before it replaces the old one, with its permissions kept |
+| `notterizmus/state.py` | What the window remembers between runs (`state.json`); a broken file can't stop the app |
 | `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
 | `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |
 | `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | Search Commands: matching, and the list of commands |

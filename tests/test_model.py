@@ -106,6 +106,14 @@ class TreeTest(unittest.TestCase):
         self.assertEqual([is_text(Node(k)) for k in ("heading", "bullet", "table", "drawing", "root")],
                          [True, True, False, False, False])
 
+    def test_a_table_with_rows_of_different_lengths_is_read_square(self):
+        """A table from a hand-edited file or a newer version with ragged rows made Delete
+        Column raise and Tab skip cells (CR47)."""
+        d = {"kind": "table", "id": "t", "data": {"rows": [[[{"t": "a"}], [{"t": "b"}]], [[{"t": "c"}]], []]}}
+        rows = Node.from_json(d).data["rows"]
+        self.assertEqual([len(r) for r in rows], [2, 2, 2])
+        self.assertEqual([[runs_text(c) for c in r] for r in rows], [["a", "b"], ["c", ""], ["", ""]])
+
     def test_new_table_cells_are_separate_lists(self):
         data = new_table_data(2, 3)
         self.assertEqual((data["header"], len(data["rows"]), [len(r) for r in data["rows"]]), (False, 2, [3, 3]))

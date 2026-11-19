@@ -76,7 +76,9 @@ def _new_view():
         security.register_uri_scheme_as_secure(SCHEME)
         security.register_uri_scheme_as_cors_enabled(SCHEME)
     # Ephemeral: the page keeps nothing on disk (the drawing lives in the chapter file).
-    view = WebKit.WebView(web_context=_context, network_session=WebKit.NetworkSession.new_ephemeral())
+    session = WebKit.NetworkSession.new_ephemeral()
+    session.connect("download-started", lambda _session, download: download.cancel())  # it saves nothing (CR31)
+    view = WebKit.WebView(web_context=_context, network_session=session)
     settings = view.get_settings()
     settings.set_javascript_can_access_clipboard(True)
     debug = bool(os.environ.get("NOTTERIZMUS_WEB_DEBUG"))
@@ -93,7 +95,11 @@ def _new_view():
 
 
 def _decide_policy(_view, decision, kind):
-    """The view shows the drawing page and nothing else: links in it go nowhere."""
+    """The view shows the drawing page and nothing else: links in it go nowhere, and
+    nothing is downloaded (CR31)."""
+    if kind == WebKit.PolicyDecisionType.RESPONSE and not decision.is_mime_type_supported():
+        decision.ignore()
+        return True
     if kind in (WebKit.PolicyDecisionType.NAVIGATION_ACTION, WebKit.PolicyDecisionType.NEW_WINDOW_ACTION):
         uri = decision.get_navigation_action().get_request().get_uri() or ""
         if not uri.startswith(f"{SCHEME}://app/"):

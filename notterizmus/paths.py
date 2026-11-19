@@ -75,7 +75,10 @@ def latest_release(app_id, env=None):
     p = metainfo_path(app_id, env)
     if p is None:
         return None, ""
-    rel = ET.parse(p).getroot().find("releases/release")
+    try:
+        rel = ET.parse(p).getroot().find("releases/release")
+    except (ET.ParseError, OSError):  # a broken file: About shows no notes (CR27)
+        return None, ""
     if rel is None:
         return None, ""
     desc = rel.find("description")

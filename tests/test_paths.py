@@ -75,6 +75,12 @@ class MetainfoTest(unittest.TestCase):
         self.assertEqual(metainfo_path("x.y", self.env), self.share / "metainfo" / "x.y.metainfo.xml")
         self.assertEqual(latest_release("x.y", self.env), ("9.9", "<p>One</p><ul><li>a &amp; b</li></ul>"))
 
+    def test_a_metainfo_file_that_is_not_xml_gives_nothing(self):
+        """About raised on it (CR27)."""
+        from notterizmus.paths import latest_release
+        (self.share / "metainfo" / "bad.metainfo.xml").write_text("<component><releases>", encoding="utf-8")
+        self.assertEqual(latest_release("bad", self.env), (None, ""))
+
     def test_a_release_without_notes_and_a_file_without_releases(self):
         from notterizmus.paths import latest_release
         self.write("n", '<release version="2.0"/>')

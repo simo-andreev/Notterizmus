@@ -128,6 +128,25 @@ class LoadTest(unittest.TestCase):
         self.assertIn("such as false", self.load("[numbering]\nbold_label = 1\n").error)
         self.assertIn('such as "."', self.load("[numbering]\nseparator = 1\n").error)
 
+    def test_triggers_that_clash_and_unknown_formats_are_reported(self):
+        """A marker with the numbered item's trigger silently took over numbered items, two
+        markers with one trigger shadowed each other, and an unknown format name silently
+        became Arabic numbers (CR23)."""
+        cases = {
+            '[markers.hash]\nsymbol = "#"\ntrigger = "#"\n': "numbered item",
+            '[markers.star]\nsymbol = "★"\ntrigger = "*"\n': "markers.dot",
+            '[numbering]\nlevels = ["roman_upper", "greek"]\n': "greek",
+        }
+        for text, named in cases.items():
+            with self.subTest(text=text):
+                r = self.load(text)
+                self.assertIsNotNone(r.error)
+                self.assertIn(named, r.error)
+                self.assertEqual(r.data, DEFAULTS)
+        self.assertIn("arabic", self.load('[numbering]\nlevels = ["greek"]\n').error, "the known ones are listed")
+        self.assertIsNone(self.load('[markers.dot]\ntrigger = ""\n[markers.star]\nsymbol = "★"\ntrigger = "*"\n').error,
+                          "a trigger moved from one marker to another is fine")
+
     def test_a_file_with_the_wrong_shape_is_reported_and_the_defaults_apply(self):
         # Each of these used to stop the app from starting, or from drawing a chapter.
         for text in ('[markers]\nstar = "★"\n',            # a marker must be a table

@@ -201,7 +201,7 @@ class TableRow(_PrefixRow):
 
     @property
     def rows(self):
-        return self.node.data.setdefault("rows", [[[]]])
+        return self.node.data["rows"]  # square, from model._table_dec or new_table_data
 
     def views(self):
         return list(self.cells.values())

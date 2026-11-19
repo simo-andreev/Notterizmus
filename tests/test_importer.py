@@ -78,6 +78,22 @@ class LabelsAndMarkersTest(unittest.TestCase):
         self.assertIsNone(parse(text_items("2.1 no bracket\n3.) odd"), Rules()))
         self.assertEqual(pasted("1)x\n- b"), [("dot", "1)x"), ("minus", "b")], "no space: ordinary text")
 
+    def test_a_word_before_a_bracket_is_text_and_a_single_letter_is_a_label(self):
+        """Any one to four Latin letters before ")" were a label: "Yes) that is right" became a
+        numbered item. Cyrillic letters, usual in Bulgarian notes, weren't labels (CR24)."""
+        self.assertEqual(pasted("Yes) that is right\nAlso) this\n- b"),
+                         [("dot", "Yes) that is right"), ("dot", "Also) this"), ("minus", "b")])
+        self.assertEqual(pasted("а) първо\nб) второ"), [("heading", "първо"), ("heading", "второ")])
+        self.assertEqual(pasted("a) one\niv) four\nXII) twelve"),
+                         [("heading", "one"), ("heading", "four"), ("heading", "twelve")])
+        self.assertEqual(pasted("Ⅰ) A\nⅠ.1) B\nⅠ.1.ab) C"), [("heading", "A", ("heading", "B", ("heading", "C")))],
+                         "inside a dotted label, letters stay a part of it (the app's own aa, ab, …)")
+
+    def test_letters_alone_are_a_label_when_the_top_level_is_numbered_with_letters(self):
+        rules = Rules()
+        rules.data["numbering"]["levels"] = ["alpha_lower", "arabic"]
+        self.assertEqual(shape(parse(text_items("aa) one\nab) two"), rules)), [("heading", "one"), ("heading", "two")])
+
     def test_every_bullet_character_is_recognised(self):
         self.assertEqual(pasted("• a\n· b\n▪ c\n◦ d\n‣ e\n* f\n+ g\n- h\n– i\n— j\n! k\n? l"),
                          [("dot", "a"), ("dot", "b"), ("dot", "c"), ("dot", "d"), ("dot", "e"), ("dot", "f"),

@@ -84,9 +84,14 @@ def _table_enc(data):
 
 
 def _table_dec(d):
+    """A table's data as the editor uses it: square. Rows of different lengths (a
+    hand-edited file, a newer version) made Delete Column raise and Tab skip cells
+    (CR47 in CODE_REVIEW.md)."""
+    rows = [[runs_from_json(cell) for cell in row] for row in d.get("rows", [])]
+    width = max((len(row) for row in rows), default=0)
     return {
         "header": bool(d.get("header")),
-        "rows": [[runs_from_json(cell) for cell in row] for row in d.get("rows", [])],
+        "rows": [row + [[] for _ in range(width - len(row))] for row in rows],
     }
 
 

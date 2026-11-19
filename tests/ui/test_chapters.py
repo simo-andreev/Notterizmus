@@ -295,6 +295,17 @@ class ChaptersTest(ui.UITestCase):
         self.assertEqual(Path(self.win.doc.path).name, "10 Ten.notz")
         self.assertEqual(names(hundred.parent), ["10 Ten.notz", "100 Appendix.notz"])
 
+    def test_a_file_that_is_not_on_this_computer_is_reported(self):
+        """App.do_open raised on a file without a local path (CR27)."""
+        toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: toasts.append(msg)
+        try:
+            ui.app().do_open([ui.Gio.File.new_for_uri("x-no-such-scheme://host/01 Intro.notz")], 1, "")
+            self.assertEqual(len(toasts), 1)
+            self.assertIn("isn't on this computer", toasts[0])
+        finally:
+            del self.win.toast
+
     def test_rename_book_renames_the_folder_and_its_chapters(self):
         a, _b = self.book("Old title", ["Ch A", "Ch B"])
         self.book("Taken title", ["Other"])

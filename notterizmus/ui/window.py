@@ -5,7 +5,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from .. import APP_ID, APP_NAME, VERSION, backups, guide, library, paths
+from .. import APP_ID, APP_NAME, VERSION, backups, guide, library, paths, state
 from ..export import to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
@@ -28,21 +28,15 @@ def notes_root():
     return paths.notes_root(glib_documents=GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS))
 
 
-def _state_path():
-    return config_dir() / "state.json"
-
-
 def load_state():
+    return state.load()
+
+
+def save_state(settings):
     try:
-        return json.loads(_state_path().read_text())
-    except (OSError, ValueError):
-        return {}
-
-
-def save_state(st):
-    p = _state_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(st, ensure_ascii=False, indent=1))
+        state.save(settings)
+    except OSError:
+        pass  # not remembered this time; nothing else depends on it
 
 
 class Window(Adw.ApplicationWindow):
@@ -658,8 +652,12 @@ class Window(Adw.ApplicationWindow):
             self.toast(f"{path.name} exists again, so it was left in the Trash")
             return
         if not _restore_from_trash(path):
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)  # no trash access (e.g. inside a sandbox): write it back
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)  # no trash access (e.g. inside a sandbox): write it back
+            except OSError as e:  # (CR27)
+                self.toast(f"Could not put “{path.stem}” back: {e.strerror or e}")
+                return
         if reopen:
             self.open_path(path)
         self._reload_sidebar()
@@ -1120,8 +1118,12 @@ class Window(Adw.ApplicationWindow):
     def on_edit_rules(self, *_):
         p = user_rules_path()
         if not p.exists():
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(RULES_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            try:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(RULES_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            except OSError as e:  # (CR27)
+                self.toast(f"Could not create {p}: {e.strerror or e}")
+                return
         Gtk.FileLauncher.new(Gio.File.new_for_path(str(p))).launch(self, None, None)
         self.toast("Edit, save, then use “Reload Formatting Rules”")
 

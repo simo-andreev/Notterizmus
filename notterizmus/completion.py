@@ -6,6 +6,7 @@ same book (book-specific terms recur), and the Hunspell dictionary's word list.
 from __future__ import annotations
 
 import bisect
+import codecs
 import os
 from collections import Counter
 from pathlib import Path
@@ -92,11 +93,16 @@ def dictionary_words(tag):
         try:
             with open(d / f"{tag}.aff", encoding="latin-1") as aff:
                 for line in aff:
-                    if line.startswith("SET "):
-                        enc = line.split()[1].replace("microsoft-", "")
+                    words_on_line = line.split()
+                    if words_on_line and words_on_line[0] == "SET":
+                        enc = words_on_line[1].replace("microsoft-", "") if len(words_on_line) > 1 else "utf-8"
                         break
         except OSError:
             pass
+        try:
+            codecs.lookup(enc)
+        except LookupError:  # an encoding Python doesn't know: this dictionary is left out (CR27)
+            continue
         seen = set()
         with open(dic, encoding=enc, errors="replace") as f:
             next(f, None)  # entry count

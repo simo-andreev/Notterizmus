@@ -81,7 +81,11 @@ class App(Adw.Application):
                 toasts.add_toast(Adw.Toast(title=f"{files[0].get_basename()} wasn't opened: finish the drawing first",
                                            use_markup=False))
             return
-        self.win.open_path(files[0].get_path())
+        path = files[0].get_path()
+        if path is None:  # not a file on this computer (CR27)
+            self.win.toast(f"{files[0].get_basename() or files[0].get_uri()} isn't on this computer, so it can't be opened")
+            return
+        self.win.open_path(path)
 
     def _snapshot(self, path):
         """Debug helper: render the window content to a PNG and quit."""

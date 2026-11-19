@@ -224,7 +224,7 @@ would replace chapter 10, so to keep those notes, copy them out before then (see
 
 ### Phase 1: Unblock the package build (S)
 
-- [ ] **CR1. Unit tests that need no GTK.**
+- [x] **CR1. Unit tests that need no GTK.**
   - Fix: move `_prefer_gpu`, which is pure environment logic, out of
     `ui/drawing_web.py` into a module without GTK (e.g. `notterizmus/gpu.py`). Call it at
     the top of `ui/app.py`, before `from .window import Window`, so it still runs before
@@ -256,8 +256,10 @@ Done when the clean build passes and the unit run is free of errors and warnings
 
 #### Phase 1 results
 
-Worked on 2026-11-19. Both fixes are in and tested. CR1's box stays open for two checks
-that need things this session didn't have: a real clean build, and your desk.
+Worked on 2026-11-19. Both fixes are in and tested. CR1's last two checks were done later
+the same day, once podman was installed and the screen was unlocked: the clean 26.04 build
+passes (`dh_auto_test`: 400 tests, OK, 38 skipped; no PyGObject in the container), and a
+stroke in the drawing window draws at 61 frames a second (see Phase 4 results).
 
 - CR1: `_prefer_gpu` is now `gpu.prefer_gpu` in `notterizmus/gpu.py`, with no GTK. It is
   called at the top of `ui/app.py`, before GTK loads, and by
@@ -540,29 +542,29 @@ Done 2026-11-19, except the checks at your desk. Each fix has tests that failed 
 
 ### Phase 4: Robustness and configuration (M)
 
-- [ ] **CR22. A state file that can't stop the app.**
+- [x] **CR22. A state file that can't stop the app.**
   - Fix: move `load_state` and `save_state` to a module without GTK. Loading returns the
     defaults for a file that isn't an object, and per key for a value of the wrong type;
     saving is atomic (CR25's helper).
   - Test (unit): `[]`, `{"zoom": "big"}`, `{"last_file": 5}` and truncated JSON all give
     the defaults; a write that fails leaves the old file.
-- [ ] **CR23. A stricter rules check.**
+- [x] **CR23. A stricter rules check.**
   - Fix: `rules._problem` reports a trigger used twice or equal to the numbered-item
     trigger, and unknown `numbering.levels` names (listing the known ones).
   - Test (unit, `tests/test_rules.py`): each case is reported in `.error`, and the
     defaults are used.
-- [ ] **CR24. Paste labels.**
+- [x] **CR24. Paste labels.**
   - Fix: letter labels only as a single letter or a roman numeral (i, iv, xii), plus
     single Cyrillic letters (а), б), в)); longer words before ")" stay text.
   - Test (unit, `tests/test_importer.py`): "Yes) …" and "Also) …" stay text; "а) …" and
     "б) …" are labels; the app's own output and the existing hand-written examples parse
     as before.
-- [ ] **CR27. Error paths that tell the user.**
+- [x] **CR27. Error paths that tell the user.**
   - Fix: guard each path listed in the issue with a toast, or by skipping the faulty item.
   - Test (unit): a malformed metainfo file gives `(None, "")`; an `.aff` file with a bare
     `SET`, or with an unknown encoding, skips that dictionary.
   - Test (UI): `do_open` with a non-local `Gio.File` gives a toast, not an exception.
-- [ ] **CR31. A tighter drawing page.**
+- [x] **CR31. A tighter drawing page.**
   - Fix: a narrower CSP, with scripts and styles as now:
     `default-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`.
     Ignore download responses in `decide-policy`. Keep clipboard access only if
@@ -575,18 +577,54 @@ Done 2026-11-19, except the checks at your desk. Each fix has tests that failed 
     and run it.
   - Verify: `lintian dist/*.deb`; the built package's `Recommends` lists hunspell-bg; the
     snap starts and opens a chapter in Documents.
-- [ ] **CR29. Leftovers in the drawing page.**
+- [x] **CR29. Leftovers in the drawing page.**
   - Check in the running drawing window whether Excalidraw still offers Mermaid or
     text-to-diagram. If it does, hide it through a stable hook (its `data-testid` or an
     Excalidraw option); hide the library the same way.
   - Test (UI, WebKit): the page has no Mermaid entry and no library trigger.
-- [ ] **CR47. Rectangular tables.**
+- [x] **CR47. Rectangular tables.**
   - Fix: square tables when they are read (pad short rows, as `importer._square` does), and
     `TableRow.rows` stops writing on read.
   - Test (unit): a ragged table loads square and keeps its cells' text.
   - Test (UI): delete a column of a table that was ragged in the file.
 
 Done when all tests pass. Then release (suggested 1.6.1 or 1.7.0).
+
+#### Phase 4 results
+
+Done 2026-11-19, except the snap (CR30). Each fix has tests that failed before it.
+
+- CR22: `state.py` (new, no GTK) reads `state.json`: a file that isn't a JSON object counts
+  as empty, and a setting of the wrong kind is left out, so the window's default applies;
+  saving goes through `files.atomic_write`, and a failed save no longer raises.
+- CR23: the rules check reports a marker with the numbered item's trigger, two markers
+  with one trigger, and unknown `numbering.levels` names (listing the known ones). Your
+  own `rules.toml` passes.
+- CR24: a label of one part is a number, a roman numeral or a single letter, Cyrillic
+  ones included, so "Yes) …" stays text; dotted labels keep letter parts ("Ⅱ.1.ab)"), and
+  with letters at the top level so does a single part, so the app's own labels still
+  round-trip.
+- CR27: a file opened from outside this computer, the rules template, Undo's write-back,
+  a moved chapter that can't be read, a broken metainfo file and an `.aff` file with a
+  bare `SET` or an unknown encoding now give a toast or are skipped.
+- CR31: the narrower CSP (no frames, objects, forms; `img-src data: blob:` for pictures),
+  download responses refused and downloads cancelled. Clipboard access stays on until
+  copy and paste in the drawing window have been tried without it. WebKit's console
+  doesn't reach the test log, so the check is a WebKit test in the page itself: a `data:`
+  and a `blob:` picture load, and a frame is refused (it loaded under the old CSP).
+- CR29: More tools offered Mermaid to Excalidraw (it fails on the stub) and Web Embed
+  (web pages the page may not load); both are hidden by their shared `data-testid`. No
+  text-to-diagram entry is shown. The library's button stays hidden by its class, and the
+  WebKit test now catches it if an Excalidraw upgrade brings it back. A synthetic 0 key
+  didn't open the library; a real press is worth a look at your desk.
+- CR47: tables are squared when read; `TableRow.rows` no longer writes on read.
+- CR30: `hunspell-bg` is in Recommends. The snap wasn't built: snapcraft needs LXD or
+  Multipass, which this machine doesn't have.
+- Phase 1's desktop check, done this time: a stroke in the drawing window draws at 61
+  frames a second (59 in the window), the app at 9% CPU, with WebKit's GPU path and GTK's
+  GL renderer, as in R29f.
+- Results: unit suite 412 tests pass, with and without PyGObject. UI suite 277 tests
+  (223 s), all of them with the real Excalidraw (232 s) and in the load check (286 s).
 
 ### Phase 5: Performance and memory (M)
 

@@ -631,6 +631,59 @@ class RealDrawingWindowTest(ui.UITestCase):
             win.close()
             ui.wait_for(lambda: not win.get_visible(), "the drawing window to close")
 
+    def test_the_page_offers_nothing_it_cannot_do(self):
+        """Mermaid to Excalidraw needs a library the page leaves out (mermaid-stub.js), Web
+        Embed shows web pages the page may not load, and the shape library keeps its items in
+        browser storage the page doesn't have (CR29)."""
+        win = self.web.edit(self.win, scene("menus"), lambda _data: None)
+        self.addCleanup(win.destroy)
+        ui.wait_for(lambda: win.done_btn.get_sensitive(), "Excalidraw to start", timeout=60)
+        shown = json.loads(self.page(win, """
+            const visible = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+            const more = document.querySelector(".App-toolbar__extra-tools-trigger");
+            more.click();
+            await new Promise((r) => setTimeout(r, 300));
+            const items = [...document.querySelectorAll(".dropdown-menu-item")].filter(visible)
+                .map((e) => e.textContent.trim());
+            const library = [...document.querySelectorAll("[class*=sidebar-trigger], button, label")]
+                .filter((e) => visible(e) && /library/i.test(e.className + " " + e.textContent)).length;
+            more.click();
+            return JSON.stringify({items, library});"""))
+        self.assertEqual([i for i in shown["items"] if "Mermaid" in i or "Embed" in i], [])
+        self.assertTrue(any(i.startswith("Frame tool") for i in shown["items"]), "the rest of the menu stays")
+        self.assertEqual(shown["library"], 0, "no way into the shape library")
+        win._closing = True
+        win.close()
+
+    def test_the_page_loads_pictures_but_no_frames(self):
+        """The CSP's default-src 'self' data: blob: also let frames and connections use data:
+        and blob: (CR31). Pictures, which Excalidraw shows from data: and blob: addresses,
+        must still load."""
+        win = self.web.edit(self.win, scene("csp"), lambda _data: None)
+        self.addCleanup(win.destroy)
+        ui.wait_for(lambda: win.done_btn.get_sensitive(), "Excalidraw to start", timeout=60)
+        got = json.loads(self.page(win, """
+            const violations = [];
+            document.addEventListener("securitypolicyviolation", (e) => violations.push(e.effectiveDirective));
+            const png = "data:image/png;base64,""" + base64.b64encode(PNG).decode() + """";
+            const image = (src) => new Promise((done) => {
+              const i = new Image();
+              i.onload = () => done(true);
+              i.onerror = () => done(false);
+              i.src = src;
+            });
+            const blob = URL.createObjectURL(await (await fetch(png)).blob());
+            const frame = document.createElement("iframe");
+            frame.src = "data:text/html,<p>embedded</p>";
+            document.body.append(frame);
+            await new Promise((r) => setTimeout(r, 300));
+            frame.remove();
+            return JSON.stringify({data: await image(png), blob: await image(blob), violations});"""))
+        self.assertEqual((got["data"], got["blob"]), (True, True), "pictures load")
+        self.assertIn("frame-src", got["violations"], "a frame doesn't")
+        win._closing = True
+        win.close()
+
     def test_a_preview_is_made_at_twice_the_size_it_is_shown_at(self):
         """Twice the drawing's own size made PNGs of 5000 px and more for large drawings,
         slow to export and to decode (R29b). Both the preview page and Done cap it."""

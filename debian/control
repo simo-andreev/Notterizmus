@@ -15,7 +15,7 @@ Depends: ${misc:Depends},
          gir1.2-adw-1 (>= 1.8),
          gir1.2-webkit-6.0,
          libenchant-2-2
-Recommends: hunspell-en-us | hunspell-dictionary
+Recommends: hunspell-en-us | hunspell-dictionary, hunspell-bg
 Description: outline editor for book chapter notes
  Notterizmus is a GNOME outline editor for taking notes on book chapters.
  Items are numbered automatically (Ⅰ, Ⅰ.1, Ⅰ.1.a) with tree connectors, and
