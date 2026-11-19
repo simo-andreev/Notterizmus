@@ -1,7 +1,7 @@
 # Notterizmus — context for coding agents
 
 ## Purpose
-- GNOME desktop outline editor for book chapter notes; output is pasted into TopCoding's notes editor (`app.topcoding.bg/assignments`). Snapshot: v1.5.0, 2026-11-18.
+- GNOME desktop outline editor for book chapter notes; output is pasted into TopCoding's notes editor (`app.topcoding.bg/assignments`). Snapshot: v1.6.0, 2026-11-19.
 - Plans and their IDs (R1, R2, …, used below and in commit messages) are in ROADMAP.md.
 - Single main user: Ubuntu 26.04 (`resolute`), GNOME 50, Wayland, locale `bg_BG.UTF-8`, notes in English and Bulgarian.
 - Distributed as a Debian package via `ppa:simeonandreev/ppa-library`; GPL-3.0-or-later.

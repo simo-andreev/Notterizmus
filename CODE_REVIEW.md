@@ -106,9 +106,9 @@ progress.
 |---|---|---|---|---|
 | 0 | Baseline and checks of your notes | (none fixed) | S | |
 | 1 | Unblock the package build | CR1, CR42 | S | |
-| 2 | Data safety | CR3, CR4, CR5, CR6, CR10, CR12, CR25, CR26 | M | After phase 2: suggested 1.6.0, which also carries the finished R29f, R29g and R33 |
+| 2 | Data safety | CR3, CR4, CR5, CR6, CR10, CR12, CR25, CR26 | M | 1.6.0 waited for phase 4 |
 | 3 | Broken or surprising behaviour | CR2, CR7, CR8, CR9, CR11, CR13, CR14, CR15, CR16, CR17, CR19, CR20, CR21 | M | |
-| 4 | Robustness and configuration | CR22, CR23, CR24, CR27, CR29, CR30, CR31, CR47 | M | After phase 4: suggested 1.6.1 or 1.7.0 |
+| 4 | Robustness and configuration | CR22, CR23, CR24, CR27, CR29, CR30, CR31, CR47 | M | **Released as 1.6.0** on 2026-11-19, with phases 1–4, R29f, R29g and R33 |
 | 5 | Performance and memory | CR18, CR32, CR33, CR34, CR35, CR36 | M | When convenient |
 | 6 | Test suite | CR50, CR51, CR52 | S–M | When convenient |
 | 7 | Code health, no change in behaviour | CR37, CR38, CR39, CR40, CR41, CR43, CR44, CR45, CR46, CR48, CR49 | L | When convenient |
@@ -625,6 +625,9 @@ Done 2026-11-19, except the snap (CR30). Each fix has tests that failed before i
   GL renderer, as in R29f.
 - Results: unit suite 412 tests pass, with and without PyGObject. UI suite 277 tests
   (223 s), all of them with the real Excalidraw (232 s) and in the load check (286 s).
+- Released as 1.6.0 on 2026-11-19, together with phases 1–3: built in a clean Ubuntu
+  26.04 container (podman, with only the Build-Depends) and then on Launchpad, whose log
+  shows the 412 unit tests ran (38 skipped there). `lintian` shows nothing above pedantic.
 
 ### Phase 5: Performance and memory (M)
 
@@ -731,8 +734,9 @@ verification, plus the checks named.
   test for the header cells in `lexical.to_nodes`, and manual pastes in Chrome and Firefox.
 - [ ] Top-level bullets: are they allowed at all? Phase 3 kept the rule README and the
   guide state (top-level items are always numbered); say if you want bullets there.
-- [ ] The version numbers of the releases, and whether one should follow phase 1 at once:
-  the PPA still serves 1.4.0 (phase 0).
+- [x] The version numbers of the releases, and whether one should follow phase 1 at once:
+  1.6.0 came after phase 4, with phases 1–4 (your call, 2026-11-19). Launchpad built it,
+  so the PPA no longer stops at 1.4.0.
 - [ ] The SDI notes in chapter 10's oldest copy (phase 0): copy them out before
   2026-11-24, or let them go.
 
