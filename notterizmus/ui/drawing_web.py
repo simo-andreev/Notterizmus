@@ -19,6 +19,7 @@ import gi
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import drawing
+from .helpers import run_once
 
 try:
     gi.require_version("WebKit", "6.0")
@@ -229,7 +230,7 @@ def render(data, done):
     """Make the preview PNG of a drawing and put it in the cache; done(png bytes or None)
     is called later, from the main loop."""
     if not available() or drawing.is_empty(data):
-        GLib.idle_add(lambda: (done(None), False)[1])
+        GLib.idle_add(run_once, done, None)
         return
     _renderer.render(data, done)
 

@@ -6,6 +6,7 @@ import time
 from gi.repository import Gdk, Gio, GLib, Graphene, Gtk
 
 from ..model import enclosing_heading, heading_numbers, is_text
+from .helpers import run_once
 from .richtext import SPELL
 from .rows import TextRow, _mods
 
@@ -206,10 +207,10 @@ class MenusMixin:
             if ok and pt.y > self.get_height() * 0.5:
                 pos = Gtk.PositionType.TOP
         pop.set_position(pos)
-        pop.connect("closed", lambda p: GLib.idle_add(lambda: (p.unparent(), False)[1]))
+        pop.connect("closed", lambda p: GLib.idle_add(run_once, p.unparent))
         pop.popup()
         if first:
-            GLib.idle_add(lambda: (first[0].grab_focus(), False)[1])
+            GLib.idle_add(run_once, first[0].grab_focus)
         return pop
 
     def show_add_menu(self, row, view):

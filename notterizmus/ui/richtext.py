@@ -203,7 +203,10 @@ class RichText(Gtk.TextView):
                     all_on = False
                     break
                 it.forward_char()
-            (buf.remove_tag if all_on else buf.apply_tag)(tag, s, e)
+            if all_on:
+                buf.remove_tag(tag, s, e)
+            else:
+                buf.apply_tag(tag, s, e)
         else:
             cur = dict(self._pending or self._typing_format(self.cursor_iter()))
             cur[name] = not cur[name]

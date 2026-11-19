@@ -6,6 +6,7 @@ from gi.repository import Gdk, GLib, Graphene, Gtk
 from ..completion import complete, count_words, dictionary_words, node_texts
 from ..model import Run
 from ..spell import should_check
+from .helpers import run_once
 from .richtext import SPELL
 from .rows import _mods
 from .outline_menus import _digit, _number_rows
@@ -152,7 +153,11 @@ class AssistMixin:
                 return
             pop.popdown()
             cb = row._cb
-            GLib.idle_add(lambda: (cb(), view.grab_focus(), False)[2])
+
+            def run():
+                cb()
+                view.grab_focus()
+            GLib.idle_add(run_once, run)
 
         lb.connect("row-activated", lambda _lb, row: pick(row))
 
@@ -199,14 +204,14 @@ class AssistMixin:
         def closed(p):
             self._assist_pop = None
             view.grab_focus()
-            GLib.idle_add(lambda: (p.unparent(), False)[1])
+            GLib.idle_add(run_once, p.unparent)
 
         pop.connect("closed", closed)
         self._assist_counts = None  # counted afresh for this popup
         first, _ = fill()
         pop.popup()
         if first is not None:
-            GLib.idle_add(lambda: (first.grab_focus(), False)[1])
+            GLib.idle_add(run_once, first.grab_focus)
         return pop
 
     def _assist_type(self, view, ch, pop):

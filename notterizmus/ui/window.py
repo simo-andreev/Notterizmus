@@ -14,6 +14,7 @@ from ..rules import Rules, user_rules_path
 from ..spell import Speller, guess_language
 from . import command_search
 from .findbar import FindBar
+from .helpers import run_once
 from .outline import OutlineEditor
 from .outline_clipboard import export_formats
 from .sidebar import ChapterSidebar
@@ -246,7 +247,7 @@ class Window(Adw.ApplicationWindow):
         self.set_zoom(self.state.get("zoom", 100), save=False, announce=False)
         self.connect("close-request", self._on_close)
         if self.rules.error:
-            GLib.idle_add(lambda: (self.toast("Rules file error — using defaults"), False)[1])
+            GLib.idle_add(run_once, self.toast, "Rules file error — using defaults")
 
         last = self.state.get("last_file")
         if last and Path(last).exists():
@@ -527,7 +528,7 @@ class Window(Adw.ApplicationWindow):
 
         dlg.connect("response", on_resp)
         dlg.present(self)
-        GLib.idle_add(lambda: (title.grab_focus(), False)[1])
+        GLib.idle_add(run_once, title.grab_focus)
 
     def apply_chapter_props(self, path, folder, number, title):
         self._flush_save()
@@ -567,7 +568,7 @@ class Window(Adw.ApplicationWindow):
         dlg.connect("response", lambda _d, resp: resp == "apply" and self.apply_book_rename(
             folder, entry.get_text().strip()))
         dlg.present(self)
-        GLib.idle_add(lambda: (entry.grab_focus(), False)[1])
+        GLib.idle_add(run_once, entry.grab_focus)
 
     def apply_book_rename(self, folder, name):
         self._flush_save()
@@ -911,7 +912,7 @@ class Window(Adw.ApplicationWindow):
 
         dlg.connect("response", on_resp)
         dlg.present(self)
-        GLib.idle_add(lambda: ((title if book.get_text() else book).grab_focus(), False)[1])
+        GLib.idle_add(run_once, lambda: (title if book.get_text() else book).grab_focus())
 
     def on_open(self, *_):
         fd = Gtk.FileDialog(title="Open Chapter")
@@ -1007,7 +1008,7 @@ class Window(Adw.ApplicationWindow):
         dlg = command_search.CommandSearch(command_search.build(self), before_run=restore)
         self._command_search = dlg
         dlg.present(self)
-        GLib.idle_add(lambda: (dlg.entry.grab_focus(), False)[1])
+        GLib.idle_add(run_once, dlg.entry.grab_focus)
 
     def on_versions(self, *_):
         """Earlier Versions: pick a kept copy of this chapter, preview it, restore it."""

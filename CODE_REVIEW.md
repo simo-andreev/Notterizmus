@@ -801,7 +801,7 @@ verification, plus the checks named.
   local imports. Free the Enchant dictionaries on shutdown, or drop the declaration. A
   pyflakes pass (`sudo apt install pyflakes3`, a development tool only) reports nothing
   new.
-- [ ] **CR48.** Small helpers (`run_once(fn, *args)` returning `GLib.SOURCE_REMOVE`,
+- [x] **CR48.** Small helpers (`run_once(fn, *args)` returning `GLib.SOURCE_REMOVE`,
   `set_class(widget, name, on)`) instead of tuple-index lambdas and conditional method
   calls.
 - [ ] **CR44.** Tests find dialogs through `get_visible_dialog()` and the widget tree;
@@ -849,6 +849,18 @@ verification, plus the checks named.
   `test_layout`), now removed; it still lists `Adw` and `Pango` in `tests/ui/support.py`,
   which re-exports them on purpose (`noqa: F401`). Unit suite 418 tests, with and without
   PyGObject; UI suite 279 tests in 171 s.
+- CR48: `notterizmus/ui/helpers.py` has `run_once(fn, *args)`, which calls `fn` and
+  returns `GLib.SOURCE_REMOVE`, and `set_class(widget, name, on)`. All 13 tuple-index
+  lambdas in the app (the review counted 12) are gone: `GLib.idle_add(run_once,
+  entry.grab_focus)` and the like in `window.py`, `outline_menus.py`, `outline_assist.py`,
+  `rows.py` and `drawing_web.py`. New Chapter's focus keeps a lambda inside `run_once`, so
+  it still picks the field when the idle runs, and the assist popup's pick is a small
+  named function, since it makes two calls. The three CSS-class toggles use `set_class`,
+  and the bold/italic toggle in `richtext.py` is an `if`. Left as they are:
+  `(indent if … else outdent)(n)` in `outline_selection.py`, which picks a function, not a
+  method of one object, and a `wait_for` condition in `tests/ui/test_drawings.py`.
+  Unit suite 418 tests, with and without PyGObject; UI suite 279 tests in 171 s, and
+  180 s with the real Excalidraw.
 
 ### With you
 

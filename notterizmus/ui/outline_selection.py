@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from gi.repository import Gdk, Graphene, Gtk
 
 from ..model import indent, normalize_runs, outdent
+from .helpers import set_class
 from .rows import TableRow, TextRow
 
 DRAG_EDGE = 30        # px from the top or bottom of the outline where a drag scrolls it
@@ -57,7 +58,7 @@ class SelectionMixin:
     def _apply_sel_css(self):
         ids = self._sel_ids()
         for nid, row in self.rows.items():
-            (row.add_css_class if nid in ids else row.remove_css_class)("node-selected")
+            set_class(row, "node-selected", nid in ids)
 
     def set_selection(self, nodes):
         self.sel = list(dict.fromkeys(nodes))

@@ -15,6 +15,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Graphene, Gtk
 from ..completion import BookWords
 from ..layout import layout
 from ..model import Node, editable_order, is_text, set_kind
+from .helpers import set_class
 from .rows import TextRow, _prefix_markup, row_type
 from .outline_undo import UndoMixin
 from .outline_keys import KeysMixin
@@ -200,7 +201,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
                 if row.set_prefix(ln.prefix):
                     self._remeasure.append(row)
                 for k in ("heading", "bullet"):
-                    (row.add_css_class if ln.node.kind == k else row.remove_css_class)(f"kind-{k}")
+                    set_class(row, f"kind-{k}", ln.node.kind == k)
                 live.add(ln.node.id)
                 wanted.append(row)
             else:
@@ -213,7 +214,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
                     self._labels.append(lbl)
                 nlabels += 1
                 for k in ("spacer", "blank"):
-                    (lbl.add_css_class if ln.kind == k else lbl.remove_css_class)(k)
+                    set_class(lbl, k, ln.kind == k)
                 markup = _prefix_markup(ln.prefix) or " "
                 if lbl._markup != markup:
                     lbl.set_markup(markup)

@@ -7,6 +7,7 @@ from gi.repository import Gdk, GLib, GObject, Gtk
 
 from .. import drawing
 from . import drawing_web
+from .helpers import run_once
 from .richtext import RichText
 
 
@@ -131,7 +132,7 @@ class TextRow(_PrefixRow):
         wire_view(editor, self.view)
         self.append(self.view)
         self._markup = None
-        self.connect("map", lambda r: GLib.timeout_add(20, lambda: (r.view.queue_resize(), False)[1]))
+        self.connect("map", lambda r: GLib.timeout_add(20, run_once, r.view.queue_resize))
 
     def set_prefix(self, segs):
         """The text takes the row's width beside the prefix, so a wider prefix (Tab adds a
