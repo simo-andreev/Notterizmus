@@ -816,7 +816,7 @@ verification, plus the checks named.
 - [x] **CR39.** Kind changes and table edits happen inside `with self._op():`; the
   attributes the mixins share are listed at the top of `outline.py`. UI tests: each is one
   undo step.
-- [ ] **CR46.** One context manager for programmatic buffer changes instead of three flags
+- [x] **CR46.** One context manager for programmatic buffer changes instead of three flags
   (together with CR9).
 - [ ] **CR49.** An `AssistPopover` class, a menu-list builder and a `VersionsDialog` class
   out of the long functions.
@@ -913,6 +913,18 @@ verification, plus the checks named.
   nothing, so after clicking item B and changing its type, Ctrl+Z restores the type and
   puts the cursor back on item A, where the last typing was. Many editors put it on the
   change; say if you want that.
+- CR46: `RichText`'s three flags (`_loading`, `_raw`, `_inserting`) are one list of the
+  reasons the buffer is changing other than by the user, `_quiet`, and our own changes go
+  through one context manager, `_quietly(reason)`: `set_runs` as "load", `insert_runs`
+  and `replace_range` as "raw". "insert" spans GTK's insert-text and our handler after
+  it, which now only formats what was typed (`_format_typed`) and always takes "insert"
+  off again. The flags didn't quiet the same handlers, so one boolean would have changed
+  behaviour: each handler names the reasons it ignores, and they are the same as before
+  (a paste's own cursor moves still drop a pending Ctrl+B/I, a load's don't). New: a
+  change that raises no longer leaves its flag on, which used to make the view stop
+  reporting edits. CR9 (R32) was fixed in phase 3 by `_pending_at`; this keeps it.
+  Unit suite 418 tests, with and without PyGObject; UI suite 282 tests in 173 s, and the
+  load check in 236 s.
 
 ### With you
 

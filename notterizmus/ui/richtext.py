@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import weakref
+from contextlib import contextmanager
 
 from gi.repository import Gdk, GLib, GObject, Graphene, Gtk, Pango
 
@@ -53,9 +54,11 @@ class RichText(Gtk.TextView):
         self.tag_found_current = buf.create_tag("found-current", background_rgba=current)
         self._pending = None  # {"bold":..,"italic":..} after Ctrl+B/I with no selection
         self._pending_at = None  # ... at this offset: moving the cursor elsewhere drops it
-        self._loading = False
-        self._inserting = False
-        self._raw = False
+        # Why the buffer is changing other than by the user, innermost last: "load"
+        # (set_runs), "raw" (insert_runs, replace_range: already formatted, reported once at
+        # the end) or "insert" (between GTK's insert-text and our handler after it, which
+        # formats what was typed). Each handler below names the reasons it ignores (CR46).
+        self._quiet = []
         self._spell_src = None
         self.carets = []  # extra (multi-cursor) carets: GtkTextMarks
         self.last_edit = None  # ("ins"|"del", text, start offset) for undo grouping
@@ -74,12 +77,20 @@ class RichText(Gtk.TextView):
 
     def set_runs(self, runs):
         buf = self.get_buffer()
-        self._loading = True
-        buf.set_text("")
-        for r in runs:
-            buf.insert_with_tags(buf.get_end_iter(), r.text, *self._tags_for(r.bold, r.italic))
-        self._loading = False
+        with self._quietly("load"):
+            buf.set_text("")
+            for r in runs:
+                buf.insert_with_tags(buf.get_end_iter(), r.text, *self._tags_for(r.bold, r.italic))
         self.schedule_spell(0)
+
+    @contextmanager
+    def _quietly(self, reason):
+        """Change the buffer from code: the handlers that ignore `reason` stay out of it."""
+        self._quiet.append(reason)
+        try:
+            yield
+        finally:
+            self._quiet.remove(reason)
 
     def _tags_for(self, bold, italic):
         return [t for t, on in ((self.tag_bold, bold), (self.tag_italic, italic)) if on]
@@ -87,17 +98,16 @@ class RichText(Gtk.TextView):
     def insert_runs(self, runs):
         """Insert formatted runs at the cursor (replacing the selection)."""
         buf = self.get_buffer()
-        self._raw = True
-        buf.begin_user_action()
-        buf.delete_selection(True, True)
-        it = self.cursor_iter()
-        for r in runs:
-            text = r.text.replace("\n", " ")
-            if text:
-                buf.insert_with_tags(it, text, *self._tags_for(r.bold, r.italic))
-        buf.place_cursor(it)
-        buf.end_user_action()
-        self._raw = False
+        with self._quietly("raw"):
+            buf.begin_user_action()
+            buf.delete_selection(True, True)
+            it = self.cursor_iter()
+            for r in runs:
+                text = r.text.replace("\n", " ")
+                if text:
+                    buf.insert_with_tags(it, text, *self._tags_for(r.bold, r.italic))
+            buf.place_cursor(it)
+            buf.end_user_action()
         self.last_edit = ("paste", "", self.cursor_offset())
         self._emit()
 
@@ -106,13 +116,12 @@ class RichText(Gtk.TextView):
         bold/italic. Reported as one content change."""
         buf = self.get_buffer()
         fmt = self._fmt_at(buf.get_iter_at_offset(start))
-        self._raw = True
-        buf.begin_user_action()
-        buf.delete(buf.get_iter_at_offset(start), buf.get_iter_at_offset(end))
-        if text:
-            buf.insert_with_tags(buf.get_iter_at_offset(start), text, *self._tags_for(fmt["bold"], fmt["italic"]))
-        buf.end_user_action()
-        self._raw = False
+        with self._quietly("raw"):
+            buf.begin_user_action()
+            buf.delete(buf.get_iter_at_offset(start), buf.get_iter_at_offset(end))
+            if text:
+                buf.insert_with_tags(buf.get_iter_at_offset(start), text, *self._tags_for(fmt["bold"], fmt["italic"]))
+            buf.end_user_action()
         self.last_edit = ("paste", "", start + len(text))
         self._emit()
 
@@ -227,12 +236,19 @@ class RichText(Gtk.TextView):
         return self._fmt_at(it) if not it.is_end() else {"bold": False, "italic": False}
 
     def _before_insert(self, *_):
-        self._inserting = True
+        self._quiet.append("insert")  # until _after_insert, which runs after GTK inserted
 
     def _after_insert(self, buf, end_iter, text, _length):
-        if self._loading or self._raw:
-            self._inserting = False
-            return
+        try:
+            if "load" not in self._quiet and "raw" not in self._quiet:
+                self._format_typed(buf, end_iter, text)
+        finally:
+            self._quiet.remove("insert")
+        if not self._quiet:
+            self._emit()
+
+    def _format_typed(self, buf, end_iter, text):
+        """Give typed text the format before it, or the pending one (Ctrl+B/I)."""
         start = end_iter.copy()
         start.backward_chars(len(text))
         self.last_edit = ("ins", text, start.get_offset())
@@ -253,25 +269,23 @@ class RichText(Gtk.TextView):
             buf.apply_tag(self.tag_bold, start, end_iter)
         if fmt["italic"]:
             buf.apply_tag(self.tag_italic, start, end_iter)
-        self._inserting = False
-        self._emit()
 
     def _on_mark_set(self, buf, it, mark):
         # Only a move elsewhere drops a pending format: an input method sets the cursor
         # again in place before it types (R32, CR9 in CODE_REVIEW.md).
-        if mark == buf.get_insert() and not self._loading and not self._inserting \
+        # A paste's own cursor moves ("raw") do drop it, as a click would.
+        if mark == buf.get_insert() and "load" not in self._quiet and "insert" not in self._quiet \
                 and it.get_offset() != self._pending_at:
             self._pending = None
 
     def _on_changed(self, _buf):
         # insertions are reported from _after_insert, once their tags are applied
-        if not self._loading and not self._inserting and not self._raw:
+        if not self._quiet:
             self.last_edit = ("del", "", self.cursor_offset())
             self._emit()
 
     def _on_tag(self, _buf, tag, *_):
-        if tag in (self.tag_bold, self.tag_italic) and not self._loading and not self._inserting \
-                and not self._raw:
+        if tag in (self.tag_bold, self.tag_italic) and not self._quiet:
             self._emit()
 
     # -- spelling ------------------------------------------------------------------------
