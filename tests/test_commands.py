@@ -1,6 +1,10 @@
+import re
 import unittest
+from pathlib import Path
 
-from notterizmus.commands import Command, search
+from notterizmus.commands import COMMANDS, SHORTCUTS, Command, command, key_label, search, shortcut_keys
+
+ROOT = Path(__file__).resolve().parents[1]
 
 CMDS = [
     Command("New Chapter", accel="<Control>n", order=0),
@@ -78,3 +82,60 @@ class RankingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def in_text(label, text):
+    """label written in text as a whole key: "Ctrl+S" is not found in "Ctrl+Shift+Z"."""
+    return re.search(r"(?<![\w+])" + re.escape(label) + r"(?![\w])", text) is not None
+
+
+def table_keys():
+    """Every key the command table and the Shortcuts dialog show, as accelerators."""
+    keys = {c.key for c in COMMANDS if c.key}
+    for _section, items in SHORTCUTS:
+        for _label, ks in items:
+            keys.update(shortcut_keys(ks))
+    return keys
+
+
+# Keys README.md describes in words instead: the multi-cursor gesture, and the Menu key as
+# right-click.
+DESCRIBED = {"<Ctrl>Up", "<Ctrl>Down", "Menu"}
+
+
+class TableTest(unittest.TestCase):
+    """CR37: one command table; README.md and the guide are checked against it."""
+
+    def test_every_key_is_in_the_readme(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        missing = sorted(key_label(k) for k in table_keys() - DESCRIBED if not in_text(key_label(k), readme))
+        self.assertEqual(missing, [], "keys of the command table missing from README.md")
+
+    def test_whole_key_match(self):
+        self.assertTrue(in_text("Ctrl+S", "save: Ctrl+S."))
+        self.assertFalse(in_text("Ctrl+S", "Ctrl+Shift+Z"))
+        self.assertFalse(in_text("Ctrl+Z", "Ctrl+Shift+Z"))
+
+    def test_key_labels(self):
+        self.assertEqual(key_label("<Ctrl><Shift>p"), "Ctrl+Shift+P")
+        self.assertEqual(key_label("<Shift><Control>z"), "Ctrl+Shift+Z")
+        self.assertEqual(key_label("<Alt>Up"), "Alt+↑")
+        self.assertEqual(key_label("<Ctrl>Page_Down"), "Ctrl+PgDn")
+        self.assertEqual(key_label("<Ctrl>question"), "Ctrl+?")
+        self.assertEqual(key_label("F2"), "F2")
+
+    def test_every_shortcut_names_a_command(self):
+        for _section, items in SHORTCUTS:
+            for _label, ks in items:
+                self.assertTrue(all(shortcut_keys(ks)), ks)
+
+    def test_each_key_belongs_to_one_command(self):
+        seen = {}
+        for c in COMMANDS:
+            for k in c.accels or (c.shown,) if c.key else ():
+                self.assertNotIn(k, seen, f"{k}: {seen.get(k)} and {c.title}")
+                seen[k] = c.title
+
+    def test_commands_are_found_by_action(self):
+        self.assertEqual(command("win.find").title, "Find")
+        self.assertEqual(command("ed.add", "next").key, "<Ctrl>Return")

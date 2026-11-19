@@ -791,7 +791,7 @@ Small and mechanical changes first; the window split last, once the earlier phas
 cover it. Each is a refactor, so the full unit and UI suites, unchanged, are the
 verification, plus the checks named.
 
-- [ ] **CR37.** One table of commands (title, action, accelerator, section, keywords) in a
+- [x] **CR37.** One table of commands (title, action, accelerator, section, keywords) in a
   module without GTK, used by the app's accelerators, the Shortcuts dialog and Search
   Commands. A unit test checks that every accelerator appears in README.md; the guide test
   reads from the table.
@@ -946,6 +946,18 @@ verification, plus the checks named.
   weak reference. New UI tests in `test_freeing` (`FreedPopupsTest`, 2 tests) failed
   before the fix and pass after it. Unit suite 418 tests, with and without PyGObject; UI
   suite 284 tests in 174 s, and the load check in 240 s.
+- CR37: `commands.COMMANDS` is the one list of commands (title, action and target,
+  accelerators or the key shown, section, keywords, when it is offered), in Search
+  Commands' order; `commands.SHORTCUTS` holds the Shortcuts dialog's groups, whose keys
+  name the table's actions. The app installs its accelerators from it
+  (`commands.accelerators()`), `command_search.build` makes the list from it (markers,
+  item types and spelling languages as one entry each), and `on_shortcuts` reads
+  `SHORTCUTS`. Checked by capturing every accelerator, both Search Commands lists (a book
+  chapter and Getting Started) and every Shortcuts item before and after: identical.
+  `tests/test_commands.TableTest` checks that every key of the table is in README.md, as a
+  whole key ("Ctrl+S" isn't found in "Ctrl+Shift+Z"); it found Ctrl+S and Ctrl+Q missing,
+  now added. `test_guide` fails if the guide teaches a key combination the table doesn't
+  have. Unit suite 427 tests, with and without PyGObject; UI suite 284 tests in 174 s.
 
 ### With you
 

@@ -4,11 +4,14 @@ import unittest
 from pathlib import Path
 
 from notterizmus import guide
+from notterizmus.commands import COMMANDS, SHORTCUTS, key_label, shortcut_keys
 from notterizmus.model import Document, can_contain
 from notterizmus.paths import guide_path
 from notterizmus.rules import Rules
 
 ROOT = Path(__file__).resolve().parents[1]
+# Keys of the text itself, which GTK and the editor handle and which are no command.
+TEXT_KEYS = {"Ctrl+C", "Ctrl+X", "Ctrl+Y", "Shift+Enter", "Shift+click"}
 KEYISH = re.compile(r"Ctrl|Alt|Shift|Enter|Tab|Backspace|Delete|Esc|F\d+|[↑↓]")
 
 
@@ -37,6 +40,16 @@ class GuideTest(unittest.TestCase):
         self.assertGreater(len(keys), 20)
         missing = sorted({k for k in keys if k not in readme})
         self.assertEqual(missing, [], "keys taught by the guide but missing from README.md")
+
+    def test_every_key_the_guide_teaches_is_in_the_command_table(self):
+        """CR37: a key changed in the table (and so in the app) can't stay in the guide."""
+        known = {key_label(a) for c in COMMANDS for a in c.accels + (c.shown,) if a}
+        for _section, items in SHORTCUTS:
+            for _label, ks in items:
+                known.update(key_label(k) for k in shortcut_keys(ks))
+        known.update(TEXT_KEYS)
+        combos = {k for k in guide.keys(guide.build()) if re.fullmatch(r"(Ctrl|Alt|Shift)\+.+|F\d+", k)}
+        self.assertEqual(sorted(combos - known), [], "keys the guide teaches that the app doesn't have")
 
     def test_uses_the_typing_triggers_from_the_rules(self):
         r = Rules()

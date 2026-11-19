@@ -70,6 +70,8 @@ walks through the controls; each time you open it, it starts fresh.
 | Copy one drawing by itself | **Copy** above it, or click it and press Ctrl+C |
 | Delete an empty item / join with the line above | Backspace at the start |
 | New chapter / open a chapter | Ctrl+N / Ctrl+O |
+| Save now (chapters also save by themselves as you type) | Ctrl+S |
+| Quit | Ctrl+Q |
 | Previous / next chapter of the book | Ctrl+PgUp / Ctrl+PgDn |
 | Show or hide the chapter list (books and their chapters, on the left) | F9 |
 | Chapter properties: rename, change the number, move to another book (on a book in the list: rename the book) | F2 |
@@ -180,7 +182,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/state.py` | What the window remembers between runs (`state.json`); a broken file can't stop the app |
 | `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
 | `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |
-| `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | Search Commands: matching, and the list of commands |
+| `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | The commands and their keys (used by the accelerators, Search Commands and the Shortcuts dialog) and command matching; the Search Commands dialog |
 | `notterizmus/find.py`, `notterizmus/ui/findbar.py` | Find and replace: matching, and the find bar |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `scripts/measure-drawing-stroke.py` | Times a pen stroke in the drawing window on your own display |

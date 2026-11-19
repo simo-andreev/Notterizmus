@@ -8,123 +8,72 @@ from __future__ import annotations
 
 from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
-from ..commands import Command, search
+from ..commands import COMMANDS, Command, search
 from ..spell import Speller
 from .rows import TextRow
 
-_MASKS = {"<Control>": Gdk.ModifierType.CONTROL_MASK, "<Shift>": Gdk.ModifierType.SHIFT_MASK,
-          "<Alt>": Gdk.ModifierType.ALT_MASK}
-
-
 def build(win):
-    """Every command available right now, in the order shown when nothing is typed."""
-    app = win.get_application()
+    """Every command of COMMANDS available right now, in its order."""
     ed = win.editor
     cmds = []
     # The editor keeps its last chapter after one is closed, so ask the window.
     has_doc = win.doc is not None
     in_book = has_doc and not win._is_guide()
 
-    def accel(action):
-        found = app.get_accels_for_action(action) if app else []
-        return found[0] if found else ""
-
-    def act(title, action, target=None, section="", keywords="", shown=None):
-        group, name = action.split(".", 1)
-        a = (win if group == "win" else ed.actions).lookup_action(name)
-        if a is None or not a.get_enabled():
-            return
-        widget = win if group == "win" else ed
-        cmds.append(Command(title, lambda: widget.activate_action(action, target),
-                            accel(action) if shown is None else shown, keywords, section, len(cmds)))
-
     # editor behaviours that are keys: replay the key on the item the cursor is in
     row = ed.rows.get(ed.current.id) if has_doc and ed.current is not None else None
     view = ed.cur_view if isinstance(row, TextRow) and ed.cur_view is row.view else \
         (row.view if isinstance(row, TextRow) else None)
 
-    def key(title, accel_str, section="", keywords=""):
+    def act(spec, title, target=None):
+        group, name = spec.action.split(".", 1)
+        a = (win if group == "win" else ed.actions).lookup_action(name)
+        if a is None or not a.get_enabled():
+            return
+        widget = win if group == "win" else ed
+        variant = None if target is None else GLib.Variant.new_string(target)
+        cmds.append(Command(title, lambda: widget.activate_action(spec.action, variant),
+                            _accel(spec.key), spec.keywords, spec.section, len(cmds)))
+
+    def key(spec):
         if view is None:
             return
-        name, state = accel_str, Gdk.ModifierType(0)
-        for prefix, mask in _MASKS.items():
-            if prefix in name:
-                name, state = name.replace(prefix, ""), state | mask
-        if state & Gdk.ModifierType.SHIFT_MASK and len(name) == 1:
-            name = name.upper()  # as GTK reports it: Shift+w arrives as "W"
-        elif state & Gdk.ModifierType.SHIFT_MASK and name == "Tab":
-            name = "ISO_Left_Tab"  # and Shift+Tab as ISO_Left_Tab
-        keyval = Gdk.keyval_from_name(name)
+        _ok, keyval, state = Gtk.accelerator_parse(spec.key)
+        if state & Gdk.ModifierType.SHIFT_MASK:
+            # as GTK reports them: Shift+w arrives as "W", Shift+Tab as ISO_Left_Tab
+            keyval = Gdk.KEY_ISO_Left_Tab if keyval == Gdk.KEY_Tab else Gdk.keyval_to_upper(keyval)
 
         def run():
             view.grab_focus()
             ed.on_key(row, view, keyval, state)
-        cmds.append(Command(title, run, accel_str, keywords, section, len(cmds)))
+        cmds.append(Command(spec.title, run, _accel(spec.key), spec.keywords, spec.section, len(cmds)))
 
-    act("New Chapter", "win.new", section="Chapter", keywords="create book")
-    act("Open Chapter…", "win.open", section="Chapter", keywords="file")
-    if in_book:
-        act("Previous Chapter", "win.prev-chapter", section="Chapter", keywords="back book")
-        act("Next Chapter", "win.next-chapter", section="Chapter", keywords="forward book")
-        act("Chapter Properties…", "win.rename", section="Chapter", keywords="rename number title move book")
-        act("Earlier Versions…", "win.versions", section="Chapter", keywords="backup restore history undo")
-    act("Copy for TopCoding", "win.copy", section="Chapter", keywords="export html paste clipboard")
-    act("Show Plain Text", "win.show-plain", section="Chapter", keywords="export preview")
-    act("Save", "win.save", section="Chapter")
-    act("Show or Hide the Chapter List", "win.sidebar", section="List", keywords="sidebar books panel")
-    act("Larger Text", "win.zoom-in", section="Text size", keywords="zoom in bigger font")
-    act("Smaller Text", "win.zoom-out", section="Text size", keywords="zoom out font")
-    act("Normal Text Size", "win.zoom-reset", section="Text size", keywords="zoom reset 100 font")
-    if has_doc:
-        act("Undo", "ed.undo", section="Text", shown="<Control>z")
-        act("Redo", "ed.redo", section="Text", shown="<Control><Shift>z")
-        act("Bold", "ed.bold", section="Text", shown="<Control>b", keywords="format strong")
-        act("Italic", "ed.italic", section="Text", shown="<Control>i", keywords="format emphasis")
-        key("Spelling Fixes and Word Completion", "<Control>space", section="Text",
-            keywords="complete suggest autocomplete")
-        act("Paste as Plain Text", "ed.paste-plain", section="Text", shown="<Control><Shift>v")
-        act("Find", "win.find", section="Find", keywords="search look")
-        act("Find and Replace", "win.replace", section="Find", keywords="search substitute change")
-        act("Find Next", "win.find-next", section="Find")
-        act("Find Previous", "win.find-prev", section="Find")
-        key("Add Menu", "<Alt>Insert", section="Add", keywords="insert new item")
-        act("Next Numbered Item", "ed.add", GLib.Variant.new_string("next"), section="Add",
-            shown="<Control>Return", keywords="heading sibling")
-        act("Sub-item", "ed.add", GLib.Variant.new_string("child"), section="Add", shown="",
-            keywords="child nested numbered")
-        act("Parent-level Item", "ed.add", GLib.Variant.new_string("parent"), section="Add", shown="",
-            keywords="up level numbered")
-        for name, m in win.rules["markers"].items():
-            label = m.get("label", name)
-            act(f"Add {label} {m['symbol']}", "ed.add", GLib.Variant.new_string(f"bullet:{name}"),
-                section="Add", shown="", keywords="bullet")
-        act("Insert Table", "win.insert-table", section="Add")
-        act("Insert Drawing", "win.insert-drawing", section="Add", shown="<Control>d",
-            keywords="excalidraw graph diagram sketch picture")
-        for kind, marker, label, _trig in ed.kind_options():
-            target = "heading" if kind == "heading" else f"bullet:{marker}"
-            act(f"Make It {' '.join(label.split())}", "ed.set-kind", GLib.Variant.new_string(target),
-                section="Item", shown="", keywords="type change convert")
-        key("Cycle Item Type", "<Control><Shift>space", section="Item", keywords="change kind")
-        key("Indent Item", "Tab", section="Item", keywords="sub level deeper")
-        key("Outdent Item", "<Shift>Tab", section="Item", keywords="level up shallower")
-        key("Move Item Up", "<Alt>Up", section="Item", keywords="reorder")
-        key("Move Item Down", "<Alt>Down", section="Item", keywords="reorder")
-        act("Delete Item", "ed.delete-item", section="Item", shown="", keywords="remove")
-        act("Expand Selection", "ed.select-scope", section="Selection", shown="<Control>w")
-        key("Shrink Selection", "<Control><Shift>w", section="Selection")
-        act("Select All Items", "ed.select-all", section="Selection", shown="<Control>a")
-    act("Check Spelling", "win.spell", section="Spelling", keywords="spell checker on off")
-    for tag in getattr(win, "languages", []):
-        act(f"Spelling Language: {Speller.language_name(tag)}", "win.spell-lang", GLib.Variant.new_string(tag),
-            section="Spelling", keywords="dictionary")
-    act("Edit Formatting Rules", "win.edit-rules", section="Settings", keywords="numbering connectors bullets")
-    act("Reload Formatting Rules", "win.reload-rules", section="Settings")
-    act("Open Notes Folder", "win.open-folder", section="Settings", keywords="files documents")
-    act("Getting Started", "win.guide", section="Help", keywords="tutorial learn practice")
-    act("Keyboard Shortcuts", "win.shortcuts", section="Help", keywords="keys help")
-    act("About Notterizmus", "win.about", section="Help", keywords="version")
+    for spec in COMMANDS:
+        if not spec.listed or (spec.needs == "doc" and not has_doc) or (spec.needs == "book" and not in_book):
+            continue
+        if not spec.action:
+            key(spec)
+        elif spec.each == "marker":
+            for name, m in win.rules["markers"].items():
+                act(spec, spec.title.format(label=f"{m.get('label', name)} {m['symbol']}"), f"bullet:{name}")
+        elif spec.each == "kind":
+            for kind, marker, label, _trig in ed.kind_options():
+                act(spec, spec.title.format(label=" ".join(label.split())),
+                    "heading" if kind == "heading" else f"bullet:{marker}")
+        elif spec.each == "language":
+            for tag in getattr(win, "languages", []):
+                act(spec, spec.title.format(label=Speller.language_name(tag)), tag)
+        else:
+            act(spec, spec.title, spec.target)
     return cmds
+
+
+def _accel(key):
+    """The key as GTK names it ("<Ctrl>z" is "<Control>z"), or ""."""
+    if not key:
+        return ""
+    _ok, keyval, mods = Gtk.accelerator_parse(key)
+    return Gtk.accelerator_name(keyval, mods)
 
 
 class CommandRow(Gtk.ListBoxRow):

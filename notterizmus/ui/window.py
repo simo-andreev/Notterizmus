@@ -5,6 +5,7 @@ from pathlib import Path
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from .. import APP_ID, APP_NAME, VERSION, backups, guide, library, paths, state
+from ..commands import SHORTCUTS, shortcut_keys
 from ..export import to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
@@ -1080,56 +1081,11 @@ class Window(Adw.ApplicationWindow):
 
     def on_shortcuts(self, *_):
         trig = {v.get("label", k): (v.get("trigger", ""), v["symbol"]) for k, v in self.rules["markers"].items()}
-        groups = [
-            ("Outline", [
-                ("New item (splits at the cursor)", "Return"),
-                ("Next numbered item at this level", "<Ctrl>Return"),
-                ("Add component menu", "<Alt>Insert"),
-                ("Indent / outdent", "Tab <Shift>Tab"),
-                ("Move item up / down", "<Alt>Up <Alt>Down"),
-                ("Cycle item type", "<Ctrl><Shift>space"),
-                ("Join with the item above", "BackSpace"),
-            ]),
-            ("Enter on an empty item", [
-                ("Bullet under Ⅰ.1.a) becomes Ⅰ.1.b)", "Return"),
-            ]),
-            ("Selection", [
-                ("Expand / shrink selection (word, item, section…)", "<Ctrl>w <Ctrl><Shift>w"),
-                ("Select all items", "<Ctrl>a"),
-                ("Extend item selection", "<Shift>Up <Shift>Down"),
-            ]),
-            ("Multiple cursors", [
-                ("Add cursor above / below (tap Ctrl twice, hold, then arrow)", "<Ctrl>Up <Ctrl>Down"),
-                ("Back to one cursor", "Escape"),
-            ]),
-            ("Text size", [("Larger / smaller text (also Ctrl + scroll wheel)", "<Ctrl>equal <Ctrl>minus"),
-                           ("Normal text size", "<Ctrl>0")]),
-            ("Find", [("Find in the chapter", "<Ctrl>f"), ("Find and replace", "<Ctrl>h <Ctrl>r"),
-                      ("Next / previous match", "<Ctrl>g <Ctrl><Shift>g")]),
-            ("Text", [("Spelling fixes and word completion", "<Ctrl>space"),
-                      ("Bold", "<Ctrl>b"), ("Italic", "<Ctrl>i"),
-                      ("Undo / redo", "<Ctrl>z <Ctrl><Shift>z"),
-                      ("Paste (detects outline structure)", "<Ctrl>v"),
-                      ("Paste as plain text", "<Ctrl><Shift>v")]),
-            ("Tables", [("Insert table", "<Ctrl>t"), ("Next / previous cell", "Tab <Shift>Tab")]),
-            ("Drawings", [("Insert drawing (Excalidraw)", "<Ctrl>d")]),
-            ("File", [("New chapter", "<Ctrl>n"), ("Open chapter", "<Ctrl>o"), ("Save", "<Ctrl>s"),
-                      ("Previous / next chapter of the book", "<Ctrl>Page_Up <Ctrl>Page_Down"),
-                      ("Chapter properties: rename, number, book (on a book: rename it)", "F2"),
-                      ("Copy for TopCoding", "<Ctrl><Shift>c")]),
-            ("Chapter list", [("Show or hide", "F9"),
-                              ("Move the chapter up / down", "<Alt>Up <Alt>Down"),
-                              ("Move the chapter to Trash", "Delete"),
-                              ("All chapter actions", "Menu")]),
-            ("Help", [("Search commands (find any command and its key)", "<Ctrl><Shift>p"),
-                      ("Getting Started (a practice chapter)", "F1"),
-                      ("Keyboard shortcuts", "<Ctrl>question")]),
-        ]
         dlg = Adw.ShortcutsDialog()
-        for title, items in groups:
+        for title, items in SHORTCUTS:  # CR37: keys from the one command table
             sec = Adw.ShortcutsSection(title=title)
-            for label, accel in items:
-                sec.add(Adw.ShortcutsItem(title=label, accelerator=accel))
+            for label, keys in items:
+                sec.add(Adw.ShortcutsItem(title=label, accelerator=" ".join(shortcut_keys(keys))))
             dlg.add(sec)
         types = Adw.ShortcutsSection(title="Item type: type at the start of an item, then Space")
         types.add(Adw.ShortcutsItem(title=f"Numbered item — “{self.rules['heading']['trigger']}”", accelerator=""))

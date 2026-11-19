@@ -11,6 +11,7 @@ gpu.prefer_gpu()  # before GTK loads: GTK and WebKit read what it sets once, at 
 from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk  # noqa: E402  (their versions: __init__.py)
 
 from .. import APP_ID, APP_NAME  # noqa: E402
+from ..commands import accelerators  # noqa: E402
 from . import drawing_web  # noqa: E402
 from .window import Window  # noqa: E402
 
@@ -45,22 +46,11 @@ class App(Adw.Application):
         # icon works straight from the checkout; install.sh also puts it in the user icon theme
         Gtk.IconTheme.get_for_display(display).add_search_path(str(ICONS))
         Gtk.Window.set_default_icon_name(APP_ID)
-        for action, accels in (("win.new", ["<Ctrl>n"]), ("win.open", ["<Ctrl>o"]), ("win.save", ["<Ctrl>s"]),
-                               ("win.copy", ["<Ctrl><Shift>c"]), ("win.shortcuts", ["<Ctrl>question"]),
-                               ("win.guide", ["F1"]), ("win.sidebar", ["F9"]), ("win.rename", ["F2"]),
-                               ("win.commands", ["<Ctrl><Shift>p"]),
-                               ("win.zoom-in", ["<Ctrl>equal", "<Ctrl>plus", "<Ctrl>KP_Add"]),
-                               ("win.zoom-out", ["<Ctrl>minus", "<Ctrl>KP_Subtract"]),
-                               ("win.zoom-reset", ["<Ctrl>0", "<Ctrl>KP_0"]),
-                               ("win.find", ["<Ctrl>f"]), ("win.replace", ["<Ctrl>h", "<Ctrl>r"]),
-                               ("win.find-next", ["<Ctrl>g"]), ("win.find-prev", ["<Ctrl><Shift>g"]),
-                               ("win.prev-chapter", ["<Ctrl>Page_Up"]), ("win.next-chapter", ["<Ctrl>Page_Down"]),
-                               ):
-            self.set_accels_for_action(action, accels)
         q = Gio.SimpleAction.new("quit", None)
         q.connect("activate", lambda *_: self.win.close() if self.win else self.quit())
         self.add_action(q)
-        self.set_accels_for_action("app.quit", ["<Ctrl>q"])
+        for action, accels in accelerators():  # CR37: from the one command table
+            self.set_accels_for_action(action, accels)
 
     def do_shutdown(self):
         drawing_web.shutdown()  # the hidden preview page, and WebKit's processes with it
