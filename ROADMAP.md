@@ -34,10 +34,10 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 As of 2026-11-19:
 
-- 1.7.0 was uploaded to the PPA on 2026-11-19, for Ubuntu 26.04 only: phases 5–7 of
-  CODE_REVIEW.md (performance, the test suite, code health), top-level bullets (CR11's
-  decision) and TopCoding's header cells (CR28). Its build on Launchpad is still to be
-  confirmed.
+- 1.7.0 is on the PPA, for Ubuntu 26.04 only, built 2026-11-19 (its log shows the
+  unit tests ran: 426 tests, OK): phases 5–7 of CODE_REVIEW.md (performance, the test
+  suite, code health), top-level bullets (CR11's decision) and TopCoding's header cells
+  (CR28).
 - 1.6.0 was on the PPA before it, built 2026-11-19: phases 1–4 of
   CODE_REVIEW.md, with R16, R29f, R29g, R32 and R33. 1.4.2 and 1.5.0 had failed
   to build there (CR1), so the PPA served 1.4.0 until now, and 1.5.0's changes
