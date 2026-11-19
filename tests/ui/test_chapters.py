@@ -6,7 +6,7 @@ from pathlib import Path
 from notterizmus.guide import b, h
 from notterizmus.library import parse_name
 from notterizmus.model import Document
-from notterizmus.rules import config_dir
+from notterizmus.paths import config_dir
 
 from . import support as ui
 

@@ -38,11 +38,32 @@ def notes_root(env=None, glib_documents=None):
     return documents_dir(env, glib_documents) / "Notterizmus"
 
 
+def _xdg_home(var, default, env=None):
+    """An XDG base folder: $var when it is set and not empty, else <home>/<default>
+    (home from $HOME, else the password database)."""
+    env = os.environ if env is None else env
+    return Path(env.get(var) or os.path.join(env.get("HOME") or str(Path.home()), default))
+
+
+def config_dir(env=None):
+    """The app's settings folder: rules.toml and state.json."""
+    return _xdg_home("XDG_CONFIG_HOME", ".config", env) / "notterizmus"
+
+
 def data_dir(env=None):
     """The app's own data folder (inside a snap, XDG_DATA_HOME is the snap's own)."""
+    return _xdg_home("XDG_DATA_HOME", os.path.join(".local", "share"), env) / "notterizmus"
+
+
+def cache_dir(env=None):
+    """The app's cache folder; nothing in it is needed (drawing previews)."""
+    return _xdg_home("XDG_CACHE_HOME", ".cache", env) / "notterizmus"
+
+
+def data_dirs(env=None):
+    """The system's data folders, in order of preference, from $XDG_DATA_DIRS."""
     env = os.environ if env is None else env
-    base = env.get("XDG_DATA_HOME") or os.path.join(env.get("HOME") or str(Path.home()), ".local", "share")
-    return Path(base) / "notterizmus"
+    return [Path(d) for d in (env.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":") if d]
 
 
 def guide_path(env=None):
@@ -62,9 +83,9 @@ def metainfo_path(app_id, env=None):
     here = Path(__file__).resolve().parents[1] / "data" / f"{app_id}.metainfo.xml"
     if here.is_file():
         return here
-    for d in (env.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":"):
-        p = Path(d) / "metainfo" / f"{app_id}.metainfo.xml"
-        if d and p.is_file():
+    for d in data_dirs(env):
+        p = d / "metainfo" / f"{app_id}.metainfo.xml"
+        if p.is_file():
             return p
     return None
 

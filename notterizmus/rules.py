@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import tomllib
 from pathlib import Path
+
+from .paths import config_dir
 
 DEFAULTS = {
     "numbering": {
@@ -88,11 +89,6 @@ FORMATS = {
     "alpha_lower": lambda n: _alpha(n, "a"),
     "alpha_upper": lambda n: _alpha(n, "A"),
 }
-
-
-def config_dir():
-    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return Path(base) / "notterizmus"
 
 
 def user_rules_path():

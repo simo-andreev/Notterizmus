@@ -7,7 +7,8 @@ from notterizmus.export import to_plain
 from notterizmus.guide import b, h
 from notterizmus.layout import layout
 from notterizmus.model import Document
-from notterizmus.rules import config_dir, user_rules_path
+from notterizmus.paths import config_dir
+from notterizmus.rules import user_rules_path
 
 from . import support as ui
 

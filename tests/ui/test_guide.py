@@ -2,7 +2,7 @@
 import json
 
 from notterizmus import guide, paths
-from notterizmus.rules import config_dir
+from notterizmus.paths import config_dir
 
 from . import support as ui
 

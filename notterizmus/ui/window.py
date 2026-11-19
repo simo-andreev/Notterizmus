@@ -9,7 +9,7 @@ from .. import APP_ID, APP_NAME, VERSION, backups, guide, library, paths, state
 from ..export import to_plain
 from ..layout import layout
 from ..model import Document, chapter_filename
-from ..rules import Rules, config_dir, user_rules_path
+from ..rules import Rules, user_rules_path
 from ..spell import Speller, guess_language
 from . import command_search
 from .findbar import FindBar

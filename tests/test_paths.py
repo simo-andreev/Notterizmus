@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from notterizmus.paths import documents_dir, notes_root
@@ -47,6 +48,35 @@ class DataFoldersTest(unittest.TestCase):
         self.assertEqual(data_dir({}), Path.home() / ".local" / "share" / "notterizmus")
         self.assertEqual(backups_dir({"HOME": "/h"}), Path("/h/.local/share/notterizmus/backups"))
         self.assertEqual(guide_path({"XDG_DATA_HOME": "/d"}).parent, data_dir({"XDG_DATA_HOME": "/d"}))
+
+    def test_config_data_and_cache_follow_one_rule(self):
+        """Set, empty and unset variables, the same way for all three folders (CR40)."""
+        from notterizmus.paths import cache_dir, config_dir, data_dir
+        for fn, var, under_home in ((config_dir, "XDG_CONFIG_HOME", ".config"),
+                                    (data_dir, "XDG_DATA_HOME", ".local/share"),
+                                    (cache_dir, "XDG_CACHE_HOME", ".cache")):
+            with self.subTest(var):
+                self.assertEqual(fn({var: "/x", "HOME": "/h"}), Path("/x/notterizmus"))
+                self.assertEqual(fn({var: "", "HOME": "/h"}), Path("/h") / under_home / "notterizmus")
+                self.assertEqual(fn({"HOME": "/h"}), Path("/h") / under_home / "notterizmus")
+                self.assertEqual(fn({}), Path.home() / under_home / "notterizmus")
+
+    def test_the_app_uses_these_folders(self):
+        from notterizmus import drawing, rules, state
+        from notterizmus.paths import cache_dir, config_dir
+        env = {"XDG_CONFIG_HOME": "/c", "XDG_CACHE_HOME": "/k"}
+        with unittest.mock.patch.dict(os.environ, env):
+            self.assertEqual(rules.user_rules_path(), config_dir() / "rules.toml")
+            self.assertEqual(state.path(), Path("/c/notterizmus/state.json"))
+            self.assertEqual(drawing.cache_dir(), cache_dir() / "drawings")
+            self.assertEqual(cache_dir(), Path("/k/notterizmus"))
+
+    def test_system_data_folders(self):
+        from notterizmus.paths import data_dirs
+        self.assertEqual(data_dirs({"XDG_DATA_DIRS": "/a::/b"}), [Path("/a"), Path("/b")])
+        default = [Path("/usr/local/share"), Path("/usr/share")]
+        self.assertEqual(data_dirs({"XDG_DATA_DIRS": ""}), default)
+        self.assertEqual(data_dirs({}), default)
 
 
 class MetainfoTest(unittest.TestCase):

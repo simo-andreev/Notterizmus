@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-from pathlib import Path
 
+from . import paths
 from .files import atomic_write
 
 SCENE_KEYS = ("elements", "appState", "files")
@@ -92,9 +91,7 @@ def preview_key(data):
 # --- preview cache -------------------------------------------------------------
 
 def cache_dir(env=None):
-    env = os.environ if env is None else env
-    base = env.get("XDG_CACHE_HOME") or os.path.join(env.get("HOME") or str(Path.home()), ".cache")
-    return Path(base) / "notterizmus" / "drawings"
+    return paths.cache_dir(env) / "drawings"
 
 
 def preview_path(data, env=None):

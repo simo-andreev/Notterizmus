@@ -795,7 +795,7 @@ verification, plus the checks named.
   module without GTK, used by the app's accelerators, the Shortcuts dialog and Search
   Commands. A unit test checks that every accelerator appears in README.md; the guide test
   reads from the table.
-- [ ] **CR40.** One XDG helper in `paths.py`. `tests/test_paths.py` covers set, unset and
+- [x] **CR40.** One XDG helper in `paths.py`. `tests/test_paths.py` covers set, unset and
   empty variables for config, data and cache.
 - [ ] **CR45.** Remove the unused parameter, the alias, the redundant `KeyError`s and the
   local imports. Free the Enchant dictionaries on shutdown, or drop the declaration. A
@@ -822,6 +822,19 @@ verification, plus the checks named.
   out of the long functions.
 - [ ] **CR38.** Split `window.py` as R14 split the editor (dialogs, chapter files, zoom and
   sidebar sizing), methods moved unchanged; `git diff --color-moved` shows only moves.
+
+#### Phase 7 results
+
+- CR40: `paths.config_dir()`, `data_dir()` and `cache_dir()` share one rule
+  (`_xdg_home`: the variable when set and not empty, else under `$HOME`, else the password
+  database's home), and `paths.data_dirs()` reads `$XDG_DATA_DIRS` for the metainfo and the
+  Hunspell dictionaries. `rules.config_dir` is gone (its callers import it from `paths`),
+  and `drawing.cache_dir()` is `paths.cache_dir() / "drawings"`. Only one thing changes: an
+  empty `XDG_DATA_DIRS` now means the default list for the dictionaries too, as the XDG
+  rule says and as the metainfo lookup already did (it used to mean `/usr/share` alone).
+  `tests/test_paths.py` covers set, empty and unset variables for all three folders, the
+  system list, and that rules, state and drawings use them. On the way: an unused
+  `config_dir` import in `window.py` and three unused `import os`.
 
 ### With you
 

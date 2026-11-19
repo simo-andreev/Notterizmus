@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from .files import atomic_write
-from .rules import config_dir
+from .paths import config_dir
 
 KINDS = {"last_file": str, "last_book": str, "spell_lang": str, "spell": bool, "sidebar": bool,
          "sidebar_width": int, "zoom": int}

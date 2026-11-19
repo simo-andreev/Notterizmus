@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import bisect
 import codecs
-import os
 from collections import Counter
 from pathlib import Path
 
 from .model import Document
+from .paths import data_dirs
 from .spell import WORD_RE
 
 MIN_WORD = 3        # shorter words aren't worth completing
@@ -76,8 +76,8 @@ _DICT_CACHE = {}
 
 
 def _dic_dirs():
-    dirs = os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
-    return [Path(d) / "hunspell" for d in dirs + ["/usr/share"] if d]
+    dirs = data_dirs()
+    return [d / "hunspell" for d in dirs + [Path("/usr/share")]]
 
 
 def dictionary_words(tag):
