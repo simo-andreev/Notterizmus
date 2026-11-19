@@ -148,13 +148,20 @@ class LexicalClipboardTest(unittest.TestCase):
         self.assertNotIn(lexical.CODE, plain)
 
     def test_a_table_keeps_its_header_row_and_empty_cells(self):
+        """Header cells get the states TopCoding's editor gives the <th> cells of our HTML:
+        3 (row and column header) in the first column, 1 (row header) in the others (CR28)."""
         nodes = lexical.to_nodes(self.lines(heading("Intro", self.table(), drawing_json())))
         table = next(n for n in nodes if n["type"] == "table")
         states = [[c["headerState"] for c in row["children"]] for row in table["children"]]
-        self.assertEqual(states, [[lexical.HEADER_ROW] * 2, [0, 0]])
+        self.assertEqual(states, [[lexical.HEADER_ROW | lexical.HEADER_COLUMN, lexical.HEADER_ROW], [0, 0]])
         last = table["children"][1]["children"][1]
         self.assertEqual([p["type"] for p in last["children"]], ["paragraph"])
         self.assertEqual(last["children"][0]["children"], [])
+
+    def test_a_table_without_a_header_row_has_no_header_cells(self):
+        nodes = lexical.to_nodes(self.lines(heading("Intro", self.table(header=False), drawing_json())))
+        table = next(n for n in nodes if n["type"] == "table")
+        self.assertEqual([[c["headerState"] for c in row["children"]] for row in table["children"]], [[0, 0], [0, 0]])
 
     def test_a_block_from_a_newer_version_is_left_out(self):
         newer = {"kind": "mindmap", "id": "m", "data": {"x": 1}}

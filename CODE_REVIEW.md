@@ -763,9 +763,14 @@ verification, plus the checks named.
 ### With you
 
 - [ ] **CR28 (R30).** The two real pastes between the app and TopCoding, and header cells
-  with `headerState` 3 in the first column. They need a TopCoding page you choose:
-  chapters 11, 12 and 15 hold real work, so ask first, as PROJECT_CONTEXT says. Then a unit
-  test for the header cells in `lexical.to_nodes`, and manual pastes in Chrome and Firefox.
+  with `headerState` 3 in the first column.
+  - Header cells: done 2026-11-19. A header row's first cell gets 3 (row and column
+    header) and its other cells 1, as TopCoding makes them from our HTML's `<th>` cells.
+    Unit tests in `tests/test_drawing.py`; not released yet.
+  - Left for you: the two real pastes, in chapter 999 of assignment 2522, the page you made
+    for tests, in Chrome and in Firefox. Copy a chapter with a drawing in the app and paste
+    it there; then select all there, press Ctrl+C, and paste into the app. Claude in
+    Chrome's key events neither copy nor paste for real (tried 2026-11-19).
 - [ ] Top-level bullets: are they allowed at all? Phase 3 kept the rule README and the
   guide state (top-level items are always numbered); say if you want bullets there.
 - [x] The version numbers of the releases, and whether one should follow phase 1 at once:
@@ -894,7 +899,7 @@ Things the test displays can't show. Do them before each release that contains t
   about 60 frames a second (`scripts/measure-drawing-stroke.py`).
 - [ ] CR10: edit a chapter, change its file from another program, keep editing: you are
   asked, and neither version is lost.
-- [ ] CR28: the real pastes with TopCoding, on the page you choose.
+- [ ] CR28: the real pastes with TopCoding, in chapter 999 of assignment 2522.
 
 ### Release gate
 

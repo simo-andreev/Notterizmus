@@ -30,7 +30,7 @@ FIREFOX_CUSTOM_MIME = "application/x-moz-custom-clipdata"
 NAMESPACE = "SummaryEditor"  # TopCoding's editor; Lexical refuses JSON from another one
 
 BOLD, ITALIC, CODE = 1, 2, 16
-HEADER_ROW = 1
+HEADER_ROW, HEADER_COLUMN = 1, 2  # Lexical's TableCellHeaderStates, a bitmask
 
 _ELEMENT = {"direction": None, "format": "", "indent": 0, "version": 1}
 
@@ -64,13 +64,21 @@ def _runs(runs):
     return children
 
 
+def _header_state(header, ri, ci):
+    """What TopCoding's editor makes of the <th> cells of our HTML: row headers, and in the
+    first column a row and column header (3), checked 2026-11-17 (CR28)."""
+    if not header or ri:
+        return 0
+    return HEADER_ROW | HEADER_COLUMN if ci == 0 else HEADER_ROW
+
+
 def _table(node):
     header = node.data.get("header")
     rows = []
     for ri, row in enumerate(node.data.get("rows", [])):
         cells = [{"children": [_paragraph(_runs(cell))], **_ELEMENT, "type": "tablecell", "backgroundColor": None,
-                  "colSpan": 1, "headerState": HEADER_ROW if header and ri == 0 else 0, "rowSpan": 1}
-                 for cell in row]
+                  "colSpan": 1, "headerState": _header_state(header, ri, ci), "rowSpan": 1}
+                 for ci, cell in enumerate(row)]
         rows.append({"children": cells, **_ELEMENT, "type": "tablerow"})
     return {"children": rows, **_ELEMENT, "type": "table"}
 
