@@ -36,6 +36,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.0" date="2026-11-19">
+      <description>
+        <p>A question before saving over a chapter changed on disk, safer saves and renumbering, ! and ? bullets, and drawing with the GPU on NVIDIA's driver.</p>
+        <ul>
+          <li>If another program changes the open chapter's file, the app asks before saving over it: Reload or Keep Mine.</li>
+          <li>New ! and ? bullets for important and uncertain points.</li>
+          <li>Drawing uses the GPU with NVIDIA's driver, and drawings stay sharp in wide windows.</li>
+          <li>Saves reach the disk and keep the file's permissions, nothing typed is lost when another chapter opens, and renumbering puts everything back if it fails.</li>
+          <li>Many smaller fixes, among them Shift+click selections, toasts with “&amp;” in a title, books whose names start with a dot, long chapter titles and the drawing window's Cancel.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.0" date="2026-11-18">
       <description>
         <p>Drawings pasted from TopCoding, deleting only what is selected, and drawings that use far less memory.</p>

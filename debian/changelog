@@ -1,3 +1,22 @@
+notterizmus (1.6.0) resolute; urgency=medium
+
+  * Ask before saving over a chapter that another program changed on
+    disk.
+  * Add ! and ? bullet types.
+  * Draw with the GPU on NVIDIA's driver; keep drawings sharp in wide
+    windows.
+  * Save the open chapter before another opens; sync saves to disk and
+    keep the file's permissions.
+  * Put chapters back when renumbering fails, and keep Earlier Versions
+    with chapters that swap places.
+  * Fix Shift+click selections, markup in toasts, book names starting
+    with a dot, long titles and other bugs found in a code review.
+  * Run the build-time tests without PyGObject, so the package builds on
+    Launchpad again.
+  * Recommend hunspell-bg.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Thu, 19 Nov 2026 11:02:05 +0200
+
 notterizmus (1.5.0) resolute; urgency=medium
 
   * Paste drawings copied from TopCoding's notes editor.

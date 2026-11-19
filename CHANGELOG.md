@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.0 — 2026-11-19
+
+- **Changed on disk**: if another program changes the open chapter's file (a sync tool, a second machine), the app asks before saving over it. **Reload** takes that version, and Ctrl+Z brings yours back; **Keep Mine** saves yours. The other version stays in Earlier Versions either way.
+- **`!` and `?` bullets** for important and uncertain points: type `! ` or `? ` at the start of an item, or choose them from its menu.
+- With NVIDIA's driver, drawing uses the GPU: a stroke in the drawing window draws at 60 frames a second instead of 8. Drawings stay sharp in wide windows.
+- Nothing typed is lost when another chapter opens (from Files, Undo after a move to the Trash, New Chapter); the last second of typing used to go.
+- Saves reach the disk before they replace the chapter, and keep its permissions; every save used to make a chapter readable by you alone.
+- Renumbering or reordering chapters puts everything back if it fails halfway, and a chapter left hidden by a crash in the middle of one is offered back at start-up. Earlier Versions follow chapters that swap places, untitled ones too, and keep their order in the hour that comes twice when daylight saving ends.
+- **Paste as Plain Text** and **One Item per Paragraph** no longer undo what you typed after the paste. Pasted "Yes) …" stays text, Bulgarian letter labels ("а)", "б)") become numbered items, and clipboard data that can't be read falls back to its text.
+- **New Chapter** takes long titles (the file name is shortened), makes chapter 10 when there is a chapter 100, says when it can't write the file, and a book whose name starts with a dot is listed.
+- Top-level items stay numbered when `* ` is typed at their start or bullets are pasted there, and an item type that can't apply leaves what you typed.
+- The drawing window asks before Cancel throws away any change, a new background included; a file opened while it is open waits; and its menu no longer offers Mermaid to Excalidraw or Web Embed, which can't work offline.
+- Fixed: Shift+click after Ctrl+W or after clicking a drawing; toasts with “&” or “<” in a title; Delete Block on a block from a newer version; Getting Started's own words going unflagged in other chapters; Ctrl+B or Ctrl+I before typing with some input methods.
+- A broken `state.json` can't keep the app from starting, and a `rules.toml` whose triggers clash or that names an unknown number format is reported.
+- The package builds on Launchpad again (1.4.2 and 1.5.0 never did: their tests needed PyGObject), and it recommends the Bulgarian spelling dictionary.
+
 ## 1.5.0 — 2026-11-18
 
 - **Paste** a copy of TopCoding's notes that includes a drawing, and the drawing arrives too, where it was among the items (Chrome and Firefox); before, only the text and tables did. Built from TopCoding's clipboard format and not yet tried with a real copy from TopCoding.
