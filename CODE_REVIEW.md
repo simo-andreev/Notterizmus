@@ -112,7 +112,7 @@ progress.
 | 5 | Performance and memory | CR18, CR32, CR33, CR34, CR35, CR36 | M | When convenient |
 | 6 | Test suite | CR50, CR51, CR52 | S–M | When convenient |
 | 7 | Code health, no change in behaviour | CR37, CR38, CR39, CR40, CR41, CR43, CR44, CR45, CR46, CR48, CR49 | L | When convenient |
-| With you | Needs your input | CR28 (R30), and the decision CR11 depends on | S | |
+| With you | Needs your input | CR28 (R30), and the decision CR11 depends on | S | Both done 2026-11-19: the real pastes work; top-level bullets allowed |
 
 Related issues to fix together: CR11 with CR20 (the same trigger code), CR9 with CR46,
 CR1 with CR41 (both move `_prefer_gpu`), CR5 with CR6 (the same two-phase move), CR12
@@ -516,8 +516,8 @@ Done 2026-11-19, except the checks at your desk. Each fix has tests that failed 
 - CR15: names are shortened to 255 bytes in the file name only (`model.fit_name`), and
   New Chapter reports a file it can't write and asks again with what you typed.
 - CR16: "already exists" goes by `library.chapter_numbered()`.
-- CR11 and CR20: the rule stays, as README and the guide state it (your decision is open
-  below; it is easy to reverse). `set_kind` refuses a top-level bullet, the menu and
+- CR11 and CR20: the rule stays, as README and the guide state it (reversed 2026-11-19 by
+  your decision in [With you](#with-you): top-level bullets are allowed). `set_kind` refuses a top-level bullet, the menu and
   Ctrl+Shift+Space leave bullets out there, a paste turns top-level bullets into
   numbered items, and a typed trigger is deleted only when it applies.
 - CR13: Delete Block goes through `delete_items()`, so a newer block keeps its sub-items.
@@ -978,17 +978,27 @@ verification, plus the checks named.
 
 ### With you
 
-- [ ] **CR28 (R30).** The two real pastes between the app and TopCoding, and header cells
+- [x] **CR28 (R30).** The two real pastes between the app and TopCoding, and header cells
   with `headerState` 3 in the first column.
   - Header cells: done 2026-11-19. A header row's first cell gets 3 (row and column
     header) and its other cells 1, as TopCoding makes them from our HTML's `<th>` cells.
     Unit tests in `tests/test_drawing.py`; not released yet.
-  - Left for you: the two real pastes, in chapter 999 of assignment 2522, the page you made
-    for tests, in Chrome and in Firefox. Copy a chapter with a drawing in the app and paste
+  - The two real pastes: done 2026-11-19 by you, in chapter 999 of assignment 2522, in
+    Chrome and in Firefox. A chapter with a drawing pasted into TopCoding, and TopCoding's
+    copy pasted back into the app, both work. What was asked: Copy a chapter with a drawing in the app and paste
     it there; then select all there, press Ctrl+C, and paste into the app. Claude in
     Chrome's key events neither copy nor paste for real (tried 2026-11-19).
-- [ ] Top-level bullets: are they allowed at all? Phase 3 kept the rule README and the
-  guide state (top-level items are always numbered); say if you want bullets there.
+- [x] Top-level bullets: are they allowed at all? Your answer, 2026-11-19: allow them.
+  Done: `set_kind`, the item-type menu, Ctrl+Shift+Space and a paste make them; CR20's
+  part (a refused trigger stays typed) stays. A bullet that moves up to the top level
+  (Shift+Tab, or its top-level parent deleted) still becomes the next numbered item, as
+  before CR11. Layout puts the blank line between top-level items before a top-level
+  bullet that follows a numbered item, or it would read as that item's. README, FEATURES,
+  PROJECT_CONTEXT and the guide say so. Tests: `test_model`
+  `test_a_top_level_item_can_become_a_bullet`, `test_editing`
+  `test_a_top_level_item_can_be_a_bullet_and_a_refused_trigger_stays_typed`,
+  `test_clipboard` `test_bullets_pasted_at_the_top_level_stay_bullets`, `test_layout`
+  `test_top_level_bullets_are_set_apart_from_numbered_items`; each failed first.
 - [x] The version numbers of the releases, and whether one should follow phase 1 at once:
   1.6.0 came after phase 4, with phases 1–4 (your call, 2026-11-19). Launchpad built it,
   so the PPA no longer stops at 1.4.0.
@@ -1115,7 +1125,8 @@ Things the test displays can't show. Do them before each release that contains t
   about 60 frames a second (`scripts/measure-drawing-stroke.py`).
 - [ ] CR10: edit a chapter, change its file from another program, keep editing: you are
   asked, and neither version is lost.
-- [ ] CR28: the real pastes with TopCoding, in chapter 999 of assignment 2522.
+- [x] CR28: the real pastes with TopCoding, in chapter 999 of assignment 2522 (2026-11-19:
+  both directions work, in Chrome and in Firefox).
 
 ### Release gate
 

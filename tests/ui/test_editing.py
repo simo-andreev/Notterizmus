@@ -31,20 +31,20 @@ class EditingTest(ui.UITestCase):
                          [("bullet", "important", "remember"), ("bullet", "question", "check")])
         self.assertEqual([ui.row(n).prefix.get_text() for n in (important, question)], ["     ! ", "     ? "])
 
-    def test_a_top_level_item_stays_numbered_and_a_refused_trigger_stays_typed(self):
-        """Top-level items are always numbered, but "* " typed at the start of one made a
-        bullet (CR11). A trigger that can't apply, "# " under a bullet, was deleted anyway
-        before the refusal (CR20)."""
-        doc = ui.open_chapter([h("Intro", b("outer", b("inner")))])
-        intro = doc.root.children[0]
+    def test_a_top_level_item_can_be_a_bullet_and_a_refused_trigger_stays_typed(self):
+        """Top-level bullets are allowed (your decision on CR11, 2026-11-19): "* " typed at
+        the start of one, Ctrl+Shift+Space and the menu make one. A trigger that can't
+        apply, "# " under a bullet, was deleted anyway before the refusal (CR20)."""
+        doc = ui.open_chapter([h("Intro", b("outer", b("inner"))), h("Next")])
+        intro, nxt = doc.root.children
         inner = intro.children[0].children[0]
         ui.type_text(ui.focus(intro, 0).view, "* ")
-        self.assertEqual((intro.kind, intro.text), ("heading", "* Intro"))
+        self.assertEqual((intro.kind, intro.text), ("bullet", "Intro"))
         ui.type_text(ui.focus(inner, 0).view, "# ")
         self.assertEqual((inner.kind, inner.text), ("bullet", "# inner"))
-        self.assertTrue(ui.press(ui.focus(intro).view, "space", ctrl=True, shift=True))
-        self.assertEqual(intro.kind, "heading", "Ctrl+Shift+Space leaves out bullets at the top level")
-        self.assertEqual({k for k, *_ in self.ed.kind_options(intro)}, {"heading"}, "and so does the menu")
+        self.assertTrue(ui.press(ui.focus(nxt).view, "space", ctrl=True, shift=True))
+        self.assertEqual(nxt.kind, "bullet", "Ctrl+Shift+Space offers bullets at the top level")
+        self.assertIn("bullet", {k for k, *_ in self.ed.kind_options()}, "and so does the menu")
 
     def test_changing_an_items_type_is_one_undo_step(self):
         """Ctrl+Shift+Space and the item-type menu change the kind inside one editor
@@ -335,7 +335,7 @@ class EditingTest(ui.UITestCase):
                          [("bullet", "stays"), ("heading", "Stays too"), ("heading", "Next")])
 
     def test_backspace_on_an_empty_top_level_item_numbers_the_bullets_it_leaves(self):
-        # They used to stay bullets, at the top level, where every item is numbered.
+        # They used to stay bullets; a bullet moved up to the top level becomes numbered, as outdent makes it.
         doc = ui.open_chapter([h("First"), h("", b("was a bullet", b("nested")), h("Sub")), h("Last")])
         root = doc.root
         self.assertTrue(ui.press(ui.focus(root.children[1], 0).view, "BackSpace"))

@@ -82,8 +82,9 @@ walks through the controls; each time you open it, it starts fresh.
 | All shortcuts | Ctrl+? |
 
 Enter on an empty sub-item moves it out one level; on an empty bullet under a
-numbered item it becomes that item's next sibling. Top-level items are always
-numbered.
+numbered item it becomes that item's next sibling. A top-level item can be a
+numbered item or a bullet (`* ` at its start); a bullet that moves up to the top level,
+by Shift+Tab or when the item above it is deleted, becomes the next numbered item.
 
 **Pasting in.** Ctrl+V recognises the app's own output, TopCoding's HTML and
 hand-written notes (`Ⅱ.1)`, `II.1)`, `2.1)`, `•`/`+`/`-`/`*` bullets nested by

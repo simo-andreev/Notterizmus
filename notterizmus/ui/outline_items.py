@@ -10,12 +10,9 @@ from . import drawing_web
 class ItemsMixin:
     """Mixed into OutlineEditor (outline.py); uses its state."""
 
-    def kind_options(self, node=None):
-        """(kind, marker, label, trigger) of each item type; for node, those it can have where
-        it is: a top-level item is always numbered (CR11 in CODE_REVIEW.md)."""
+    def kind_options(self):
+        """(kind, marker, label, trigger) of each item type."""
         opts = [("heading", None, "Numbered Item", self.rules["heading"]["trigger"])]
-        if node is not None and node.parent is not None and node.parent.kind == "root":
-            return opts
         for name, m in self.rules["markers"].items():
             opts.append(("bullet", name, f"{m['symbol']}   {m.get('label', name)}", m.get("trigger", "")))
         return opts
@@ -31,7 +28,7 @@ class ItemsMixin:
         return True
 
     def cycle_kind(self, node):
-        opts = self.kind_options(node)
+        opts = self.kind_options()
         cur = next((i for i, (k, m, *_) in enumerate(opts)
                     if k == node.kind and (k != "bullet" or m == node.marker)), -1)
         with self._op():

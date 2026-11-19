@@ -83,7 +83,7 @@ def build(rules=None):
           b("Type one of these at the start of an item:", *types),
           b((key("Ctrl+Shift+Space"), " switches the type of the item you're in. Clicking an item's label, "
              f"such as {label([3])} or {dot}, opens a menu with the types, plus adding and deleting.")),
-          b("Top-level items are always numbered. Bullets can hold bullets and tables, but not numbered items."),
+          b("A top-level item can be a bullet too. Bullets can hold bullets and tables, but not numbered items."),
           b(_try("put the cursor at the very start of this line and type ", key(con), " and Space. Then press ",
                  key("Ctrl+Shift+Space"), " a few times."))),
 

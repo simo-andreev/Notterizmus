@@ -257,7 +257,7 @@ def outdent(node):
     node.detach()
     gp.insert(idx + 1, node)
     if gp.kind == "root" and node.kind == "bullet":
-        node.kind = "heading"  # top level is always numbered
+        node.kind = "heading"  # a bullet outdented to the top level is the next numbered item
     return True
 
 
@@ -281,7 +281,7 @@ def remove_promote(node):
         c.parent = None
         if can_contain(par, c):
             if par.kind == "root" and c.kind == "bullet":
-                c.kind = "heading"  # top level is always numbered
+                c.kind = "heading"  # as when it is outdented there
             par.insert(idx, c)
             idx += 1
     node.children = []
@@ -345,8 +345,6 @@ def set_kind(node, kind, marker=None):
         return "A numbered item can't sit under a bullet."
     if kind == "bullet" and any(c.kind == "heading" for c in node.children):
         return "This item has numbered sub-items, so it can't become a bullet."
-    if kind == "bullet" and node.parent is not None and node.parent.kind == "root":
-        return "A top-level item is always numbered."  # (CR11 in CODE_REVIEW.md)
     node.kind = kind
     if marker:
         node.marker = marker

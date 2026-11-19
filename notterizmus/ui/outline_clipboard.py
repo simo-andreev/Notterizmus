@@ -335,8 +335,6 @@ class ClipboardMixin:
                 if not can_contain(p, n):
                     p, i = root, len(root.children)
                     pos[:] = [p, i]
-                if p is root and n.kind == "bullet":
-                    n.kind = "heading"  # top-level items are always numbered, as outdent makes them (CR11)
                 p.insert(i, n)
                 pos[1] += 1
                 if other[0] is p and other[1] >= i:

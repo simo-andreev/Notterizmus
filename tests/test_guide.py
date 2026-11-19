@@ -20,7 +20,7 @@ class GuideTest(unittest.TestCase):
         root = guide.build()
         self.assertTrue(root.children)
         for top in root.children:
-            self.assertEqual(top.kind, "heading", "top-level items are always numbered")
+            self.assertEqual(top.kind, "heading", "the guide's top-level items are numbered")
         for n in root.walk():
             for c in n.children:
                 self.assertTrue(can_contain(n, c), f"{c} can't sit under {n}")

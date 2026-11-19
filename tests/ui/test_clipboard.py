@@ -212,12 +212,12 @@ class PasteTest(ui.UITestCase):
                 self.paste(ui.focus(item, 0), lambda: item.text)
                 self.assertEqual(item.text, "plain text")
 
-    def test_bullets_pasted_at_the_top_level_become_numbered_items(self):
-        """Top-level items are always numbered (CR11)."""
+    def test_bullets_pasted_at_the_top_level_stay_bullets(self):
+        """Top-level bullets are allowed (your decision on CR11, 2026-11-19)."""
         doc = ui.open_chapter([h("")])
         self.put(plain="- one\n- two")
         self.paste(ui.focus(doc.root.children[0], 0), lambda: len(self.win.doc.root.children) == 2)
-        self.assertEqual([(n.kind, n.text) for n in self.win.doc.root.children], [("heading", "one"), ("heading", "two")])
+        self.assertEqual([(n.kind, n.text) for n in self.win.doc.root.children], [("bullet", "one"), ("bullet", "two")])
 
     def test_an_outline_pasted_into_an_item_with_text_goes_after_it(self):
         doc = ui.open_chapter([h("Intro", b("mine"), h("Sub")), h("Last")])

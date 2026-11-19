@@ -61,6 +61,7 @@ class _Layout:
 
     def top(self, root):
         n = 0
+        prev = None
         for i, c in enumerate(root.children):
             if c.kind == "heading":
                 if i > 0 and self.t["blank_between_top_level"]:
@@ -68,7 +69,13 @@ class _Layout:
                 n += 1
                 self.heading(c, "", "", [n])
             else:
+                # a top-level bullet after a numbered item is set apart from it, or it
+                # would read as that item's (top-level bullets: CR11's decision)
+                if c.kind == "bullet" and prev is not None and prev.kind == "heading" \
+                        and self.t["blank_between_top_level"]:
+                    self.out.append(Line("blank"))
                 self.leaf(c, "", 0)
+            prev = c
 
     def heading(self, h, head_conn, inner, numbers):
         prefix = []

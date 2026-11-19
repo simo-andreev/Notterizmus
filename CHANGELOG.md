@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A top-level item can be a bullet: type `* ` (or another bullet's trigger) at its start, use Ctrl+Shift+Space or the item-type menu, or paste bullets there. A bullet after a numbered item is set apart by a blank line. Shift+Tab still turns a bullet into the next numbered item.
 - Menus and the Ctrl+Space popup are let go once they close; each one used to stay in memory until the app quit, the Ctrl+Space popup with the text it was opened on.
 - **Earlier Versions** opens at once on big chapters: 0.07 s instead of 0.9 s for 54 copies of a 4 MB chapter. Each copy's item count and "same as now" are filled in a moment later.
 - Long chapters are lighter to edit: Enter, Tab and undo in a chapter of 500 items re-measure the few rows they change instead of every row. Ctrl+Space in a book of 30 chapters keeps up with typing (0.09 ms a key instead of 2.8 ms), and pasting 5,000 lines takes 0.1 s instead of 17 s.

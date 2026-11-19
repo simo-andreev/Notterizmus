@@ -140,6 +140,23 @@ class ShapeTest(unittest.TestCase):
         self.assertNotIn("\n\n", text)
         self.assertTrue(text.endswith("       • c\nⅡ) B\n"))
 
+    def test_top_level_bullets_are_set_apart_from_numbered_items(self):
+        """Top-level bullets are allowed (CR11's decision): one after a numbered item gets
+        the blank line a numbered item gets, or it would read as that item's; bullets in a
+        row stay together."""
+        root = Node("root", children=[B("first"), H("One", B("a")), B("x"), B("y", "dot", B("sub")), H("Two")])
+        self.assertEqual(plain(root), "• first\n"
+                                      "\n"
+                                      "Ⅰ) One\n"
+                                      "     • a\n"
+                                      "\n"
+                                      "• x\n"
+                                      "• y\n"
+                                      "    • sub\n"
+                                      "\n"
+                                      "Ⅱ) Two\n")
+        self.assertNotIn("\n\n", plain(root, tree__blank_between_top_level=False))
+
     def test_bullet_columns_follow_the_indent_rules(self):
         root = Node("root", children=[H("A", B("b", "dot", B("deep")), H("A1", B("c")))])
         self.assertEqual(plain(root, bullets__indent=2, bullets__nested_indent=1), "Ⅰ) A\n"

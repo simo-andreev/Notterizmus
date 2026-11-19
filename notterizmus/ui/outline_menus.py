@@ -148,7 +148,7 @@ class MenusMixin:
         cur = "heading" if node.kind == "heading" else f"bullet:{node.marker}"
         self.actions.lookup_action("set-kind").set_state(GLib.Variant.new_string(cur))
         m = Gio.Menu()
-        for kind, marker, label, trig in self.kind_options(node):
+        for kind, marker, label, trig in self.kind_options():
             m.append_item(_mi(f"{label}      {trig}␣" if trig else label, "ed.set-kind",
                               "heading" if kind == "heading" else f"bullet:{marker}"))
         return m

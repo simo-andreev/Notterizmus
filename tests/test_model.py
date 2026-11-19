@@ -279,14 +279,14 @@ class RemoveAndKindTest(unittest.TestCase):
         self.assertIsNone(set_kind(top.children[1], "bullet", "plus"))
         self.assertEqual((top.children[1].kind, top.children[1].marker), ("bullet", "plus"))
 
-    def test_a_top_level_item_cannot_become_a_bullet(self):
-        """Top-level items are always numbered (README, the guide), but only outdent and
-        remove_promote kept to it: "* " typed at the start of one made a bullet (CR11)."""
-        top = H("A", B("b"))
-        Node("root", children=[top])
-        self.assertIn("always numbered", set_kind(top, "bullet"))
-        self.assertEqual(top.kind, "heading")
-        self.assertIsNone(set_kind(top.children[0], "bullet", "plus"), "below the top level it can")
+    def test_a_top_level_item_can_become_a_bullet(self):
+        """Top-level bullets are allowed (your decision on CR11, 2026-11-19); an item with
+        numbered sub-items still can't become one."""
+        top, other = H("A", B("b")), H("C", H("d"))
+        Node("root", children=[top, other])
+        self.assertIsNone(set_kind(top, "bullet", "plus"))
+        self.assertEqual((top.kind, top.marker), ("bullet", "plus"))
+        self.assertIn("numbered sub-items", set_kind(other, "bullet"))
 
     def test_a_bullet_under_a_bullet_cannot_become_numbered(self):
         inner = B("inner")

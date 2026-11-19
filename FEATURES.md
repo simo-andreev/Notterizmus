@@ -7,7 +7,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Numbered items generated automatically: `Ⅰ)`, `Ⅰ.1)`, `Ⅰ.1.a)`, `Ⅰ.1.a.ⅰ)`, using single-character Unicode Roman numerals.
 - Tree connectors (`├ └ │`), with spacer lines drawn automatically.
 - Bullets: `•` note, `+` pro, `-` con, `!` important, `?` question. Bullets nest by indentation.
-- Typing triggers at the start of an item: `# ` numbered, `* ` bullet, `+ ` pro, `- ` con, `! ` important, `? ` question. Ctrl+Shift+Space cycles the type.
+- Typing triggers at the start of an item: `# ` numbered, `* ` bullet, `+ ` pro, `- ` con, `! ` important, `? ` question. Ctrl+Shift+Space cycles the type. A top-level item can be numbered or a bullet.
 - Bold and italic (Ctrl+B / Ctrl+I), on a selection or for text you are about to type.
 - Tables with row and column controls, an optional header row, and Tab to move between cells.
 - Drawings (Ctrl+D, the menu, Alt+Insert or Search Commands): [Excalidraw](https://excalidraw.com) opens inside the app, offline. **Done** puts the drawing under the item as a picture; **Edit Drawing** or a double-click opens it again. **Copy** above a drawing (or a click on it and Ctrl+C) copies that drawing alone, for TopCoding or another chapter. Adding, changing and deleting a drawing are undo steps. The drawing itself (not the picture) is saved in the chapter file.
