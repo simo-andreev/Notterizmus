@@ -1,5 +1,5 @@
 """Search Commands (Ctrl+Shift+P): find a command by name, see its key, run it."""
-from notterizmus.guide import b, h, key
+from notterizmus.guide import b, h
 
 from . import support as ui
 

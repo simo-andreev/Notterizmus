@@ -8,7 +8,7 @@ from .. import gpu
 
 gpu.prefer_gpu()  # before GTK loads: GTK and WebKit read what it sets once, at the start
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402  (their versions: __init__.py)
+from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk  # noqa: E402  (their versions: __init__.py)
 
 from .. import APP_ID, APP_NAME  # noqa: E402
 from .window import Window  # noqa: E402
@@ -92,7 +92,6 @@ class App(Adw.Application):
         w = self.win.get_content()
         paintable = Gtk.WidgetPaintable.new(w)
         snap = Gtk.Snapshot()
-        from gi.repository import Graphene
         bg = Gdk.RGBA()
         bg.parse("#222226" if Adw.StyleManager.get_default().get_dark() else "#fafafb")
         snap.append_color(bg, Graphene.Rect().init(0, 0, w.get_width(), w.get_height()))

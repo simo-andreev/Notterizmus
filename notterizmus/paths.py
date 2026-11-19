@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -92,7 +93,6 @@ def metainfo_path(app_id, env=None):
 
 def latest_release(app_id, env=None):
     """(version, description markup) of the newest <release> in the metainfo."""
-    import xml.etree.ElementTree as ET
     p = metainfo_path(app_id, env)
     if p is None:
         return None, ""

@@ -1,6 +1,4 @@
 """Regressions in what the outline draws: rows that jump, a hidden cursor, a tall first item."""
-import unittest
-
 from notterizmus.guide import b, h
 
 from . import support as ui

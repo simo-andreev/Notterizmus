@@ -68,7 +68,6 @@ class Speller:
         lib.enchant_broker_init.restype = vp
         lib.enchant_broker_request_dict.argtypes = [vp, cp]
         lib.enchant_broker_request_dict.restype = vp
-        lib.enchant_broker_free_dict.argtypes = [vp, vp]
         lib.enchant_broker_list_dicts.argtypes = [vp, _DESCRIBE, vp]
         lib.enchant_dict_check.argtypes = [vp, cp, ss]
         lib.enchant_dict_check.restype = ctypes.c_int

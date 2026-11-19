@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
@@ -381,7 +382,7 @@ class Window(Adw.ApplicationWindow):
         self._save_pending()  # before reading: it may be this very chapter
         try:
             self.set_doc(Document.load(path))
-        except (OSError, ValueError, KeyError) as e:
+        except (OSError, ValueError) as e:
             self.toast(f"Could not open {Path(path).name}: {e}")
 
     # -- chapter sidebar -------------------------------------------------------------------
@@ -484,7 +485,7 @@ class Window(Adw.ApplicationWindow):
         path = Path(path)
         try:
             doc = Document.load(path)
-        except (OSError, ValueError, KeyError) as e:
+        except (OSError, ValueError) as e:
             self.toast(f"Could not read {path.name}: {e}")
             return
         books = [b.path for b in library.scan(notes_root())]
@@ -1059,7 +1060,7 @@ class Window(Adw.ApplicationWindow):
                     return
                 try:
                     text = to_plain(layout(Document.load(row._backup.path).root, self.rules))
-                except (OSError, ValueError, KeyError) as e:
+                except (OSError, ValueError) as e:
                     text = f"This copy can't be read: {e}"
                     restore.set_sensitive(False)
                 preview.get_buffer().set_text(text)
@@ -1107,7 +1108,7 @@ class Window(Adw.ApplicationWindow):
         """Put an earlier version's content in the editor; Ctrl+Z takes it back."""
         try:
             earlier = Document.load(path)
-        except (OSError, ValueError, KeyError) as e:
+        except (OSError, ValueError) as e:
             self.toast(f"Could not read that version: {e}")
             return
         self._flush_save()
@@ -1263,7 +1264,6 @@ def _restore_from_trash(path):
 
 def _day(day):
     """'Today', 'Yesterday' or '2026-11-02'."""
-    from datetime import date, timedelta
     if day == date.today():
         return "Today"
     if day == date.today() - timedelta(days=1):

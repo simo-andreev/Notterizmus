@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .model import BLOCK_KINDS, Run
+from .model import BLOCK_KINDS
 
 
 @dataclass
@@ -68,7 +68,7 @@ class _Layout:
                 n += 1
                 self.heading(c, "", "", [n])
             else:
-                self.leaf(c, "", False, 0)
+                self.leaf(c, "", 0)
 
     def heading(self, h, head_conn, inner, numbers):
         prefix = []
@@ -99,11 +99,11 @@ class _Layout:
                 self.heading(c, head_conn, child_inner, numbers + [n])
             else:
                 trunk_str = inner + self.t["trunk"] if i < last_head else inner
-                self.leaf(c, trunk_str, True, marker_col)
+                self.leaf(c, trunk_str, marker_col)
             if c.kind in BLOCK_KINDS:
                 prev = c
 
-    def leaf(self, c, trunk_str, _owned, marker_col):
+    def leaf(self, c, trunk_str, marker_col):
         base = trunk_str
         if len(base) < marker_col:
             base = base + " " * (marker_col - len(base))
@@ -120,4 +120,4 @@ class _Layout:
             prefix.append(Seg(self.r.marker_symbol(c.marker) + " ", "marker"))
         self.out.append(Line("item", prefix, c))
         for k in c.children:
-            self.leaf(k, trunk_str, True, marker_col + self.r["bullets"]["nested_indent"])
+            self.leaf(k, trunk_str, marker_col + self.r["bullets"]["nested_indent"])

@@ -797,7 +797,7 @@ verification, plus the checks named.
   reads from the table.
 - [x] **CR40.** One XDG helper in `paths.py`. `tests/test_paths.py` covers set, unset and
   empty variables for config, data and cache.
-- [ ] **CR45.** Remove the unused parameter, the alias, the redundant `KeyError`s and the
+- [x] **CR45.** Remove the unused parameter, the alias, the redundant `KeyError`s and the
   local imports. Free the Enchant dictionaries on shutdown, or drop the declaration. A
   pyflakes pass (`sudo apt install pyflakes3`, a development tool only) reports nothing
   new.
@@ -835,6 +835,20 @@ verification, plus the checks named.
   `tests/test_paths.py` covers set, empty and unset variables for all three folders, the
   system list, and that rules, state and drawings use them. On the way: an unused
   `config_dir` import in `window.py` and three unused `import os`.
+- CR45: `_Layout.leaf` has lost `_owned`; `export.runs_html` is the function itself, not
+  an alias of `_runs_html`; the four `KeyError`s around `Document.load` in `window.py` and
+  the one in `library.book_name` are gone (it raises only `OSError` and `ValueError`).
+  Imports moved to the top where there is no cycle: `library` (model, uuid), `paths`
+  (ElementTree), `window` (datetime) and `app` (Graphene, which GTK loads anyway).
+  `drawing_web` keeps its WebKit import inside `try`, since WebKit may be missing. The
+  Enchant broker and dictionaries live as long as the app, so freeing them at exit would
+  buy nothing: the unused `enchant_broker_free_dict` declaration is dropped instead.
+  pyflakes isn't installed here; a scan of every module's imports in `notterizmus/`,
+  `tests/` and `scripts/` found four more unused ones (`Run` in `layout.py`, `json` in
+  `tests/test_completion.py`, `key` in `test_command_search`, `unittest` in
+  `test_layout`), now removed; it still lists `Adw` and `Pango` in `tests/ui/support.py`,
+  which re-exports them on purpose (`noqa: F401`). Unit suite 418 tests, with and without
+  PyGObject; UI suite 279 tests in 171 s.
 
 ### With you
 

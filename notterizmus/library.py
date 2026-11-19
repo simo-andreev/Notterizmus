@@ -6,8 +6,11 @@ named "<NN> <Title>.notz" by model.chapter_filename().
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from .model import Document, chapter_filename, fit_name
 
 _NAME = re.compile(r"^(\d+)(?:\s+(.*))?$")
 
@@ -96,7 +99,6 @@ def safe_name(name):
     """A book name as a folder name: without "/", "\\" or NUL, never hidden (scan() skips
     hidden folders, so ".NET" becomes "_NET"), never "." or ".." (they would put chapters in
     the notes folder itself, or above it), and short enough for a file name (CR7, CR15)."""
-    from .model import fit_name
     folder = "".join("_" if c in "/\\\0" else c for c in name).strip()
     if folder in ("", ".", ".."):
         return "Unsorted"
@@ -105,12 +107,11 @@ def safe_name(name):
 
 def book_name(book_dir):
     """The book's name as stored in its chapters (folder names lose "/" and "\\")."""
-    from .model import Document
     for f in sorted(Path(book_dir).glob("*.notz")):
         if not f.name.startswith("."):
             try:
                 name = Document.load(f).book
-            except (OSError, ValueError, KeyError):
+            except (OSError, ValueError):
                 continue
             if name:
                 return name
@@ -120,7 +121,6 @@ def book_name(book_dir):
 def _rewrite(path, new_path, doc=None, **fields):
     """Save the chapter at path (already loaded as doc, if given) to new_path with some
     fields changed; remove the old file."""
-    from .model import Document
     if doc is None:
         doc = Document.load(path)
     if "number" in fields:
@@ -136,7 +136,6 @@ def _rewrite(path, new_path, doc=None, **fields):
 
 
 def _temp_path(folder):
-    import uuid
     return Path(folder) / f".moving-{uuid.uuid4().hex[:8]}.notz"  # hidden: scan() skips it
 
 
@@ -171,7 +170,6 @@ def set_chapter(path, number, title, book_dir=None):
     book, or if two chapters have it, it raises FileExistsError. Returns {old path: new
     path}. Every check comes before any file moves, and a failure after the swap (a full
     disk, say) undoes the swap before it is raised (CR6 in CODE_REVIEW.md)."""
-    from .model import chapter_filename
     path = Path(path)
     folder = Path(book_dir) if book_dir else path.parent
     moving = not same_file(folder, path.parent)
@@ -210,7 +208,6 @@ def renumber(changes):
     staging name with its new number, then given its new name. If anything fails halfway
     (a full disk, say), every chapter is put back under its old name and number before the
     error is raised again (CR6 in CODE_REVIEW.md)."""
-    from .model import Document, chapter_filename
     # Read every chapter before moving any: one that can't be read then stops the change
     # while all the files still have their names.
     docs = {Path(path): Document.load(path) for path in changes}
@@ -278,7 +275,6 @@ def stranded(root):
 def restore_stranded(path):
     """Give a stranded chapter its name back, from the number and title inside it. If
     another chapter has that name, " (restored)" goes after its title. Returns the new path."""
-    from .model import Document, chapter_filename
     path = Path(path)
     doc = Document.load(path)
     title, n = doc.chapter_title, 1

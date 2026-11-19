@@ -1,4 +1,3 @@
-import json
 import tempfile
 import unittest
 from collections import Counter

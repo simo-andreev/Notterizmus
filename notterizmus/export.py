@@ -23,7 +23,7 @@ def _seg_html(text, bold, italic):
     return h
 
 
-def _runs_html(runs):
+def runs_html(runs):
     return "".join(_seg_html(r.text, r.bold, r.italic) for r in runs)
 
 
@@ -35,7 +35,7 @@ def _table_html(node):
         tag = "th" if header and ri == 0 else "td"
         out.append("<tr>")
         for cell in row:
-            out.append(f"<{tag}><p>{_runs_html(cell) or '<br>'}</p></{tag}>")
+            out.append(f"<{tag}><p>{runs_html(cell) or '<br>'}</p></{tag}>")
         out.append("</tr>")
     out.append("</tbody></table>")
     return "".join(out)
@@ -108,5 +108,3 @@ def to_plain(lines):
             out.append("".join(s.text for s in ln.segs()).rstrip())
     return "\n".join(out) + "\n"
 
-
-runs_html = _runs_html
