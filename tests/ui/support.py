@@ -567,6 +567,13 @@ def walk(widget):
         c = c.get_next_sibling()
 
 
+def chapter_rows():
+    """[(label, path, selected)] of the chapter rows the sidebar shows; a chapter row's
+    last label is its title."""
+    return [([w for w in walk(r) if isinstance(w, Gtk.Label)][-1].get_text(), r._path, r.is_selected())
+            for r in app().win.sidebar.rows() if r._path is not None]
+
+
 def open_popovers():
     return [w for w in walk(app().win) if isinstance(w, Gtk.Popover) and w.get_visible()]
 

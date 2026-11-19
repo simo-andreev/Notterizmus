@@ -804,7 +804,7 @@ verification, plus the checks named.
 - [x] **CR48.** Small helpers (`run_once(fn, *args)` returning `GLib.SOURCE_REMOVE`,
   `set_class(widget, name, on)`) instead of tuple-index lambdas and conditional method
   calls.
-- [ ] **CR44.** Tests find dialogs through `get_visible_dialog()` and the widget tree;
+- [x] **CR44.** Tests find dialogs through `get_visible_dialog()` and the widget tree;
   `chapter_rows()` moves to `tests/ui/support.py`; `drawing_web.shutdown()` is called when
   the app shuts down, or moves to the tests.
 - [ ] **CR43.** Row classes with real attributes (`ChapterRow`, `BookRow`, menu rows), and
@@ -861,6 +861,17 @@ verification, plus the checks named.
   method of one object, and a `wait_for` condition in `tests/ui/test_drawings.py`.
   Unit suite 418 tests, with and without PyGObject; UI suite 279 tests in 171 s, and
   180 s with the real Excalidraw.
+- CR44: the window no longer keeps `_command_search` or `_versions_preview`: the tests
+  take Search Commands from `get_visible_dialog()` and Earlier Versions' preview from the
+  dialog's widget tree (`ui.walk`). `ChapterSidebar.chapter_rows()` is now
+  `tests/ui/support.chapter_rows()`, and the sidebar's `_labels`, used only by it, is
+  gone. `drawing_web.shutdown()` stays where it is, since `measure_drawings.py` uses it
+  to start a fresh preview page, and `App.do_shutdown` now calls it, so quitting lets go
+  of the hidden page and WebKit's processes in order. Checked by hand on a private
+  Broadway display, since the UI suite never quits its app: a preview rendered, then
+  `quit()` cleared the page and the app exited 0 with no warning beyond the two Broadway
+  gives for any web view (no GL, no AT-SPI). Unit suite 418 tests, with and without
+  PyGObject; UI suite 279 tests in 170 s.
 
 ### With you
 

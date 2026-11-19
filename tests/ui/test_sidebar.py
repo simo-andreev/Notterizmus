@@ -21,7 +21,7 @@ class SidebarTest(ui.UITestCase):
 
     def rows_of(self, paths):
         wanted = {Path(p).resolve() for p in paths}
-        return [(label, sel) for label, path, sel in self.win.sidebar.chapter_rows()
+        return [(label, sel) for label, path, sel in ui.chapter_rows()
                 if Path(path).resolve() in wanted]
 
     def test_lists_the_book_in_order_and_marks_the_open_chapter(self):
@@ -96,8 +96,8 @@ class SidebarTest(ui.UITestCase):
         self.make_book("Sidebar guide", ["Mine"])
         self.win.lookup_action("guide").activate(None)
         ui.settle()
-        self.assertFalse(any(sel for _l, _p, sel in self.win.sidebar.chapter_rows()))
-        self.assertFalse(any("Getting Started" in str(p) for _l, p, _s in self.win.sidebar.chapter_rows()))
+        self.assertFalse(any(sel for _l, _p, sel in ui.chapter_rows()))
+        self.assertFalse(any("Getting Started" in str(p) for _l, p, _s in ui.chapter_rows()))
 
     def test_switching_back_to_the_window_keeps_focus_in_the_list(self):
         paths = self.make_book("Sidebar focus", ["Kept"])
@@ -110,7 +110,7 @@ class SidebarTest(ui.UITestCase):
         ui.wait_for(focused_on_kept, "focus still on the chapter's row")
         (paths[0].parent / "99 Added outside.notz").write_text(paths[0].read_text(encoding="utf-8"), encoding="utf-8")
         self.win._reload_sidebar()  # the folder changed: rebuilt, focus stays on the same chapter
-        ui.wait_for(lambda: "Added outside" in [label for label, _p, _s in self.win.sidebar.chapter_rows()],
+        ui.wait_for(lambda: "Added outside" in [label for label, _p, _s in ui.chapter_rows()],
                     "the new chapter in the list")
         ui.wait_for(focused_on_kept, "focus still on the same chapter")
 

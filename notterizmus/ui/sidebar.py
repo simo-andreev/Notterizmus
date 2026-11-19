@@ -266,17 +266,3 @@ class ChapterSidebar(Adw.Bin):
         while (r := self.list.get_row_at_index(i)) is not None:
             yield r
             i += 1
-
-    def chapter_rows(self):
-        """[(label, path, selected)] of the chapter rows shown (used by the tests)."""
-        return [(list(_labels(r))[-1].get_text(), r._path, r.is_selected())
-                for r in self.rows() if r._path is not None]
-
-
-def _labels(widget):
-    c = widget.get_first_child()
-    while c is not None:
-        if isinstance(c, Gtk.Label):
-            yield c
-        yield from _labels(c)
-        c = c.get_next_sibling()

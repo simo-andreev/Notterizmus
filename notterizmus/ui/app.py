@@ -11,6 +11,7 @@ gpu.prefer_gpu()  # before GTK loads: GTK and WebKit read what it sets once, at 
 from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk  # noqa: E402  (their versions: __init__.py)
 
 from .. import APP_ID, APP_NAME  # noqa: E402
+from . import drawing_web  # noqa: E402
 from .window import Window  # noqa: E402
 
 CSS = Path(__file__).with_name("style.css")
@@ -60,6 +61,10 @@ class App(Adw.Application):
         q.connect("activate", lambda *_: self.win.close() if self.win else self.quit())
         self.add_action(q)
         self.set_accels_for_action("app.quit", ["<Ctrl>q"])
+
+    def do_shutdown(self):
+        drawing_web.shutdown()  # the hidden preview page, and WebKit's processes with it
+        Adw.Application.do_shutdown(self)
 
     def do_activate(self):
         if not self.win:

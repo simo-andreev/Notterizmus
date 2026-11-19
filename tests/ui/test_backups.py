@@ -80,7 +80,8 @@ class BackupsTest(ui.UITestCase):
         self.assertEqual(rows[0].get_header().get_label(), "Today")
         listbox = rows[0].get_parent()
         listbox.select_row(rows[2])  # the oldest
-        buf = self.win._versions_preview.get_buffer()
+        preview = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.TextView))
+        buf = preview.get_buffer()
         self.assertEqual(buf.get_text(*buf.get_bounds(), True),
                          to_plain(layout(Document.load(rows[2]._backup.path).root, self.win.rules)))
         restore = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.Button) and w.get_label() == "Restore")

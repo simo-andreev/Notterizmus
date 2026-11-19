@@ -82,7 +82,7 @@ class ChaptersTest(ui.UITestCase):
         self.assertEqual(names(old.parent), [old.name.replace("Draft", "Final")])
         self.assertEqual(self.win.doc.chapter_title, "Final")
         self.assertIn("Final", self.win.wtitle.get_title())
-        self.assertIn("Final", [label for label, _p, _s in self.win.sidebar.chapter_rows()])
+        self.assertIn("Final", [label for label, _p, _s in ui.chapter_rows()])
         ui.type_text(ui.row(self.win.doc.root.children[0]).view, " more")
         # autosave goes to the new file, and the old one doesn't come back
         ui.wait_for(lambda: " more" in Document.load(self.win.doc.path).root.children[0].text, "the autosave")
@@ -322,7 +322,7 @@ class ChaptersTest(ui.UITestCase):
         self.assertEqual(self.win.wtitle.get_subtitle(), "New title")
         self.assertEqual(Path(self.win.doc.path).parent.name, "New title")
         self.assertIn("New title", [r._book for r in self.win.sidebar.rows() if r._book])
-        self.assertGreaterEqual(len(self.win.sidebar.chapter_rows()), 2)
+        self.assertGreaterEqual(len(ui.chapter_rows()), 2)
 
     def test_the_list_menu_has_numbered_choices(self):
         path = self.book("Menu", ["Only"])[0]
@@ -364,7 +364,7 @@ class ChaptersTest(ui.UITestCase):
         self.assertEqual(sorted(f.name for f in a.parent.iterdir()), before,
                          "every chapter keeps its name; none is left under a hidden one")
         self.assertEqual(Path(self.win.doc.path).resolve(), b2.resolve())
-        self.assertEqual([label for label, p, _s in self.win.sidebar.chapter_rows() if Path(p).parent == a.parent],
+        self.assertEqual([label for label, p, _s in ui.chapter_rows() if Path(p).parent == a.parent],
                          ["Aa", "Bb", "Broken"])
 
     def test_renaming_a_book_takes_a_file_that_is_not_a_chapter_along(self):

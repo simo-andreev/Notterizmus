@@ -1006,7 +1006,6 @@ class Window(Adw.ApplicationWindow):
                 view.grab_focus()
                 view.select_range(*sel)
         dlg = command_search.CommandSearch(command_search.build(self), before_run=restore)
-        self._command_search = dlg
         dlg.present(self)
         GLib.idle_add(run_once, dlg.entry.grab_focus)
 
@@ -1053,7 +1052,6 @@ class Window(Adw.ApplicationWindow):
             lb.set_header_func(day_header)
             preview = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
                                    left_margin=16, right_margin=16, top_margin=12, bottom_margin=12)
-            self._versions_preview = preview
 
             def selected(_lb, row):
                 restore.set_sensitive(row is not None)

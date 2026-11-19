@@ -13,7 +13,7 @@ class CommandSearchTest(ui.UITestCase):
     def open_search(self, text=""):
         self.win.lookup_action("commands").activate(None)
         ui.wait_for(lambda: self.win.get_visible_dialog() is not None, "Search Commands")
-        dlg = self.win._command_search
+        dlg = self.win.get_visible_dialog()
         self.search(dlg, text)
         return dlg
 

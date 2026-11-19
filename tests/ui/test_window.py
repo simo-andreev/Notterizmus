@@ -197,7 +197,7 @@ class WindowTest(ui.UITestCase):
         self.assertEqual((Path(doc.path), doc.book, doc.chapter_no, doc.chapter_title), (path, "Fresh book", 4, "Made here"))
         self.assertEqual([(n.kind, n.text) for n in doc.root.children], [("heading", "")])
         self.assertIs(self.ed.current, doc.root.children[0], "ready to type")
-        self.assertIn("Made here", [label for label, _p, _s in self.win.sidebar.chapter_rows()])
+        self.assertIn("Made here", [label for label, _p, _s in ui.chapter_rows()])
         self.assertEqual(state()["last_book"], "Fresh book")
 
     def test_new_chapter_with_a_number_that_exists_opens_that_chapter(self):
