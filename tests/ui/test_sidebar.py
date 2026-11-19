@@ -30,7 +30,7 @@ class SidebarTest(ui.UITestCase):
 
     def test_clicking_a_chapter_opens_it(self):
         paths = self.make_book("Sidebar click", ["One", "Two"])
-        row = next(r for r in self.win.sidebar.rows() if r._path and Path(r._path).resolve() == paths[0].resolve())
+        row = next(r for r in self.win.sidebar.rows() if r.path and Path(r.path).resolve() == paths[0].resolve())
         self.win.sidebar.list.emit("row-activated", row)
         ui.settle()
         self.assertEqual(Path(self.win.doc.path).resolve(), paths[0].resolve())
@@ -54,10 +54,10 @@ class SidebarTest(ui.UITestCase):
 
     def test_a_book_row_folds_its_chapters(self):
         paths = self.make_book("Sidebar fold", ["Only"])
-        book_row = next(r for r in self.win.sidebar.rows() if r._book == "Sidebar fold")
+        book_row = next(r for r in self.win.sidebar.rows() if r.book == "Sidebar fold")
         self.win.sidebar.list.emit("row-activated", book_row)
         ui.wait_for(lambda: self.rows_of(paths) == [], "the book to fold")
-        book_row = next(r for r in self.win.sidebar.rows() if r._book == "Sidebar fold")
+        book_row = next(r for r in self.win.sidebar.rows() if r.book == "Sidebar fold")
         self.win.sidebar.list.emit("row-activated", book_row)
         ui.wait_for(lambda: self.rows_of(paths) == [("Only", True)], "the book to unfold")
 
@@ -82,7 +82,7 @@ class SidebarTest(ui.UITestCase):
                             "collapsing isn't saved as a choice to hide it")
             self.win.lookup_action("sidebar").activate(None)
             ui.wait_for(self.win.split.get_show_sidebar, "the list over the text")
-            row = next(r for r in self.win.sidebar.rows() if r._path and Path(r._path).resolve() == paths[0].resolve())
+            row = next(r for r in self.win.sidebar.rows() if r.path and Path(r.path).resolve() == paths[0].resolve())
             self.win.sidebar.list.emit("row-activated", row)
             ui.settle()
             self.assertEqual(Path(self.win.doc.path).resolve(), paths[0].resolve())
@@ -101,10 +101,10 @@ class SidebarTest(ui.UITestCase):
 
     def test_switching_back_to_the_window_keeps_focus_in_the_list(self):
         paths = self.make_book("Sidebar focus", ["Kept"])
-        row = next(r for r in self.win.sidebar.rows() if r._path and Path(r._path).resolve() == paths[0].resolve())
+        row = next(r for r in self.win.sidebar.rows() if r.path and Path(r.path).resolve() == paths[0].resolve())
         row.grab_focus()
         focused_on_kept = lambda: (self.win.sidebar.focused_row() is not None  # noqa: E731
-                                   and Path(self.win.sidebar.focused_row()._path).resolve() == paths[0].resolve())
+                                   and Path(self.win.sidebar.focused_row().path).resolve() == paths[0].resolve())
         ui.wait_for(focused_on_kept, "focus on the chapter's row")
         self.win._reload_sidebar()  # what happens when the window becomes active again
         ui.wait_for(focused_on_kept, "focus still on the chapter's row")

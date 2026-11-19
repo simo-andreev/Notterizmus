@@ -807,7 +807,7 @@ verification, plus the checks named.
 - [x] **CR44.** Tests find dialogs through `get_visible_dialog()` and the widget tree;
   `chapter_rows()` moves to `tests/ui/support.py`; `drawing_web.shutdown()` is called when
   the app shuts down, or moves to the tests.
-- [ ] **CR43.** Row classes with real attributes (`ChapterRow`, `BookRow`, menu rows), and
+- [x] **CR43.** Row classes with real attributes (`ChapterRow`, `BookRow`, menu rows), and
   `ChapterSidebar.focused_target()` instead of window.py reading `row._path`.
 - [ ] **CR41.** Spelling state owned by the editor and passed to the views; the GPU
   environment set explicitly when the app starts (done with CR1). A test checks that
@@ -872,6 +872,17 @@ verification, plus the checks named.
   `quit()` cleared the page and the app exited 0 with no warning beyond the two Broadway
   gives for any web view (no GL, no AT-SPI). Unit suite 418 tests, with and without
   PyGObject; UI suite 279 tests in 170 s.
+- CR43: no Python attribute is stuck on a plain GTK widget any more; each kind of widget
+  that carries data has its own small class. The chapter list's rows are `BookRow` and
+  `ChapterRow` (a `SidebarRow` with `book`, `folder` and `path`), and F2 in `window.py`
+  asks `ChapterSidebar.focused_target()` instead of reading the row. The item menu and
+  the Ctrl+Space popup share `MenuRow` (`choice`, `act`, `target`, `cb`), which
+  `_number_rows` and the tests' `menu_choices` recognise by class. Search Commands has
+  `CommandRow` (`cmd`), Earlier Versions `VersionRow` (`backup`), the outline's spacer
+  lines `PrefixLabel` (`shown`), and the drawing page's view is `drawing_web._PageView`
+  (`loaded`, `waiting`), defined only where WebKit is installed. Unit suite 418 tests,
+  with and without PyGObject; UI suite 279 tests in 170 s (`test_freeing`'s sidebar check
+  included), and 179 s with the real Excalidraw.
 
 ### With you
 

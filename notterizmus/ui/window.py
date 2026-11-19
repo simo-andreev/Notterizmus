@@ -451,12 +451,12 @@ class Window(Adw.ApplicationWindow):
     def on_rename(self, *_):
         """F2: the focused sidebar row (chapter or book), else the open chapter."""
         focus = self.get_focus()
-        if focus is not None and focus.is_ancestor(self.sidebar):
-            row = self.sidebar.focused_row()
-            if row is not None and row._path is None:
-                return self.on_book_rename(str(row._folder))
-            if row is not None:
-                return self.on_chapter_props(str(row._path))
+        target = self.sidebar.focused_target() if focus is not None and focus.is_ancestor(self.sidebar) else None
+        if target is not None:
+            kind, path = target
+            if kind == "book":
+                return self.on_book_rename(str(path))
+            return self.on_chapter_props(str(path))
         if not self.doc or self._is_guide() or not self.doc.path:
             self.toast("Open a chapter of a book first")
             return
@@ -1033,16 +1033,15 @@ class Window(Adw.ApplicationWindow):
             lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE, css_classes=["navigation-sidebar"])
             rows = []
             for b in found:
-                row = Adw.ActionRow(title=f"{b.when:%H:%M}", subtitle="…", tooltip_text=_when(b.when))
-                row._backup = b
+                row = VersionRow(b, title=f"{b.when:%H:%M}", subtitle="…", tooltip_text=_when(b.when))
                 lb.append(row)
                 rows.append(row)
             self._fill_versions(dlg, rows)
 
             def day_header(row, before):
                 # a heading above the first copy of each day: Today, Yesterday, 2026-11-02
-                day = row._backup.when.date()
-                if before is not None and before._backup.when.date() == day:
+                day = row.backup.when.date()
+                if before is not None and before.backup.when.date() == day:
                     row.set_header(None)
                     return
                 label = Gtk.Label(label=_day(day), xalign=0, margin_start=12, margin_top=12, margin_bottom=4)
@@ -1058,7 +1057,7 @@ class Window(Adw.ApplicationWindow):
                 if row is None:
                     return
                 try:
-                    text = to_plain(layout(Document.load(row._backup.path).root, self.rules))
+                    text = to_plain(layout(Document.load(row.backup.path).root, self.rules))
                 except (OSError, ValueError) as e:
                     text = f"This copy can't be read: {e}"
                     restore.set_sensitive(False)
@@ -1075,7 +1074,7 @@ class Window(Adw.ApplicationWindow):
                 row = lb.get_selected_row()
                 dlg.close()
                 if row is not None:
-                    self.restore_version(row._backup.path)
+                    self.restore_version(row.backup.path)
 
             restore.connect("clicked", do_restore)
             lb.connect("row-activated", lambda *_: do_restore())
@@ -1098,7 +1097,7 @@ class Window(Adw.ApplicationWindow):
             row = next(pending, None) if open_[0] else None
             if row is None:
                 return GLib.SOURCE_REMOVE
-            row.set_subtitle(_copy_summary(row._backup.path, now))
+            row.set_subtitle(_copy_summary(row.backup.path, now))
             return GLib.SOURCE_CONTINUE
 
         GLib.idle_add(next_row)
@@ -1259,6 +1258,14 @@ def _restore_from_trash(path):
         return True
     except GLib.Error:
         return False
+
+
+class VersionRow(Adw.ActionRow):
+    """A kept copy in Earlier Versions (backup: a backups.Backup)."""
+
+    def __init__(self, backup, **props):
+        super().__init__(**props)
+        self.backup = backup
 
 
 def _day(day):

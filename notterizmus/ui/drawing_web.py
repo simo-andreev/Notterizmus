@@ -68,6 +68,17 @@ def _serve(request):
     request.finish(Gio.MemoryInputStream.new_from_bytes(GLib.Bytes.new(data)), len(data), mime)
 
 
+if WebKit is not None:
+    class _PageView(WebKit.WebView):
+        """The drawing page's view. Until the page has loaded (loaded), JavaScript calls wait
+        in waiting: WebKit drops a call made before that."""
+
+        def __init__(self, **props):
+            super().__init__(**props)
+            self.loaded = False
+            self.waiting = []
+
+
 def _new_view():
     global _context
     if _context is None:
@@ -79,7 +90,7 @@ def _new_view():
     # Ephemeral: the page keeps nothing on disk (the drawing lives in the chapter file).
     session = WebKit.NetworkSession.new_ephemeral()
     session.connect("download-started", lambda _session, download: download.cancel())  # it saves nothing (CR31)
-    view = WebKit.WebView(web_context=_context, network_session=session)
+    view = _PageView(web_context=_context, network_session=session)
     settings = view.get_settings()
     settings.set_javascript_can_access_clipboard(True)
     debug = bool(os.environ.get("NOTTERIZMUS_WEB_DEBUG"))
@@ -87,8 +98,6 @@ def _new_view():
     settings.set_enable_write_console_messages_to_stdout(debug)
     view.connect("decide-policy", _decide_policy)
     view.connect("context-menu", lambda *_: True)  # Excalidraw has its own
-    view.ntz_loaded = False
-    view.ntz_waiting = []
     view.connect("load-changed", _load_changed)
     view.connect("load-failed", _load_failed)
     view.load_uri(PAGE)
@@ -113,8 +122,8 @@ def _call(view, body, done, **args):
     """Run an async JavaScript function body in the page; done(value, error) gets its
     result as text (or None and the error message); args are passed as text. Waits for the page to have loaded:
     a call made before that is dropped by WebKit when the page arrives."""
-    if not view.ntz_loaded:
-        view.ntz_waiting.append((body, done, args))
+    if not view.loaded:
+        view.waiting.append((body, done, args))
         return
     variant = GLib.Variant("a{sv}", {k: GLib.Variant("s", v) for k, v in args.items()})
 
@@ -130,15 +139,15 @@ def _call(view, body, done, **args):
 
 
 def _load_changed(view, event):
-    if event == WebKit.LoadEvent.FINISHED and not view.ntz_loaded:
-        view.ntz_loaded = True
-        waiting, view.ntz_waiting = view.ntz_waiting, []
+    if event == WebKit.LoadEvent.FINISHED and not view.loaded:
+        view.loaded = True
+        waiting, view.waiting = view.waiting, []
         for body, done, args in waiting:
             _call(view, body, done, **args)
 
 
 def _load_failed(view, _event, _uri, error):
-    waiting, view.ntz_waiting = view.ntz_waiting, []
+    waiting, view.waiting = view.waiting, []
     for _body, done, _args in waiting:
         done(None, error.message)
     return False

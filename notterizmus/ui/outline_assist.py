@@ -9,7 +9,7 @@ from ..spell import should_check
 from .helpers import run_once
 from .richtext import SPELL
 from .rows import _mods
-from .outline_menus import _digit, _number_rows
+from .outline_menus import MenuRow, _digit, _number_rows
 
 
 class AssistMixin:
@@ -115,13 +115,11 @@ class AssistMixin:
                              else Gtk.PositionType.BOTTOM)
 
         def add_row(child, cb=None, kind=None):
-            row = Gtk.ListBoxRow(activatable=cb is not None, selectable=False,
-                                 can_focus=cb is not None)
+            row = MenuRow(choice=kind == "choice", cb=cb, activatable=cb is not None, selectable=False,
+                          can_focus=cb is not None)
             row.set_child(child)
             if kind:
                 row.add_css_class(kind)
-            row._cb = cb
-            row._choice = kind == "choice"
             lb.append(row)
             return row
 
@@ -149,10 +147,10 @@ class AssistMixin:
         numbered = {}
 
         def pick(row):
-            if row is None or row._cb is None:
+            if row is None or row.cb is None:
                 return
             pop.popdown()
-            cb = row._cb
+            cb = row.cb
 
             def run():
                 cb()

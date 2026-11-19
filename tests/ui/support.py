@@ -570,8 +570,8 @@ def walk(widget):
 def chapter_rows():
     """[(label, path, selected)] of the chapter rows the sidebar shows; a chapter row's
     last label is its title."""
-    return [([w for w in walk(r) if isinstance(w, Gtk.Label)][-1].get_text(), r._path, r.is_selected())
-            for r in app().win.sidebar.rows() if r._path is not None]
+    return [([w for w in walk(r) if isinstance(w, Gtk.Label)][-1].get_text(), r.path, r.is_selected())
+            for r in app().win.sidebar.rows() if r.path is not None]
 
 
 def open_popovers():
@@ -589,9 +589,10 @@ def close_popovers():
 
 def menu_choices(pop):
     """[(number, label, row)] for the numbered rows of one of the app's popup menus."""
+    from notterizmus.ui.outline_menus import MenuRow
     out = []
     for w in walk(pop):
-        if isinstance(w, Gtk.ListBoxRow) and getattr(w, "_choice", False):
+        if isinstance(w, MenuRow) and w.choice:
             labels = [x for x in walk(w) if isinstance(x, Gtk.Label)]
             num = next((x.get_text() for x in labels if x.has_css_class("menu-num")), "")
             text = next((x.get_text() for x in labels if not x.has_css_class("menu-num") and x.get_text()), "")

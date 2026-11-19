@@ -94,6 +94,15 @@ def wire_view(editor, view):
     editor.track_cursor(view)
 
 
+class PrefixLabel(Gtk.Label):
+    """A line of the outline between rows (a spacer or a blank); shown is the markup it
+    shows, so an unchanged one isn't set again."""
+
+    def __init__(self):
+        super().__init__(xalign=0, css_classes=["prefix"])
+        self.shown = None
+
+
 class _PrefixRow(Gtk.Box):
     def __init__(self, editor, node):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)

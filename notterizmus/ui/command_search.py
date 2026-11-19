@@ -127,6 +127,12 @@ def build(win):
     return cmds
 
 
+class CommandRow(Gtk.ListBoxRow):
+    def __init__(self, cmd, **props):
+        super().__init__(**props)
+        self.cmd = cmd
+
+
 class CommandSearch(Adw.Dialog):
     __gtype_name__ = "NtzCommandSearch"
 
@@ -175,8 +181,7 @@ class CommandSearch(Adw.Dialog):
                 box.append(section)
             if cmd.accel:
                 box.append(Adw.ShortcutLabel(accelerator=cmd.accel))
-            row = Gtk.ListBoxRow(child=box)
-            row._cmd = cmd
+            row = CommandRow(cmd, child=box)
             self.list.append(row)
         first = self.list.get_row_at_index(0)
         if first is not None:
@@ -209,7 +214,7 @@ class CommandSearch(Adw.Dialog):
     def choose(self, row):
         if row is None:
             return
-        self.chosen = row._cmd
+        self.chosen = row.cmd
         self.close()
 
     def _closed(self, *_):

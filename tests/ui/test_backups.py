@@ -58,7 +58,7 @@ class BackupsTest(ui.UITestCase):
         self.assertEqual(row.get_subtitle(), "…", "shown before its copy is read")
         ui.wait_for(lambda: row.get_subtitle() != "…", "the copy's details")
         self.assertEqual(row.get_subtitle(), "2 items · same as now")
-        self.assertEqual(Path(row._backup.path).read_bytes(), Path(doc.path).read_bytes())
+        self.assertEqual(Path(row.backup.path).read_bytes(), Path(doc.path).read_bytes())
 
     def test_restoring_an_earlier_version_and_undoing_it(self):
         doc = ui.open_chapter([h("now")], book="Backups restore")
@@ -83,7 +83,7 @@ class BackupsTest(ui.UITestCase):
         preview = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.TextView))
         buf = preview.get_buffer()
         self.assertEqual(buf.get_text(*buf.get_bounds(), True),
-                         to_plain(layout(Document.load(rows[2]._backup.path).root, self.win.rules)))
+                         to_plain(layout(Document.load(rows[2].backup.path).root, self.win.rules)))
         restore = next(w for w in ui.walk(dlg) if isinstance(w, ui.Gtk.Button) and w.get_label() == "Restore")
         restore.emit("clicked")
         ui.wait_for(lambda: self.win.get_visible_dialog() is None, "the dialog to close")

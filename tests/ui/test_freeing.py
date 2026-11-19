@@ -103,7 +103,7 @@ class FreedSidebarRowsTest(ui.UITestCase):
         sidebar.expanded.add("Freed list")
         sidebar._rebuild()
         w = Watch()
-        for i, row in enumerate(r for r in sidebar.rows() if r._path is not None):
+        for i, row in enumerate(r for r in sidebar.rows() if r.path is not None):
             w.add(f"chapter row {i}", row)
         self.assertGreaterEqual(len(w.names), 2)
         row = None  # (no local name may keep the last one)

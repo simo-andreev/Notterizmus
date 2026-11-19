@@ -22,12 +22,12 @@ class CommandSearchTest(ui.UITestCase):
         ui.wait_for(lambda: dlg._filled_for == text, "the list to follow the search")
 
     def titles(self, dlg):
-        return [r._cmd.title for r in dlg.rows()]
+        return [r.cmd.title for r in dlg.rows()]
 
     def pick(self, dlg, title):
-        row = next(r for r in dlg.rows() if r._cmd.title == title)
-        ran, run = [], row._cmd.run
-        row._cmd.run = lambda: (run(), ran.append(True))  # it runs once the dialog has gone
+        row = next(r for r in dlg.rows() if r.cmd.title == title)
+        ran, run = [], row.cmd.run
+        row.cmd.run = lambda: (run(), ran.append(True))  # it runs once the dialog has gone
         dlg.list.emit("row-activated", row)
         ui.wait_for(lambda: ran, f"“{title}” to run")
         ui.settle()
@@ -43,7 +43,7 @@ class CommandSearchTest(ui.UITestCase):
         self.assertEqual(self.titles(dlg)[0], "Chapter Properties…")
         self.search(dlg, "new chap")
         first = dlg.list.get_row_at_index(0)
-        self.assertEqual(first._cmd.title, "New Chapter")
+        self.assertEqual(first.cmd.title, "New Chapter")
         shown = [w for w in ui.walk(first) if isinstance(w, ui.Adw.ShortcutLabel)]
         self.assertEqual([w.get_accelerator() for w in shown], ["<Control>n"])
 

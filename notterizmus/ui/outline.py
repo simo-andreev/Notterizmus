@@ -16,7 +16,7 @@ from ..completion import BookWords
 from ..layout import layout
 from ..model import Node, editable_order, is_text, set_kind
 from .helpers import set_class
-from .rows import TextRow, _prefix_markup, row_type
+from .rows import PrefixLabel, TextRow, _prefix_markup, row_type
 from .outline_undo import UndoMixin
 from .outline_keys import KeysMixin
 from .outline_items import ItemsMixin
@@ -208,17 +208,15 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
                 if nlabels < len(self._labels):
                     lbl = self._labels[nlabels]
                 else:
-                    lbl = Gtk.Label(xalign=0)
-                    lbl.add_css_class("prefix")
-                    lbl._markup = None
+                    lbl = PrefixLabel()
                     self._labels.append(lbl)
                 nlabels += 1
                 for k in ("spacer", "blank"):
                     set_class(lbl, k, ln.kind == k)
                 markup = _prefix_markup(ln.prefix) or " "
-                if lbl._markup != markup:
+                if lbl.shown != markup:
                     lbl.set_markup(markup)
-                    lbl._markup = markup
+                    lbl.shown = markup
                 wanted.append(lbl)
         del self._labels[nlabels:]
         wanted_ids = {id(w) for w in wanted}

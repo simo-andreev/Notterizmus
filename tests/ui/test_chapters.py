@@ -68,8 +68,8 @@ class ChaptersTest(ui.UITestCase):
 
     def sidebar_row(self, path=None, book=None):
         return next(r for r in self.win.sidebar.rows()
-                    if (path and r._path and Path(r._path).resolve() == Path(path).resolve())
-                    or (book and r._book == book))
+                    if (path and r.path and Path(r.path).resolve() == Path(path).resolve())
+                    or (book and r.book == book))
 
     def test_f2_renames_the_open_chapter_and_autosave_follows_it(self):
         self.assertEqual(self.app.get_accels_for_action("win.rename"), ["F2"])
@@ -130,7 +130,7 @@ class ChaptersTest(ui.UITestCase):
         na, nb = number(a), number(b2)
         self.assertEqual(names(a.parent), [f"{na:02d} Bb.notz", f"{nb:02d} Aa.notz"])
         focused = self.win.sidebar.focused_row()
-        self.assertTrue(focused is not None and focused._path.name == f"{nb:02d} Aa.notz",
+        self.assertTrue(focused is not None and focused.path.name == f"{nb:02d} Aa.notz",
                         "focus follows the moved chapter, so Alt+↓ can repeat")
 
     def test_dragging_a_chapter_reorders_the_book(self):
@@ -321,7 +321,7 @@ class ChaptersTest(ui.UITestCase):
         self.assertEqual({Document.load(f).book for f in new.glob("*.notz")}, {"New title"})
         self.assertEqual(self.win.wtitle.get_subtitle(), "New title")
         self.assertEqual(Path(self.win.doc.path).parent.name, "New title")
-        self.assertIn("New title", [r._book for r in self.win.sidebar.rows() if r._book])
+        self.assertIn("New title", [r.book for r in self.win.sidebar.rows() if r.book])
         self.assertGreaterEqual(len(ui.chapter_rows()), 2)
 
     def test_the_list_menu_has_numbered_choices(self):

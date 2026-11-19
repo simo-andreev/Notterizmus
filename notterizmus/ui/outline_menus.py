@@ -23,6 +23,15 @@ def _mi(label, action=None, target=None, accel=None):
     return item
 
 
+class MenuRow(Gtk.ListBoxRow):
+    """A row of the editor's popup lists. A choice gets a number key (_number_rows); the row
+    runs its action (act, with target) or its callback (cb)."""
+
+    def __init__(self, choice=False, act=None, target=None, cb=None, **props):
+        super().__init__(**props)
+        self.choice, self.act, self.target, self.cb = choice, act, target, cb
+
+
 def _digit(keyval):
     """Digit keys (top row or keypad) as menu numbers: 1–9 → 1–9, 0 → 10; else None."""
     name = Gdk.keyval_name(keyval) or ""
@@ -37,7 +46,7 @@ def _number_rows(lb):
     numbered = {}
     r = lb.get_first_child()
     while r is not None:
-        if isinstance(r, Gtk.ListBoxRow) and getattr(r, "_choice", False):
+        if isinstance(r, MenuRow) and r.choice:
             n = len(numbered) + 1
             on = r.get_sensitive() and n <= 10
             num = Gtk.Label(label=str(n % 10) if on else "", width_chars=1, css_classes=["menu-num"])
@@ -149,7 +158,7 @@ class MenusMixin:
                 ga = self.actions.lookup_action(act[3:]) if act and act.startswith("ed.") else None
                 checked = bool(ga and ga.get_state() is not None and target is not None
                                and ga.get_state().equal(target))
-                row = Gtk.ListBoxRow()
+                row = MenuRow(choice=True, act=act, target=target)
                 box = Gtk.Box(spacing=10)
                 if show_marks:
                     mark = Gtk.Image.new_from_icon_name("object-select-symbolic")
@@ -164,8 +173,6 @@ class MenusMixin:
                     box.append(al)
                 row.set_child(box)
                 row.set_sensitive(ga is None or ga.get_enabled())
-                row._act, row._target = act, target
-                row._choice = True
                 lb.append(row)
                 if not first and row.get_sensitive():
                     first.append(row)
@@ -178,8 +185,8 @@ class MenusMixin:
 
             def run():
                 self._menu_node = node
-                if row._act:
-                    parent.activate_action(row._act, row._target)
+                if row.act:
+                    parent.activate_action(row.act, row.target)
                 self._menu_node = None
                 return False
             GLib.idle_add(run)
