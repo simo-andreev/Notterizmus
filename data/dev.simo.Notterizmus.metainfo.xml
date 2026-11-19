@@ -36,6 +36,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.7.0" date="2026-11-19">
+      <description>
+        <p>Bullets at the top level, faster editing of long chapters, and an Earlier Versions that opens at once.</p>
+        <ul>
+          <li>A top-level item can be a bullet: type its trigger at the start, use Ctrl+Shift+Space or the item-type menu, or paste bullets there.</li>
+          <li>Enter, Tab, undo, Ctrl+Space and large pastes stay quick in long chapters and big books.</li>
+          <li>Earlier Versions opens at once on big chapters.</li>
+          <li>Menus and the Ctrl+Space popup give their memory back once they close.</li>
+          <li>Copy for TopCoding gives tables with drawings the same header cells TopCoding makes itself.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.0" date="2026-11-19">
       <description>
         <p>A question before saving over a chapter changed on disk, safer saves and renumbering, ! and ? bullets, and drawing with the GPU on NVIDIA's driver.</p>

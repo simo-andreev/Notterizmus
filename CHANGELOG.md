@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.7.0 — 2026-11-19
 
 - A top-level item can be a bullet: type `* ` (or another bullet's trigger) at its start, use Ctrl+Shift+Space or the item-type menu, or paste bullets there. A bullet after a numbered item is set apart by a blank line. Shift+Tab still turns a bullet into the next numbered item.
 - Menus and the Ctrl+Space popup are let go once they close; each one used to stay in memory until the app quit, the Ctrl+Space popup with the text it was opened on.

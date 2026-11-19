@@ -1,3 +1,14 @@
+notterizmus (1.7.0) resolute; urgency=medium
+
+  * Allow bullets at the top level; set them apart from numbered items.
+  * Keep Enter, Tab, undo, Ctrl+Space and large pastes quick in long
+    chapters.
+  * Open Earlier Versions at once on big chapters.
+  * Free menus and the Ctrl+Space popup once they close.
+  * Match TopCoding's header cells in tables copied with drawings.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Thu, 19 Nov 2026 19:59:07 +0200
+
 notterizmus (1.6.0) resolute; urgency=medium
 
   * Ask before saving over a chapter that another program changed on
