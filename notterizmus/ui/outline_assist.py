@@ -95,124 +95,134 @@ class AssistMixin:
         return sections
 
     def show_assist(self, view):
-        """Popup at the cursor with spelling fixes and completions. Typing keeps going
-        into the text and refilters; Enter or Tab picks, Esc closes."""
+        """Popup at the cursor with spelling fixes and completions (AssistPopover)."""
         self.clear_carets()
-        pop = Gtk.Popover(has_arrow=False)
-        pop.add_css_class("menu")
-        pop.add_css_class("ntz-menu")
-        lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, activate_on_single_click=True)
-        pop.set_child(lb)
-        pop.set_parent(view)
+        pop = AssistPopover(self, view)
         self._assist_pop = pop
-
-        def place():
-            rect = view.cursor_rect()
-            pop.set_pointing_to(rect)
-            ok, pt = view.compute_point(self, Graphene.Point().init(rect.x, rect.y))
-            pop.set_position(Gtk.PositionType.TOP if ok and pt.y > self.get_height() * 0.6
-                             else Gtk.PositionType.BOTTOM)
-
-        def add_row(child, cb=None, kind=None):
-            row = MenuRow(choice=kind == "choice", cb=cb, activatable=cb is not None, selectable=False,
-                          can_focus=cb is not None)
-            row.set_child(child)
-            if kind:
-                row.add_css_class(kind)
-            lb.append(row)
-            return row
-
-        def fill():
-            while (c := lb.get_first_child()) is not None:
-                lb.remove(c)
-            sections = self._assist_sections(view)
-            first = None
-            for title, rows in sections:
-                if lb.get_first_child() is not None:
-                    add_row(Gtk.Separator(), kind="sep")
-                head = Gtk.Label(label=title, xalign=0, css_classes=["heading", "dim-label"])
-                add_row(head, kind="head")
-                for label, cb in rows:
-                    r = add_row(Gtk.Label(label=label, xalign=0), cb, kind="choice")
-                    r.set_sensitive(cb is not None)
-                    first = first or (r if cb else None)
-            if not sections:
-                add_row(Gtk.Label(label="No suggestions", xalign=0, css_classes=["dim-label"]))
-            numbered.clear()
-            numbered.update(_number_rows(lb))
-            place()
-            return first, bool(sections)
-
-        numbered = {}
-
-        def pick(row):
-            if row is None or row.cb is None:
-                return
-            pop.popdown()
-            cb = row.cb
-
-            def run():
-                cb()
-                view.grab_focus()
-            GLib.idle_add(run_once, run)
-
-        lb.connect("row-activated", lambda _lb, row: pick(row))
-
-        def on_key(_c, keyval, _kc, state):
-            name = Gdk.keyval_name(keyval)
-            ctrl, shift, alt = _mods(state)
-            n = None if ctrl or alt else _digit(keyval)
-            if n in numbered:
-                pick(numbered[n])
-                return True
-            if name in ("Up", "Down", "Page_Up", "Page_Down", "Return", "KP_Enter", "space") \
-                    and not ctrl:
-                return False if name != "space" else self._assist_type(view, " ", pop)
-            if name == "Tab":
-                pick(lb.get_focus_child())
-                return True
-            if name == "Escape":
-                pop.popdown()
-                return True
-            buf = view.get_buffer()
-            if name == "BackSpace":
-                it = view.cursor_iter()
-                if it.get_offset() > 0:
-                    start = it.copy()
-                    start.backward_char()
-                    buf.delete(start, it)
-            else:
-                uni = Gdk.keyval_to_unicode(keyval)
-                if ctrl or alt or not uni or not chr(uni).isprintable():
-                    return False
-                buf.insert_interactive_at_cursor(chr(uni), -1, True)
-            first, any_ = fill()
-            if not any_:
-                pop.popdown()
-            elif first is not None:
-                first.grab_focus()
-            return True
-
-        keys = Gtk.EventControllerKey()
-        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        keys.connect("key-pressed", on_key)
-        pop.add_controller(keys)
-
-        def closed(p):
-            self._assist_pop = None
-            view.grab_focus()
-            GLib.idle_add(run_once, p.unparent)
-
-        pop.connect("closed", closed)
         self._assist_counts = None  # counted afresh for this popup
-        first, _ = fill()
-        pop.popup()
-        if first is not None:
-            GLib.idle_add(run_once, first.grab_focus)
+        pop.open()
         return pop
 
-    def _assist_type(self, view, ch, pop):
-        """A space ends the word: type it and close the popup."""
-        view.get_buffer().insert_interactive_at_cursor(ch, -1, True)
-        pop.popdown()
+
+class AssistPopover(Gtk.Popover):
+    """Ctrl+Space at the cursor: spelling fixes and completions for the word there, from
+    the editor's _assist_sections (CR49 in CODE_REVIEW.md). Typing keeps going into the
+    text and refills it; a number, Enter or Tab picks, Esc closes."""
+
+    def __init__(self, editor, view):
+        super().__init__(has_arrow=False)
+        self.add_css_class("menu")
+        self.add_css_class("ntz-menu")
+        self.editor, self.view = editor, view
+        self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, activate_on_single_click=True)
+        self.numbered = {}
+        self.set_child(self.list)
+        self.set_parent(view)
+        self.list.connect("row-activated", lambda _lb, row: self.pick(row))
+        keys = Gtk.EventControllerKey()
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        keys.connect("key-pressed", self._on_key)
+        self.add_controller(keys)
+        self.connect("closed", self._on_closed)
+
+    def open(self):
+        first, _ = self.fill()
+        self.popup()
+        if first is not None:
+            GLib.idle_add(run_once, first.grab_focus)
+
+    def place(self):
+        """Point at the cursor: above it in the lower part of the outline, else below."""
+        rect = self.view.cursor_rect()
+        self.set_pointing_to(rect)
+        ok, pt = self.view.compute_point(self.editor, Graphene.Point().init(rect.x, rect.y))
+        self.set_position(Gtk.PositionType.TOP if ok and pt.y > self.editor.get_height() * 0.6
+                          else Gtk.PositionType.BOTTOM)
+
+    def _add_row(self, child, cb=None, kind=None):
+        row = MenuRow(choice=kind == "choice", cb=cb, activatable=cb is not None, selectable=False,
+                      can_focus=cb is not None)
+        row.set_child(child)
+        if kind:
+            row.add_css_class(kind)
+        self.list.append(row)
+        return row
+
+    def fill(self):
+        """List what the word at the cursor gets now; returns (the first row that can be
+        picked or None, whether there was anything)."""
+        lb = self.list
+        while (c := lb.get_first_child()) is not None:
+            lb.remove(c)
+        sections = self.editor._assist_sections(self.view)
+        first = None
+        for title, rows in sections:
+            if lb.get_first_child() is not None:
+                self._add_row(Gtk.Separator(), kind="sep")
+            head = Gtk.Label(label=title, xalign=0, css_classes=["heading", "dim-label"])
+            self._add_row(head, kind="head")
+            for label, cb in rows:
+                r = self._add_row(Gtk.Label(label=label, xalign=0), cb, kind="choice")
+                r.set_sensitive(cb is not None)
+                first = first or (r if cb else None)
+        if not sections:
+            self._add_row(Gtk.Label(label="No suggestions", xalign=0, css_classes=["dim-label"]))
+        self.numbered = _number_rows(lb)
+        self.place()
+        return first, bool(sections)
+
+    def pick(self, row):
+        if row is None or row.cb is None:
+            return
+        self.popdown()
+        cb, view = row.cb, self.view
+
+        def run():
+            cb()
+            view.grab_focus()
+        GLib.idle_add(run_once, run)
+
+    def _on_key(self, _c, keyval, _kc, state):
+        name = Gdk.keyval_name(keyval)
+        ctrl, shift, alt = _mods(state)
+        n = None if ctrl or alt else _digit(keyval)
+        if n in self.numbered:
+            self.pick(self.numbered[n])
+            return True
+        if name in ("Up", "Down", "Page_Up", "Page_Down", "Return", "KP_Enter", "space") and not ctrl:
+            if name != "space":
+                return False
+            # a space ends the word: type it and close the popup
+            self.view.get_buffer().insert_interactive_at_cursor(" ", -1, True)
+            self.popdown()
+            return True
+        if name == "Tab":
+            self.pick(self.list.get_focus_child())
+            return True
+        if name == "Escape":
+            self.popdown()
+            return True
+        view = self.view
+        buf = view.get_buffer()
+        if name == "BackSpace":
+            it = view.cursor_iter()
+            if it.get_offset() > 0:
+                start = it.copy()
+                start.backward_char()
+                buf.delete(start, it)
+        else:
+            uni = Gdk.keyval_to_unicode(keyval)
+            if ctrl or alt or not uni or not chr(uni).isprintable():
+                return False
+            buf.insert_interactive_at_cursor(chr(uni), -1, True)
+        first, any_ = self.fill()
+        if not any_:
+            self.popdown()
+        elif first is not None:
+            first.grab_focus()
         return True
+
+    def _on_closed(self, _pop):
+        self.editor._assist_pop = None
+        self.view.grab_focus()
+        GLib.idle_add(run_once, self.unparent)

@@ -818,7 +818,7 @@ verification, plus the checks named.
   undo step.
 - [x] **CR46.** One context manager for programmatic buffer changes instead of three flags
   (together with CR9).
-- [ ] **CR49.** An `AssistPopover` class, a menu-list builder and a `VersionsDialog` class
+- [x] **CR49.** An `AssistPopover` class, a menu-list builder and a `VersionsDialog` class
   out of the long functions.
 - [ ] **CR38.** Split `window.py` as R14 split the editor (dialogs, chapter files, zoom and
   sidebar sizing), methods moved unchanged; `git diff --color-moved` shows only moves.
@@ -925,6 +925,23 @@ verification, plus the checks named.
   reporting edits. CR9 (R32) was fixed in phase 3 by `_pending_at`; this keeps it.
   Unit suite 418 tests, with and without PyGObject; UI suite 282 tests in 173 s, and the
   load check in 236 s.
+- CR49: the three long functions are classes. `outline_menus.MenuList` turns a
+  `Gio.Menu` into the numbered list (sections, headings, check marks for stateful editor
+  actions, accelerators); `_popup` keeps only the popover's wiring. The Ctrl+Space popup
+  is `outline_assist.AssistPopover`, a `Gtk.Popover` with `open`, `place`, `fill`, `pick`
+  and its key handler as methods; `show_assist` makes one and opens it, and the editor's
+  `_assist_type` is gone into the key handler. Earlier Versions is
+  `ui/versions.VersionsDialog`, in its own module with `VersionRow` and the day, time and
+  summary helpers, so `window.py` is 116 lines shorter (1,292 to 1,176); `on_versions`
+  checks, saves and opens the dialog. Unit suite 418 tests, with and without PyGObject;
+  UI suite 282 tests in 173 s.
+- Found while checking CR49, not changed (the same before and after it, checked with a
+  throwaway probe on both): popups are never freed. Every Ctrl+Space popup stays alive
+  after it closes, and keeps the text view it was opened on alive with it, and every item
+  menu leaves its popover behind. Their handlers hold the popover (a closure before
+  CR49, a method now), a cycle through GTK that Python's collector can't see, as R29c and
+  CR18 were for rows. `editor._ctx` also keeps the last word's view until the next popup.
+  Small per popup, but it adds up over a long session.
 
 ### With you
 

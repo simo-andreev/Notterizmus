@@ -61,6 +61,83 @@ def _number_rows(lb):
         r = r.get_next_sibling()
     return numbered
 
+
+class MenuList:
+    """A Gio.Menu as the app's numbered popup list (CR49 in CODE_REVIEW.md): `list` is the
+    ListBox, a MenuRow per item with its accelerator, and a check mark in front when the
+    menu has an item of a stateful editor action ("ed." in `actions`); sections become a
+    separator and their label a heading. `numbered` is {number key: row}, `first` the
+    first row that can be chosen."""
+
+    def __init__(self, model, actions):
+        self.actions = actions
+        self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, activate_on_single_click=True)
+        self.first = None
+        self.marks = self._stateful(model)
+        self._add(model)
+        self.numbered = _number_rows(self.list)
+
+    def _action(self, name):
+        """The editor's action for an "ed.…" name; None for other actions."""
+        return self.actions.lookup_action(name[3:]) if name and name.startswith("ed.") else None
+
+    def _stateful(self, menu):
+        for i in range(menu.get_n_items()):
+            sec = menu.get_item_link(i, "section")
+            if sec is not None and self._stateful(sec):
+                return True
+            a = menu.get_item_attribute_value(i, "action", GLib.VariantType.new("s"))
+            ga = self._action(a.unpack()) if a else None
+            if ga is not None and ga.get_state() is not None:
+                return True
+        return False
+
+    def _add(self, menu):
+        for i in range(menu.get_n_items()):
+            sec = menu.get_item_link(i, "section")
+            if sec is None:
+                self._add_item(menu, i)
+                continue
+            last = self.list.get_last_child()
+            if last is not None and not (last.has_css_class("head") or last.has_css_class("sep")):
+                sep = Gtk.ListBoxRow(activatable=False, selectable=False, can_focus=False, child=Gtk.Separator())
+                sep.add_css_class("sep")
+                self.list.append(sep)
+            head = menu.get_item_attribute_value(i, "label", GLib.VariantType.new("s"))
+            if head is not None:
+                hl = Gtk.Label(label=head.unpack(), xalign=0, css_classes=["heading", "dim-label"])
+                hr = Gtk.ListBoxRow(activatable=False, selectable=False, can_focus=False, child=hl)
+                hr.add_css_class("head")
+                self.list.append(hr)
+            self._add(sec)
+
+    def _add_item(self, menu, i):
+        label = menu.get_item_attribute_value(i, "label", GLib.VariantType.new("s"))
+        action = menu.get_item_attribute_value(i, "action", GLib.VariantType.new("s"))
+        target = menu.get_item_attribute_value(i, "target", None)
+        accel = menu.get_item_attribute_value(i, "accel", GLib.VariantType.new("s"))
+        act = action.unpack() if action else None
+        ga = self._action(act)
+        checked = bool(ga and ga.get_state() is not None and target is not None and ga.get_state().equal(target))
+        row = MenuRow(choice=True, act=act, target=target)
+        box = Gtk.Box(spacing=10)
+        if self.marks:
+            mark = Gtk.Image.new_from_icon_name("object-select-symbolic")
+            mark.set_opacity(1 if checked else 0)
+            box.append(mark)
+        box.append(Gtk.Label(label=label.unpack() if label else "", xalign=0, hexpand=True))
+        if accel:
+            ok, key, mods = Gtk.accelerator_parse(accel.unpack())
+            al = Gtk.Label(label=Gtk.accelerator_get_label(key, mods) if ok else "", css_classes=["dim-label"])
+            al.set_margin_start(24)
+            box.append(al)
+        row.set_child(box)
+        row.set_sensitive(ga is None or ga.get_enabled())
+        self.list.append(row)
+        if self.first is None and row.get_sensitive():
+            self.first = row
+
+
 class MenusMixin:
     """Mixed into OutlineEditor (outline.py); uses its state."""
 
@@ -113,71 +190,8 @@ class MenusMixin:
         pop = Gtk.Popover(has_arrow=False)
         pop.add_css_class("menu")
         pop.add_css_class("ntz-menu")
-        lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, activate_on_single_click=True)
-        first = []
-
-        def stateful(menu):
-            for i in range(menu.get_n_items()):
-                sec = menu.get_item_link(i, "section")
-                if sec is not None and stateful(sec):
-                    return True
-                a = menu.get_item_attribute_value(i, "action", GLib.VariantType.new("s"))
-                ga = self.actions.lookup_action(a.unpack()[3:]) if a and a.unpack().startswith("ed.") else None
-                if ga is not None and ga.get_state() is not None:
-                    return True
-            return False
-        show_marks = stateful(model)
-
-        def add_rows(menu):
-            for i in range(menu.get_n_items()):
-                sec = menu.get_item_link(i, "section")
-                if sec is not None:
-                    last = lb.get_last_child()
-                    if last is not None and not (last.has_css_class("head") or last.has_css_class("sep")):
-                        sep = Gtk.ListBoxRow(activatable=False, selectable=False, can_focus=False)
-                        sep.set_child(Gtk.Separator())
-                        sep.add_css_class("sep")
-                        lb.append(sep)
-                    head = menu.get_item_attribute_value(i, "label", GLib.VariantType.new("s"))
-                    if head is not None:
-                        hr = Gtk.ListBoxRow(activatable=False, selectable=False, can_focus=False)
-                        hl = Gtk.Label(label=head.unpack(), xalign=0)
-                        hl.add_css_class("heading")
-                        hl.add_css_class("dim-label")
-                        hr.set_child(hl)
-                        hr.add_css_class("head")
-                        lb.append(hr)
-                    add_rows(sec)
-                    continue
-                label = menu.get_item_attribute_value(i, "label", GLib.VariantType.new("s"))
-                action = menu.get_item_attribute_value(i, "action", GLib.VariantType.new("s"))
-                target = menu.get_item_attribute_value(i, "target", None)
-                accel = menu.get_item_attribute_value(i, "accel", GLib.VariantType.new("s"))
-                act = action.unpack() if action else None
-                ga = self.actions.lookup_action(act[3:]) if act and act.startswith("ed.") else None
-                checked = bool(ga and ga.get_state() is not None and target is not None
-                               and ga.get_state().equal(target))
-                row = MenuRow(choice=True, act=act, target=target)
-                box = Gtk.Box(spacing=10)
-                if show_marks:
-                    mark = Gtk.Image.new_from_icon_name("object-select-symbolic")
-                    mark.set_opacity(1 if checked else 0)
-                    box.append(mark)
-                box.append(Gtk.Label(label=label.unpack() if label else "", xalign=0, hexpand=True))
-                if accel:
-                    ok, key, mods = Gtk.accelerator_parse(accel.unpack())
-                    al = Gtk.Label(label=Gtk.accelerator_get_label(key, mods) if ok else "")
-                    al.add_css_class("dim-label")
-                    al.set_margin_start(24)
-                    box.append(al)
-                row.set_child(box)
-                row.set_sensitive(ga is None or ga.get_enabled())
-                lb.append(row)
-                if not first and row.get_sensitive():
-                    first.append(row)
-
-        add_rows(model)
-        numbered = _number_rows(lb)
+        menu = MenuList(model, self.actions)
+        lb, numbered = menu.list, menu.numbered
 
         def activated(_lb, row):
             pop.popdown()
@@ -215,8 +229,8 @@ class MenusMixin:
         pop.set_position(pos)
         pop.connect("closed", lambda p: GLib.idle_add(run_once, p.unparent))
         pop.popup()
-        if first:
-            GLib.idle_add(run_once, first[0].grab_focus)
+        if menu.first is not None:
+            GLib.idle_add(run_once, menu.first.grab_focus)
         return pop
 
     def show_add_menu(self, row, view):

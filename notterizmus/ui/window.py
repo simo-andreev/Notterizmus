@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from datetime import date, timedelta
 from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
@@ -18,6 +16,7 @@ from .helpers import run_once
 from .outline import OutlineEditor
 from .outline_clipboard import export_formats
 from .sidebar import ChapterSidebar
+from .versions import VersionsDialog
 
 RULES_TEMPLATE = Path(__file__).resolve().parent.parent / "rules.example.toml"
 SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX = 260, 180, 520  # chapter list width, px
@@ -1016,91 +1015,7 @@ class Window(Adw.ApplicationWindow):
             return
         self._flush_save()
         found = backups.list_backups(self._backup_folder())
-        dlg = Adw.Dialog(title="Earlier Versions", content_width=860, content_height=600)
-        tv = Adw.ToolbarView()
-        header = Adw.HeaderBar(show_start_title_buttons=False, show_end_title_buttons=False)
-        cancel = Gtk.Button(label="Cancel")
-        cancel.connect("clicked", lambda *_: dlg.close())
-        restore = Gtk.Button(label="Restore", sensitive=False, css_classes=["suggested-action"])
-        header.pack_start(cancel)
-        header.pack_end(restore)
-        tv.add_top_bar(header)
-        if not found:
-            tv.set_content(Adw.StatusPage(
-                icon_name="document-open-recent-symbolic", title="No Earlier Versions Yet",
-                description="A copy is kept when you open a chapter, and every 10 minutes while you edit it."))
-        else:
-            lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE, css_classes=["navigation-sidebar"])
-            rows = []
-            for b in found:
-                row = VersionRow(b, title=f"{b.when:%H:%M}", subtitle="…", tooltip_text=_when(b.when))
-                lb.append(row)
-                rows.append(row)
-            self._fill_versions(dlg, rows)
-
-            def day_header(row, before):
-                # a heading above the first copy of each day: Today, Yesterday, 2026-11-02
-                day = row.backup.when.date()
-                if before is not None and before.backup.when.date() == day:
-                    row.set_header(None)
-                    return
-                label = Gtk.Label(label=_day(day), xalign=0, margin_start=12, margin_top=12, margin_bottom=4)
-                label.add_css_class("heading")
-                label.add_css_class("dim-label")
-                row.set_header(label)
-            lb.set_header_func(day_header)
-            preview = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
-                                   left_margin=16, right_margin=16, top_margin=12, bottom_margin=12)
-
-            def selected(_lb, row):
-                restore.set_sensitive(row is not None)
-                if row is None:
-                    return
-                try:
-                    text = to_plain(layout(Document.load(row.backup.path).root, self.rules))
-                except (OSError, ValueError) as e:
-                    text = f"This copy can't be read: {e}"
-                    restore.set_sensitive(False)
-                preview.get_buffer().set_text(text)
-
-            lb.connect("row-selected", selected)
-            paned = Gtk.Paned(position=250, shrink_start_child=False, resize_start_child=False,
-                              start_child=Gtk.ScrolledWindow(child=lb, hscrollbar_policy=Gtk.PolicyType.NEVER),
-                              end_child=Gtk.ScrolledWindow(child=preview, hexpand=True))
-            tv.set_content(paned)
-            lb.select_row(lb.get_row_at_index(0))
-
-            def do_restore(*_):
-                row = lb.get_selected_row()
-                dlg.close()
-                if row is not None:
-                    self.restore_version(row.backup.path)
-
-            restore.connect("clicked", do_restore)
-            lb.connect("row-activated", lambda *_: do_restore())
-        dlg.set_child(tv)
-        dlg.present(self)
-
-    def _fill_versions(self, dlg, rows):
-        """Each copy's item count, and whether it is the chapter as it is now, a row at a time
-        once Earlier Versions shows: read before it, 54 copies of a 4 MB chapter kept it from
-        showing for 0.9 s (CR32 in CODE_REVIEW.md)."""
-        try:
-            now = Path(self.doc.path).read_bytes()
-        except OSError:
-            now = None
-        pending = iter(rows)
-        open_ = [True]
-        dlg.connect("closed", lambda *_: open_.__setitem__(0, False))
-
-        def next_row():
-            row = next(pending, None) if open_[0] else None
-            if row is None:
-                return GLib.SOURCE_REMOVE
-            row.set_subtitle(_copy_summary(row.backup.path, now))
-            return GLib.SOURCE_CONTINUE
-
-        GLib.idle_add(next_row)
+        VersionsDialog(found, self.doc.path, self.rules, self.restore_version).present(self)
 
     def restore_version(self, path):
         """Put an earlier version's content in the editor; Ctrl+Z takes it back."""
@@ -1258,35 +1173,3 @@ def _restore_from_trash(path):
         return True
     except GLib.Error:
         return False
-
-
-class VersionRow(Adw.ActionRow):
-    """A kept copy in Earlier Versions (backup: a backups.Backup)."""
-
-    def __init__(self, backup, **props):
-        super().__init__(**props)
-        self.backup = backup
-
-
-def _day(day):
-    """'Today', 'Yesterday' or '2026-11-02'."""
-    if day == date.today():
-        return "Today"
-    if day == date.today() - timedelta(days=1):
-        return "Yesterday"
-    return f"{day:%Y-%m-%d}"
-
-
-def _copy_summary(path, now):
-    """'12 items', '12 items · same as now' (now: the chapter file's bytes) or "can't be read"."""
-    try:
-        data = Path(path).read_bytes()
-        items = sum(1 for n in Document.from_json(json.loads(data)).root.walk() if n.kind != "root")
-    except (OSError, ValueError, RecursionError):
-        return "can't be read"
-    return f"{items} item{'s' if items != 1 else ''}" + (" · same as now" if data == now else "")
-
-
-def _when(dt):
-    """'Today 14:05', 'Yesterday 09:30' or '2026-11-02 18:40'."""
-    return f"{_day(dt.date())} {dt:%H:%M}"
