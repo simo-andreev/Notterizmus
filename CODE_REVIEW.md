@@ -935,13 +935,17 @@ verification, plus the checks named.
   summary helpers, so `window.py` is 116 lines shorter (1,292 to 1,176); `on_versions`
   checks, saves and opens the dialog. Unit suite 418 tests, with and without PyGObject;
   UI suite 282 tests in 173 s.
-- Found while checking CR49, not changed (the same before and after it, checked with a
-  throwaway probe on both): popups are never freed. Every Ctrl+Space popup stays alive
-  after it closes, and keeps the text view it was opened on alive with it, and every item
-  menu leaves its popover behind. Their handlers hold the popover (a closure before
-  CR49, a method now), a cycle through GTK that Python's collector can't see, as R29c and
-  CR18 were for rows. `editor._ctx` also keeps the last word's view until the next popup.
-  Small per popup, but it adds up over a long session.
+- Found while checking CR49, then fixed: popups were never freed. Every Ctrl+Space popup
+  stayed alive after it closed, with the text view it was opened on, and every item menu
+  (and the chapter list's menu, which is the same popup) left its popover behind. Their
+  handlers held the popover, a cycle through GTK that Python's collector can't see, as
+  R29c and CR18 were for rows, and `editor._ctx` kept the last word's view until the next
+  popup. Now `helpers.let_go_when_closed()` takes a closed menu off its parent and drops
+  its list and key controller; `AssistPopover`'s handlers hold it weakly
+  (`helpers.weak_handler`, which was `richtext._weak`); and `_ctx` holds its view through a
+  weak reference. New UI tests in `test_freeing` (`FreedPopupsTest`, 2 tests) failed
+  before the fix and pass after it. Unit suite 418 tests, with and without PyGObject; UI
+  suite 284 tests in 174 s, and the load check in 240 s.
 
 ### With you
 

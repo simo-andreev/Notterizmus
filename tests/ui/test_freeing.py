@@ -109,3 +109,45 @@ class FreedSidebarRowsTest(ui.UITestCase):
         row = None  # (no local name may keep the last one)
         sidebar._rebuild()
         w.wait(self)
+
+
+def watch_assist(test, node):
+    """Open Ctrl+Space on node's text and close it again; a Watch on the popup and the
+    view (a helper, so no local variable keeps either alive)."""
+    view = ui.focus(node).view
+    pop = test.ed.show_assist(view)
+    ui.wait_for(pop.get_visible, "the Ctrl+Space popup")
+    w = Watch()
+    w.add("Ctrl+Space popup", pop)
+    w.add("its text view", view)
+    pop.popdown()
+    ui.wait_for(lambda: test.ed._assist_pop is None, "the popup to close")
+    return w
+
+
+def watch_item_menu(test, node):
+    """Open the item menu of node's row and close it again; a Watch on its popover."""
+    test.ed.show_item_menu(ui.row(node))
+    pop = ui.open_popovers()[0]
+    w = Watch()
+    w.add("item menu", pop)
+    pop.popdown()
+    ui.wait_for(lambda: not ui.open_popovers(), "the menu to close")
+    return w
+
+
+class FreedPopupsTest(ui.UITestCase):
+    """A closed popup is freed: its own handlers held it, a cycle through GTK like the
+    rows' (R29c), and a Ctrl+Space popup kept its text view, which outlived its chapter."""
+
+    def test_a_closed_ctrl_space_popup_frees_itself_and_its_view(self):
+        doc = ui.open_chapter([h("Intro", b("wor"))])
+        w = watch_assist(self, doc.root.children[0].children[0])
+        doc = None
+        ui.open_chapter([h("Other", b("x"))])
+        w.wait(self)
+
+    def test_a_closed_item_menu_frees_itself(self):
+        doc = ui.open_chapter([h("Intro", b("one"))])
+        w = watch_item_menu(self, doc.root.children[0].children[0])
+        w.wait(self)

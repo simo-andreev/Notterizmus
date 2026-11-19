@@ -1,12 +1,14 @@
 """OutlineEditor, part: spelling fixes and word completion (Ctrl+Space)."""
 from __future__ import annotations
 
+import weakref
+
 from gi.repository import Gdk, GLib, Graphene, Gtk
 
 from ..completion import complete, count_words, dictionary_words, node_texts
 from ..model import Run
 from ..spell import should_check
-from .helpers import run_once
+from .helpers import run_once, weak_handler
 from .rows import _mods
 from .outline_menus import MenuRow, _digit, _number_rows
 
@@ -27,9 +29,10 @@ class AssistMixin:
 
     def _replace_word(self, word):
         """Replace the word recorded in self._ctx, keeping its bold/italic."""
-        if not self._ctx:
+        ref, s, e = self._ctx or (lambda: None, 0, 0)
+        view = ref()
+        if view is None:
             return
-        view, s, e = self._ctx
         buf = view.get_buffer()
         it = buf.get_iter_at_offset(s)
         fmt = (it.has_tag(view.tag_bold), it.has_tag(view.tag_italic))
@@ -62,7 +65,7 @@ class AssistMixin:
         s, e = wb
         text = view.get_plain()
         word, prefix = text[s:e], text[s:it.get_offset()]
-        self._ctx = (view, s, e)
+        self._ctx = (weakref.ref(view), s, e)  # not kept for a closed chapter's view
         sp = self.spelling.speller
         comps = []
         if prefix:
@@ -118,12 +121,13 @@ class AssistPopover(Gtk.Popover):
         self.numbered = {}
         self.set_child(self.list)
         self.set_parent(view)
-        self.list.connect("row-activated", lambda _lb, row: self.pick(row))
+        # Handlers hold it weakly: it's freed once closed (R29c, CR49's note).
+        self.list.connect("row-activated", weak_handler(self._activated))
         keys = Gtk.EventControllerKey()
         keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        keys.connect("key-pressed", self._on_key)
+        keys.connect("key-pressed", weak_handler(self._on_key))
         self.add_controller(keys)
-        self.connect("closed", self._on_closed)
+        self.connect("closed", weak_handler(self._on_closed))
 
     def open(self):
         first, _ = self.fill()
@@ -170,6 +174,9 @@ class AssistPopover(Gtk.Popover):
         self.numbered = _number_rows(lb)
         self.place()
         return first, bool(sections)
+
+    def _activated(self, _lb, row):
+        self.pick(row)
 
     def pick(self, row):
         if row is None or row.cb is None:

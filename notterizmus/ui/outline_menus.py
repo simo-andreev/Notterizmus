@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import time
+import weakref
 
 from gi.repository import Gdk, Gio, GLib, Graphene, Gtk
 
 from ..model import enclosing_heading, heading_numbers, is_text
-from .helpers import run_once
+from .helpers import let_go_when_closed, run_once
 from .rows import TextRow, _mods
 
 
@@ -227,7 +228,7 @@ class MenusMixin:
             if ok and pt.y > self.get_height() * 0.5:
                 pos = Gtk.PositionType.TOP
         pop.set_position(pos)
-        pop.connect("closed", lambda p: GLib.idle_add(run_once, p.unparent))
+        let_go_when_closed(pop, keys)
         pop.popup()
         if menu.first is not None:
             GLib.idle_add(run_once, menu.first.grab_focus)
@@ -291,7 +292,7 @@ class MenusMixin:
             hit = view.misspelled_at(it)
             if hit:
                 (s, e), word = hit
-                self._ctx = (view, s, e)
+                self._ctx = (weakref.ref(view), s, e)
                 sec = Gio.Menu()
                 sugg = sp.suggest(word)
                 for w in sugg:
