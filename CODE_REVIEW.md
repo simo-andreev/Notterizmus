@@ -809,7 +809,7 @@ verification, plus the checks named.
   the app shuts down, or moves to the tests.
 - [x] **CR43.** Row classes with real attributes (`ChapterRow`, `BookRow`, menu rows), and
   `ChapterSidebar.focused_target()` instead of window.py reading `row._path`.
-- [ ] **CR41.** Spelling state owned by the editor and passed to the views; the GPU
+- [x] **CR41.** Spelling state owned by the editor and passed to the views; the GPU
   environment set explicitly when the app starts (done with CR1). A test checks that
   importing `drawing_web` no longer changes `os.environ` (done with CR1:
   `tests/test_gpu.py` checks that only `ui/app.py` calls `gpu.prefer_gpu()` when imported).
@@ -883,6 +883,19 @@ verification, plus the checks named.
   (`loaded`, `waiting`), defined only where WebKit is installed. Unit suite 418 tests,
   with and without PyGObject; UI suite 279 tests in 170 s (`test_freeing`'s sidebar check
   included), and 179 s with the real Excalidraw.
+- CR41: `richtext.SPELL`, one dict for every view in the app, is gone. The editor owns a
+  `richtext.Spelling` (its `Speller` and whether checking is on), `set_spelling()` sets
+  it, and every text view its rows make, table cells included, is given it; a `RichText`
+  made without one doesn't check. The spelling menus and Ctrl+Space read the editor's.
+  New UI test `test_window`: `test_table_cells_are_checked_and_follow_the_switch`, which
+  fails when a cell isn't given the editor's spelling (tried by taking it out). The GPU
+  environment was done with CR1. The other module-level state stays, on purpose:
+  `window._ZOOM_PROVIDER` is the one CSS provider for the whole display (one per window
+  piled up, and a closed window's would win: PROJECT_CONTEXT, R5); `drawing_web._context`
+  is the one WebKit context, where the app's URI scheme can be registered only once, and
+  `_renderer` the one hidden preview page; `completion._DICT_CACHE` holds a dictionary's
+  words, which don't change while the app runs. Unit suite 418 tests, with and without
+  PyGObject; UI suite 280 tests in 170 s.
 
 ### With you
 

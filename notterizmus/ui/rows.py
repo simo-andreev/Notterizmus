@@ -135,7 +135,7 @@ class TextRow(_PrefixRow):
 
     def __init__(self, editor, node):
         super().__init__(editor, node)
-        self.view = RichText()
+        self.view = RichText(editor.spelling)
         self.view.set_runs(node.runs)
         self.view.connect("content-changed", _in_row(lambda row, v, _v: row._on_changed(v)))
         wire_view(editor, self.view)
@@ -229,7 +229,7 @@ class TableRow(_PrefixRow):
         self.cells = {}
         for r, row in enumerate(self.rows):
             for c, cell in enumerate(row):
-                rt = RichText(left_margin=6, right_margin=6)
+                rt = RichText(self.editor.spelling, left_margin=6, right_margin=6)
                 rt.set_runs(cell)
                 rt.set_size_request(150, -1)  # height set by editor.size_new_views
                 rt.add_css_class("cell")

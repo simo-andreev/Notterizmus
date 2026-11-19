@@ -7,7 +7,6 @@ from gi.repository import Gdk, Gio, GLib, Graphene, Gtk
 
 from ..model import enclosing_heading, heading_numbers, is_text
 from .helpers import run_once
-from .richtext import SPELL
 from .rows import TextRow, _mods
 
 
@@ -273,8 +272,8 @@ class MenusMixin:
         menu = Gio.Menu()
         it = view.iter_at_widget_point(*point) if point else view.cursor_iter()
         self._ctx = None
-        sp = SPELL["speller"]
-        if SPELL["enabled"] and sp is not None and it is not None:
+        sp = self.spelling.speller
+        if self.spelling.enabled and sp is not None and it is not None:
             hit = view.misspelled_at(it)
             if hit:
                 (s, e), word = hit

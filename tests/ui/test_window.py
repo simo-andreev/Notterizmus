@@ -4,7 +4,7 @@ from pathlib import Path
 
 from notterizmus import APP_NAME, VERSION
 from notterizmus.export import to_plain
-from notterizmus.guide import b, h
+from notterizmus.guide import b, h, table
 from notterizmus.layout import layout
 from notterizmus.model import Document
 from notterizmus.paths import config_dir
@@ -372,6 +372,16 @@ class SpellingSwitchTest(ui.UITestCase):
         self.win.lookup_action("spell").activate(None)
         ui.wait_for(lambda: self.marked(view), "the underline back")
         self.assertTrue(state()["spell"])
+
+    def test_table_cells_are_checked_and_follow_the_switch(self):
+        """Every text view the editor makes shares its spelling, table cells too (CR41)."""
+        doc = ui.open_chapter([h("Intro", table([["fine", "a mispeled cell"]], header=False))])
+        cell = ui.row(doc.root.children[0].children[0]).cells[(0, 1)]
+        ui.wait_for(lambda: self.marked(cell), "the misspelled word in the cell to be underlined")
+        self.win.lookup_action("spell").activate(None)
+        self.assertFalse(self.marked(cell), "the underline goes at once")
+        self.win.lookup_action("spell").activate(None)
+        ui.wait_for(lambda: self.marked(cell), "the underline back")
 
     def test_the_language_is_picked_from_the_chapters_text_and_a_choice_is_saved_in_it(self):
         if "bg_BG" not in self.win.languages:

@@ -8,8 +8,15 @@ from gi.repository import Gdk, GLib, GObject, Graphene, Gtk, Pango
 from ..model import Run, normalize_runs
 from ..spell import WORD_RE, should_check
 
-# Shared spell-check state, set by the editor: {"speller": Speller|None, "enabled": bool}
-SPELL = {"speller": None, "enabled": False}
+
+class Spelling:
+    """Spell checking for an editor's text views: its Speller (None without Enchant) and
+    whether checking is on. The editor owns one and gives it to every view it makes; a view
+    made without one doesn't check (CR41 in CODE_REVIEW.md)."""
+
+    def __init__(self):
+        self.speller = None
+        self.enabled = False
 
 
 def _weak(method):
@@ -26,9 +33,10 @@ class RichText(Gtk.TextView):
     __gtype_name__ = "NtzRichText"
     __gsignals__ = {"content-changed": (GObject.SignalFlags.RUN_FIRST, None, ())}
 
-    def __init__(self, **kw):
+    def __init__(self, spelling=None, **kw):
         super().__init__(wrap_mode=Gtk.WrapMode.WORD_CHAR, hexpand=True, accepts_tab=False,
                          top_margin=1, bottom_margin=1, **kw)
+        self.spelling = spelling if spelling is not None else Spelling()
         self.add_css_class("rt")
         buf = self.get_buffer()
         buf.set_enable_undo(False)  # the editor keeps a document-wide history
@@ -281,8 +289,8 @@ class RichText(Gtk.TextView):
     def recheck_spelling(self):
         buf = self.get_buffer()
         buf.remove_tag(self.tag_spell, *buf.get_bounds())
-        sp = SPELL["speller"]
-        if not SPELL["enabled"] or sp is None or not sp.dict:
+        sp = self.spelling.speller
+        if not self.spelling.enabled or sp is None or not sp.dict:
             return
         for m in WORD_RE.finditer(self.get_plain()):
             w = m.group()

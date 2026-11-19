@@ -7,7 +7,6 @@ from ..completion import complete, count_words, dictionary_words, node_texts
 from ..model import Run
 from ..spell import should_check
 from .helpers import run_once
-from .richtext import SPELL
 from .rows import _mods
 from .outline_menus import MenuRow, _digit, _number_rows
 
@@ -18,8 +17,8 @@ class AssistMixin:
     # -- spelling ------------------------------------------------------------------------
 
     def set_spelling(self, speller, enabled):
-        SPELL["speller"] = speller
-        SPELL["enabled"] = enabled
+        self.spelling.speller = speller
+        self.spelling.enabled = enabled
         for v in self.all_views():
             v.recheck_spelling()
 
@@ -40,14 +39,14 @@ class AssistMixin:
             view.insert_runs([Run(word, *fmt)])
 
     def _spell_add(self, word):
-        if SPELL["speller"]:
-            SPELL["speller"].add(word)
+        if self.spelling.speller:
+            self.spelling.speller.add(word)
             for v in self.all_views():
                 v.recheck_spelling()
 
     def _spell_ignore(self, word):
-        if SPELL["speller"]:
-            SPELL["speller"].ignore(word)
+        if self.spelling.speller:
+            self.spelling.speller.ignore(word)
             for v in self.all_views():
                 v.recheck_spelling()
 
@@ -64,7 +63,7 @@ class AssistMixin:
         text = view.get_plain()
         word, prefix = text[s:e], text[s:it.get_offset()]
         self._ctx = (view, s, e)
-        sp = SPELL["speller"]
+        sp = self.spelling.speller
         comps = []
         if prefix:
             if self._assist_counts is None:
@@ -84,7 +83,7 @@ class AssistMixin:
         # While a word is being completed it is "misspelled" only because it's unfinished,
         # so spelling fixes show when nothing completes it or the cursor is inside it.
         mid_word = it.get_offset() < e
-        if (mid_word or not comps) and SPELL["enabled"] and sp is not None \
+        if (mid_word or not comps) and self.spelling.enabled and sp is not None \
                 and should_check(word) and not sp.check(word):
             sugg = sp.suggest(word)
             rows = [(w, lambda w=w: self._replace_word(w)) for w in sugg]

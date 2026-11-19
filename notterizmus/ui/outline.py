@@ -16,6 +16,7 @@ from ..completion import BookWords
 from ..layout import layout
 from ..model import Node, editable_order, is_text, set_kind
 from .helpers import set_class
+from .richtext import Spelling
 from .rows import PrefixLabel, TextRow, _prefix_markup, row_type
 from .outline_undo import UndoMixin
 from .outline_keys import KeysMixin
@@ -40,6 +41,7 @@ class OutlineEditor(UndoMixin, KeysMixin, ItemsMixin, SelectionMixin, ClipboardM
     def __init__(self, rules):
         super().__init__(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
         self.rules = rules
+        self.spelling = Spelling()  # set_spelling(); given to every text view the rows make
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.box.add_css_class("outline")
         self.set_child(Adw.Clamp(maximum_size=1200, tightening_threshold=900, child=self.box))
