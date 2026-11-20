@@ -59,6 +59,10 @@ class UnknownBlocksTest(unittest.TestCase):
             lambda dr: [heading("Intro", heading("One"), dr, heading("Two"))],
             lambda dr: [heading("Intro"), dr, heading("Next")],
             lambda dr: [heading("Intro", heading("One", bullet("a"), dr))],
+            # Intro's bullets after its sub-item One are set apart from it by spacers
+            lambda dr: [heading("Intro", heading("One"), dr, bullet("a"), heading("Two"))],
+            lambda dr: [heading("Intro", heading("One"), bullet("a"), dr, heading("Two"))],
+            lambda dr: [heading("Intro", heading("One"), dr, heading("Two"), bullet("a"))],
         ]
         for make in cases:
             with_block = Document.from_json(chapter(*make(copy.deepcopy(MINDMAP)))).root

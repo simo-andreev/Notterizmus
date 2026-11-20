@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Bullets that come after a numbered sub-item but belong to the item above it get a `│` spacer line before and after them, so they no longer read as that sub-item's. Turn it off with `spacer_around_parent_leaves = false` in `rules.toml`.
+
 ## 1.7.0 — 2026-11-19
 
 - A top-level item can be a bullet: type `* ` (or another bullet's trigger) at its start, use Ctrl+Shift+Space or the item-type menu, or paste bullets there. A bullet after a numbered item is set apart by a blank line. Shift+Tab still turns a bullet into the next numbered item.

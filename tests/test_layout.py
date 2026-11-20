@@ -112,11 +112,64 @@ class ShapeTest(unittest.TestCase):
                                       "└ Ⅰ.1) A1\n")
 
     def test_bullets_after_the_last_numbered_child_have_no_trunk(self):
+        """The trunk has ended, so the line that sets them apart from A1 is empty."""
         root = Node("root", children=[H("A", B("before"), H("A1"), B("after"))])
         self.assertEqual(plain(root), "Ⅰ) A\n"
                                       "│    • before\n"
                                       "└ Ⅰ.1) A1\n"
+                                      "\n"
                                       "     • after\n")
+
+    def test_bullets_after_a_numbered_child_are_set_apart_before_and_after(self):
+        """A's bullets after A1 would read as A1's, their indent aside: spacers on both
+        sides space them like a sibling of A1 and A2. Bullets in a row, and their own
+        bullets, stay together; A1's bullets get none."""
+        root = Node("root", children=[H("A", B("intro"), H("A1", B("a1")),
+                                        B("x"), B("y", "dot", B("sub")), H("A2"))])
+        self.assertEqual(plain(root), "Ⅰ) A\n"
+                                      "│    • intro\n"
+                                      "├ Ⅰ.1) A1\n"
+                                      "│      • a1\n"
+                                      "│\n"
+                                      "│    • x\n"
+                                      "│    • y\n"
+                                      "│        • sub\n"
+                                      "│\n"
+                                      "└ Ⅰ.2) A2\n")
+
+    def test_bullets_after_a_numbered_child_are_set_apart_in_deeper_levels(self):
+        root = Node("root", children=[H("A", H("A1", H("a"), B("x"), H("b")))])
+        self.assertEqual(plain(root), "Ⅰ) A\n"
+                                      "│\n"
+                                      "└ Ⅰ.1) A1\n"
+                                      "  │\n"
+                                      "  ├ Ⅰ.1.a) a\n"
+                                      "  │\n"
+                                      "  │    • x\n"
+                                      "  │\n"
+                                      "  └ Ⅰ.1.b) b\n")
+
+    def test_a_table_after_a_numbered_child_is_set_apart_too(self):
+        table = Node("table", data={"rows": [[[Run("c")]]]})
+        lines = layout(Node("root", children=[H("A", H("A1"), table, H("A2"))]), Rules())
+        self.assertEqual([ln.kind for ln in lines],
+                         ["item", "spacer", "item", "spacer", "table", "spacer", "item"])
+
+    def test_setting_apart_bullets_after_a_numbered_child_can_be_turned_off(self):
+        root = Node("root", children=[H("A", H("A1"), B("x"), H("A2"), B("y"))])
+        self.assertEqual(plain(root, tree__spacer_around_parent_leaves=False),
+                         "Ⅰ) A\n"
+                         "│\n"
+                         "├ Ⅰ.1) A1\n"
+                         "│    • x\n"
+                         "└ Ⅰ.2) A2\n"
+                         "     • y\n")
+        self.assertEqual(plain(root, tree__spacer_lines=False),
+                         "Ⅰ) A\n"
+                         "├ Ⅰ.1) A1\n"
+                         "│    • x\n"
+                         "└ Ⅰ.2) A2\n"
+                         "     • y\n")
 
     def test_a_spacer_comes_before_a_numbered_child_unless_a_bullet_precedes_it(self):
         self.assertEqual(plain(self.tree()), "Ⅰ) A\n"
