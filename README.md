@@ -1,4 +1,6 @@
-<img src="data/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png" width="96" align="right" alt="">
+<img src="data/icons/hicolor/256x256/apps/dev.simo.Notterizmus.png" width="96" align="right" alt="app logo - a devilish face whit the letter N on its forehead">
+
+&nbsp;
 
 # Notterizmus 1.7
 
