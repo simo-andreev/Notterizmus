@@ -24,6 +24,9 @@ DEFAULTS = {
         "trunk": "│",
         "spacer_lines": True,       # "│ │" line before each numbered sub-item...
         "spacer_after_leaf": False,  # ...except right after a bullet
+        # bullets of an item that follow one of its numbered sub-items: spacer lines
+        # before and after them, so they don't read as that sub-item's
+        "spacer_around_parent_leaves": True,
         "blank_between_top_level": True,
         "bold_connectors": False,
     },

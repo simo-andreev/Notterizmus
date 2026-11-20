@@ -19,6 +19,7 @@ space = "  "
 trunk = "│"
 spacer_lines = true         # "│ │" line before each numbered sub-item
 spacer_after_leaf = false   # also add it when the previous line is a bullet
+spacer_around_parent_leaves = true  # and around bullets that follow a numbered sub-item
 blank_between_top_level = true
 bold_connectors = false
 

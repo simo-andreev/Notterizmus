@@ -11,6 +11,8 @@ Shape produced (default rules):
     │ │
     │ └ Ⅱ.1.c) Check ...
     │
+    │    • note under Ⅱ after its sub-item Ⅱ.1
+    │
     └ Ⅱ.2) Step 2
 """
 from __future__ import annotations
@@ -94,18 +96,29 @@ class _Layout:
         marker_col = label_col + self.r["bullets"]["indent"]
         prev = None  # the nearest earlier sibling that is shown: blocks from a newer version
         #              aren't exported, so they don't count (kept as it goes: CR36)
+        # Bullets (tables, drawings) of h that follow one of its numbered sub-items would
+        # read as that sub-item's, their indent aside: spacer lines set them apart, before
+        # and after, so they read as a sibling of the sub-items.
+        apart = self.t["spacer_lines"] and self.t["spacer_around_parent_leaves"]
+        in_apart = False  # inside such a run of leaves
         for i, c in enumerate(kids):
             if c.kind == "heading":
                 n += 1
                 is_last = i == last_head
-                if self.t["spacer_lines"] and (
-                        prev is None or prev.kind == "heading" or self.t["spacer_after_leaf"]):
+                if self.t["spacer_lines"] and (prev is None or prev.kind == "heading"
+                                               or in_apart or self.t["spacer_after_leaf"]):
                     self.out.append(Line("spacer", [self.conn(inner + self.t["trunk"])]))
+                in_apart = False
                 head_conn = inner + (self.t["last"] if is_last else self.t["branch"])
                 child_inner = inner + (self.t["space"] if is_last else self.t["pipe"])
                 self.heading(c, head_conn, child_inner, numbers + [n])
             else:
                 trunk_str = inner + self.t["trunk"] if i < last_head else inner
+                if apart and c.kind in BLOCK_KINDS and prev is not None and prev.kind == "heading":
+                    # after the last sub-item the trunk has ended: an empty line then
+                    trunk = trunk_str.rstrip()
+                    self.out.append(Line("spacer", [self.conn(trunk)] if trunk else []))
+                    in_apart = True
                 self.leaf(c, trunk_str, marker_col)
             if c.kind in BLOCK_KINDS:
                 prev = c
