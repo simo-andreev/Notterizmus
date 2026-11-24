@@ -98,6 +98,7 @@ and get a version number when they ship.
 | R10 | **Drag to reorder**: drag an item by its prefix to move it or change its level | Alt+↑/↓ is the only way to move items | M |
 | R11 | **Connectors that line up in TopCoding**: pad with Unicode spaces sized to Roboto's character widths so the `│` columns align | Listed known limit. `export.code_prefix` aligns them but adds a code background | L (spike: measure in the browser and confirm TopCoding keeps those spaces) |
 | R33 | **`!` and `?` bullet types** for important points and for uncertain ones (added 2026-11-18): built-in markers next to `•`, `+` and `-`, typed as `! ` and `? ` at the start of an item and reached by Ctrl+Shift+Space. Today they can only be added by hand in Edit Formatting Rules | Marks what to remember and what to check later, and the marks travel with the notes to TopCoding | S. **Done** 2026-11-18, released in 1.6.0: `important` (`!`) and `question` (`?`) in `rules.DEFAULTS` and the rules template, after `-` in the menus and the Ctrl+Shift+Space cycle; pasted `! ` and `? ` lines become these bullets. A user's `[markers.question]`, which the template used to suggest, changes the built-in one instead of adding a second |
+| R34 | **Section links** (added 2026-11-24): a section's title or label named in any item's text links to that section; Ctrl+click or F12 goes there, Alt+← comes back. Detected from the text, so the file format doesn't change. Requirements: [docs/requirements/R34-section-links.md](docs/requirements/R34-section-links.md) | Chapters refer back to earlier sections by name; reaching them means scrolling or Ctrl+F | M. **Draft**, open questions to agree; follow-ups R34b–R34d there |
 
 ### Drawings — done in 1.4.0
 
@@ -263,6 +264,8 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 8. Added 2026-11-18: the R32 fix, at any time; R33 with the richer notes in
    step 5. Both are **done** and released in 1.6.0, R33 ahead of step 5 (R32 as
    CR9, to confirm on the desktop).
+9. Added 2026-11-24: R34, after its open questions are agreed. Its book-wide
+   follow-up (R34b) shares a title index with R9.
 
 ## Open questions
 
