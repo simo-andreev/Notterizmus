@@ -201,7 +201,7 @@ class ClipboardMixin:
         else:
             v.set_cursor(off)
         if mime == NODES_MIME:  # items: as _own_json() read them
-            self.insert_forest(node, items)
+            self._insert_forest_over(node, v, items)
             return
         if mime == RUNS_MIME:
             with self._op():
@@ -244,11 +244,19 @@ class ClipboardMixin:
                           lambda: self._resplit(ctx, paras, block_nodes(items), mark))
             return
         count = sum(1 for top in forest for _ in top.walk())
-        self.insert_forest(node, forest)
+        self._insert_forest_over(node, v, forest)
         plain_text = "\n".join(runs_text(l) for l in lines)
         mark = self.undo_mark()
         self.emit("toast", f"Pasted {count} items as an outline", "Paste as Plain Text",
                   lambda: self._replace_with_plain(ctx, plain_text, mark))
+
+    def _insert_forest_over(self, node, v, forest):
+        """Paste items into `node`, whose view `v` has the paste's selection or cursor: the
+        selected text goes first, in the same undo step, so the items replace it rather
+        than land beside it. An item left empty is replaced by them (insert_forest)."""
+        with self._op():
+            v.get_buffer().delete_selection(True, True)
+            self.insert_forest(node, forest)
 
     def _undo_paste(self, mark):
         """Take back the paste a toast's button is about. It must still be the last change:
@@ -263,9 +271,15 @@ class ClipboardMixin:
     def _resplit(self, ctx, lines, blocks, mark):
         if not self._undo_paste(mark):
             return
-        row = self.rows.get(ctx[0])
+        fid, off, selo = ctx
+        row = self.rows.get(fid)
         if isinstance(row, TextRow):
-            row.view.set_cursor(ctx[1])
+            # the undo brought back the text the paste replaced: select it again, so the
+            # paragraphs replace it too
+            if selo:
+                row.view.select_range(*selo)
+            else:
+                row.view.set_cursor(off)
             self._paste_lines(row.node, row.view, lines, blocks)
 
     def _insert_blocks(self, node, blocks, focus=None):

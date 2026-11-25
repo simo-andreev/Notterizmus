@@ -86,6 +86,55 @@ class PasteTest(ui.UITestCase):
         self.assertEqual(item.text, "one 2 three")
         self.assertEqual(self.toasts, [], "a one-line paste needs no notice")
 
+    def test_an_outline_pasted_over_selected_text_replaces_it(self):
+        """The selected text stayed, and the items went after the item (appended)."""
+        doc = ui.open_chapter([h("Intro", b("keep old end"))])
+        intro = doc.root.children[0]
+        item = intro.children[0]
+        self.put(plain="- first\n- second")
+        r = ui.focus(item, 0)
+        r.view.select_range(5, 9)
+        self.paste(r, lambda: len(intro.children) == 3)
+        self.assertEqual([n.text for n in intro.children], ["keep end", "first", "second"])
+        ui.press(self.ed.cur_view, "z", ctrl=True)
+        self.assertEqual([n.text for n in self.win.doc.root.children[0].children], ["keep old end"],
+                         "one undo takes back the paste and brings back the selected text")
+
+    def test_an_outline_pasted_over_all_of_an_items_text_takes_its_place(self):
+        doc = ui.open_chapter([h("Intro", b("old"), b("after"))])
+        intro = doc.root.children[0]
+        self.put(plain="- first\n- second")
+        r = ui.focus(intro.children[0], 0)
+        r.view.select_range(0, 3)
+        self.paste(r, lambda: len(intro.children) == 3)
+        self.assertEqual([n.text for n in intro.children], ["first", "second", "after"])
+
+    def test_copied_items_pasted_over_selected_text_replace_it(self):
+        doc = ui.open_chapter([h("Intro", b("copied"), b("old"))])
+        intro = doc.root.children[0]
+        copied, target = intro.children
+        self.ed.sel = [copied]
+        self.ed.copy_items()
+        self.ed.clear_selection()
+        r = ui.focus(target, 0)
+        r.view.select_range(0, 3)
+        self.paste(r, lambda: len(intro.children) == 2 and target.parent is None)
+        self.assertEqual([n.text for n in intro.children], ["copied", "copied"])
+
+    def test_one_item_per_paragraph_after_a_paste_over_selected_text_replaces_it(self):
+        doc = ui.open_chapter([h("Intro", b("Notes: old"))])
+        item = doc.root.children[0].children[0]
+        self.put(plain="First paragraph.\n\nSecond paragraph.\n")
+        r = ui.focus(item, 0)
+        r.view.select_range(7, 10)
+        self.paste(r, lambda: "First" in item.text)
+        self.assertEqual(item.text, "Notes: First paragraph. Second paragraph.")
+        split = self.toasts[-1][2]
+        split()
+        ui.wait_for(lambda: len(self.win.doc.root.children[0].children) == 2, "one item per paragraph")
+        self.assertEqual([n.text for n in self.win.doc.root.children[0].children],
+                         ["Notes: First paragraph.", "Second paragraph."])
+
     def test_html_keeps_bold_and_italic(self):
         doc = ui.open_chapter([h("Intro", b("start: "))])
         item = doc.root.children[0].children[0]

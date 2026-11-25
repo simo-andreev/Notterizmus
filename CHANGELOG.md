@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pasting over selected text replaces it, whatever is pasted. An outline, items copied in the app, or **One Item per Paragraph** after a paste used to keep the selected text and add the pasted items after it. Selecting all of an item's text and pasting an outline puts the outline in its place.
+
 - Bullets that come after a numbered sub-item but belong to the item above it get a `│` spacer line before and after them, so they no longer read as that sub-item's. Turn it off with `spacer_around_parent_leaves = false` in `rules.toml`.
 
 ## 1.7.0 — 2026-11-19
