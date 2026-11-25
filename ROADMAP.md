@@ -92,7 +92,7 @@ and get a version number when they ship.
 
 | ID | Item | Why | Size |
 |---|---|---|---|
-| R35 | **Assessment practice** (asked 2026-11-25): import a TopCoding chapter assessment's report from the `.txt` its page downloads, graded or not; practice each question from a blank answer, with your original answer, the score, the sample answer and the feedback behind Reveal; drafts saved as you type, finished attempts kept and compared with the sample answer | Recall practice for the chapter assessments, next to the chapter's notes | M. **Done** 2026-11-25, not released. Follow-ups: remove an assessment from the app (today: delete its folder in `.assessments`); spell checking in the answer editor; a key of its own for the window; merging drafts edited on two computers (today the other one is kept as an attempt) |
+| R35 | **Assessment practice** (asked 2026-11-25): import a TopCoding chapter assessment's report from the `.txt` its page downloads, graded or not; practice each question from a blank answer, with your original answer, the score, the sample answer and the feedback behind Reveal; drafts saved as you type, finished attempts kept and compared with the sample answer | Recall practice for the chapter assessments, next to the chapter's notes | M. **Done** 2026-11-25, released in 1.8.0. Follow-ups: remove an assessment from the app (today: delete its folder in `.assessments`); spell checking in the answer editor; a key of its own for the window; merging drafts edited on two computers (today the other one is kept as an attempt) |
 
 ### Richer notes — not started
 

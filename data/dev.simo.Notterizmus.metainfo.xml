@@ -36,6 +36,16 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.8.0" date="2026-11-25">
+      <description>
+        <p>Practice TopCoding chapter assessments, and pastes that replace the selected text.</p>
+        <ul>
+          <li>Assessments: import a TopCoding assessment report from its .txt download, graded or not, and practice each question from a blank answer. Reveal shows your original answer, its score, the sample answer and the feedback, and finished attempts can be compared with the sample answer.</li>
+          <li>Pasting over selected text replaces it, whatever is pasted.</li>
+          <li>Bullets after a numbered sub-item that belong to the item above it are set apart by spacer lines.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.7.0" date="2026-11-19">
       <description>
         <p>Bullets at the top level, faster editing of long chapters, and an Earlier Versions that opens at once.</p>

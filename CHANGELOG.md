@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0 — 2026-11-25
 
 - **Assessments**: practice a TopCoding chapter assessment from the report you download from it as `.txt`. Menu → **Import Assessment Report…** reads the file, graded or not yet graded, and attaches it to the chapter it goes with. Each question starts with a blank answer; **Reveal** shows the answer you gave, its score, the sample answer and the feedback, and **Load My Original Answer** brings yours back. Answers are saved as you type; **Finish Attempt** keeps them in **Earlier Attempts**, where you can compare them with the sample answer. Importing the graded download of a report you imported before grading adds its scores and keeps your practice.
 

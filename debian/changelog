@@ -1,3 +1,12 @@
+notterizmus (1.8.0) resolute; urgency=medium
+
+  * Practice TopCoding chapter assessments imported from their .txt
+    reports.
+  * Replace the selected text when pasting an outline or items.
+  * Set apart bullets that follow a numbered sub-item.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Wed, 25 Nov 2026 23:41:37 +0200
+
 notterizmus (1.7.0) resolute; urgency=medium
 
   * Allow bullets at the top level; set them apart from numbered items.
