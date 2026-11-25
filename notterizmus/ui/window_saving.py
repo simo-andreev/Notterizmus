@@ -145,4 +145,6 @@ class WindowSaving:
             GLib.source_remove(self._save_src)
             self._save_src = None
         self.save(quiet=True, ask=False)
+        if self._assessments is not None:  # the app quits as one: its drafts are saved as it closes
+            self._assessments.close()
         return False

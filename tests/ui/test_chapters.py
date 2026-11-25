@@ -339,8 +339,8 @@ class ChaptersTest(ui.UITestCase):
         self.assertTrue(ui.press(self.win.sidebar.list, "Menu"))
         ui.wait_for(ui.open_popovers, "the chapter's menu")
         choices = [(n, t) for n, t, _r in ui.menu_choices(ui.open_popovers()[0])]
-        self.assertEqual(choices, [("1", "Chapter Properties…"), ("2", "Move Up"), ("3", "Move Down"),
-                                   ("4", "Move to Trash")])
+        self.assertEqual(choices, [("1", "Chapter Properties…"), ("2", "Import Assessment Report…"), ("3", "Move Up"),
+                                   ("4", "Move Down"), ("5", "Move to Trash")])
 
     # -- a file in the book that isn't a chapter (damaged, or put there by something else) --------
 

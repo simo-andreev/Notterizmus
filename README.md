@@ -80,6 +80,8 @@ walks through the controls; each time you open it, it starts fresh.
 | In the chapter list: reorder, move to Trash, more | drag, or Alt+↑ / Alt+↓; Delete; right-click |
 | Resize the chapter list (double-click the edge for the default width) | drag the edge between the list and the text |
 | Getting Started: a practice chapter that shows the controls | F1 |
+| Practice a TopCoding assessment: import its report, answer from memory, then reveal | menu → **Assessments…** (see below) |
+| In the Assessments window: previous / next question; show or hide the question list | Ctrl+PgUp / Ctrl+PgDn; F9 |
 | Search every command by name (each shows its key) | Ctrl+Shift+P |
 | All shortcuts | Ctrl+? |
 
@@ -96,6 +98,20 @@ goes into the current item as one paragraph with line-break hyphenation removed;
 the notification offers **One Item per Paragraph**. A table copied on its own, or
 with such text, is added after the item. A copy from TopCoding's notes brings its
 drawings along, in their places; a drawing copied by itself is added after the item.
+
+**Practicing assessments.** On a TopCoding assessment report, choose **Download
+.txt**, then menu → **Import Assessment Report…** (or drop the file on the
+Assessments window). The app suggests the chapter whose title matches the report;
+confirm it or pick another (or none). Each question starts with a blank answer, to
+write from memory; **Reveal** shows the answer you gave, its score, the sample answer
+and the feedback, and **Load My Original Answer** puts your answer in the editor
+(Ctrl+Z takes it back). Answers are saved as you type. **Finish Attempt** keeps them
+in **Earlier Attempts**, where **Compare with Sample Answer** shows one beside the
+sample, and starts a blank attempt. A report downloaded before TopCoding graded it
+has no scores or feedback; import the graded download later and choose **Replace**:
+your drafts and attempts stay. Right-click a chapter in the list for **Practice
+Assessment** and **Import Assessment Report…**. The app reads only the downloaded
+file; it never contacts TopCoding and doesn't grade your practice answers.
 
 **Spelling.** The language button in the header bar (e.g. `EN-US`) switches
 language or turns checking off. A new chapter picks its language from its text,
@@ -135,6 +151,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
 | Getting Started practice copy, rewritten each time it's opened | `~/.local/share/notterizmus/Getting Started.notz` |
 | Earlier versions of each chapter (thinned with age, kept for good) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
+| Imported assessment reports and your practice on them: each report's `.txt` as downloaded, what was read from it and its chapter (`report.json`), the attempt in progress (`draft.json`) and finished attempts (`attempts/<UTC time>Z.json`) | `<Documents>/Notterizmus/.assessments/<title>_<completed>/` (hidden, so it isn't listed as a book; to remove an assessment, delete its folder) |
 
 Rules cover numbering format per level, connector characters, spacing, spacer
 and blank lines, and your own bullet markers.
@@ -187,6 +204,9 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |
 | `notterizmus/commands.py`, `notterizmus/ui/command_search.py` | The commands and their keys (used by the accelerators, Search Commands and the Shortcuts dialog) and command matching; the Search Commands dialog |
 | `notterizmus/find.py`, `notterizmus/ui/findbar.py` | Find and replace: matching, and the find bar |
+| `notterizmus/assessment_txt.py` | Reading TopCoding's assessment report `.txt` (graded or not); errors name the line and question (no GTK) |
+| `notterizmus/assessments.py` | Imported reports and practice attempts in the notes folder: imports, duplicates, drafts, attempts, chapter links, crash recovery (no GTK) |
+| `notterizmus/ui/assessments_window.py`, `assessment_page.py`, `attempts.py` | The Assessments window: the list and importing; practicing one; Earlier Attempts |
 | `tests/`, `tests/ui/`, `scripts/ui-tests.sh` | Unit tests (no GTK); UI tests and their runner |
 | `scripts/measure-drawing-stroke.py` | Times a pen stroke in the drawing window on your own display |
 | `notterizmus/ui/outline.py` | Editor widget: building and refreshing rows, focus, scrolling |
@@ -194,7 +214,8 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/ui/rows.py`, `richtext.py` | Row widgets (text, table, drawing) and the rich-text view |
 | `notterizmus/drawing.py`, `notterizmus/ui/drawing_web.py` | Drawing blocks: the scene, its export and the preview cache (no GTK); the Excalidraw window and preview renderer (WebKitGTK) |
 | `web/drawing/`, `scripts/build-drawing-editor.sh`, `notterizmus/drawing_web/` | Source of the embedded Excalidraw page, its build script (Node.js), and the built page that ships with the app |
-| `notterizmus/ui/window.py`, `app.py` | Window: building it, the open chapter, spelling, copy and find; the app and its accelerators |
+| `notterizmus/ui/window.py`, `app.py` | Window: building it, the open chapter, spelling, copy and find, opening the Assessments window; the app and its accelerators |
+| `notterizmus/ui/helpers.py` | Small shared UI helpers, and `WORKER`: the thread that reads and writes assessments' files |
 | `notterizmus/ui/window_*.py` | The window's mixins: `saving` (autosave, changes on disk), `chapters` (new, open, rename, reorder, Trash), `dialogs`, `zoom`, `sizing` (the chapter list's width) |
 | `data/` | Icons, desktop entry, AppStream metadata, `.notz` MIME type |
 | `debian/`, `scripts/release.sh` | Ubuntu packaging and the PPA release script |

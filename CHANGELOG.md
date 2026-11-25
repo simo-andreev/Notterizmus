@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Assessments**: practice a TopCoding chapter assessment from the report you download from it as `.txt`. Menu → **Import Assessment Report…** reads the file, graded or not yet graded, and attaches it to the chapter it goes with. Each question starts with a blank answer; **Reveal** shows the answer you gave, its score, the sample answer and the feedback, and **Load My Original Answer** brings yours back. Answers are saved as you type; **Finish Attempt** keeps them in **Earlier Attempts**, where you can compare them with the sample answer. Importing the graded download of a report you imported before grading adds its scores and keeps your practice.
+
 - Pasting over selected text replaces it, whatever is pasted. An outline, items copied in the app, or **One Item per Paragraph** after a paste used to keep the selected text and add the pasted items after it. Selecting all of an item's text and pasting an outline puts the outline in its place.
 
 - Bullets that come after a numbered sub-item but belong to the item above it get a `│` spacer line before and after them, so they no longer read as that sub-item's. Turn it off with `spacer_around_parent_leaves = false` in `rules.toml`.

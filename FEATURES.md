@@ -61,6 +61,14 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Typing continues into the text and narrows the list; Enter or Tab picks, Space or Esc closes. Works in table cells too.
 - Completions keep your capitalisation and only appear when they add at least two letters.
 
+## Practicing assessments
+- Import a TopCoding assessment report from its downloaded `.txt` (menu → **Import Assessment Report…**, a chapter's right-click menu, or by dropping the file on the Assessments window). Graded and ungraded downloads both work; a file that isn't a whole report is refused with the line and question at fault, and nothing is imported.
+- Each report goes with a chapter: the app suggests the one whose title matches (case, punctuation and small typos aside) and you confirm it. It follows the chapter when it's renamed, renumbered or moved.
+- The practice page: the questions in a list showing which you've drafted and revealed, a blank editor for each answer with live word and character counts, and progress for the attempt. **Reveal** shows your original answer with its score, the sample answer and the feedback; **Load My Original Answer** puts your answer in the editor, asking first if there's text, and Ctrl+Z takes it back. Ctrl+PgUp / Ctrl+PgDn go between questions; F9 shows or hides the list.
+- Answers are saved as you type (800 ms after you stop), in the background. **Finish Attempt** keeps the attempt and starts a blank one; **Earlier Attempts** shows each attempt's answer, read-only, beside the sample answer if you like.
+- Importing the same report again (same title and completion time) asks: **Skip**, or **Replace**, which keeps your drafts and attempts, so the graded download can follow an ungraded one.
+- Everything is kept in a hidden `.assessments` folder in your notes folder, written in one step so a crash can't leave a half-written file; a draft another computer changed (through a sync tool) is kept as an attempt rather than overwritten.
+
 ## Files and desktop
 - One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).
 - Chapter Properties (F2): rename a chapter, change its number (a number another chapter has is swapped with it) or move it to another book. On a book in the list, F2 renames the book: its folder and the name stored in its chapters.

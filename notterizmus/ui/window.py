@@ -4,13 +4,14 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from .. import APP_ID, APP_NAME, guide, paths
+from .. import APP_ID, APP_NAME, assessments, guide, library, paths
 from ..layout import layout
 from ..model import Document
 from ..rules import Rules
 from ..spell import Speller, guess_language
 from .findbar import FindBar
-from .helpers import load_state, notes_root, run_once, save_state
+from .assessments_window import AssessmentsWindow
+from .helpers import WORKER, assessments_root, load_state, notes_root, run_once, save_state
 from .outline import OutlineEditor
 from .outline_clipboard import export_formats
 from .sidebar import ChapterSidebar
@@ -39,6 +40,8 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.doc = None
         self._save_src = None
         self._disk_dialog = None  # asking what to do about a chapter changed on disk (CR10)
+        self._assessments = None  # the Assessments window, while it is open
+        self._linked = {}  # {chapter file, resolved: the folder of its newest assessment}
         self.speller = Speller()
         self.languages = self.speller.languages()
 
@@ -61,6 +64,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         if last and Path(last).exists():
             self.open_path(last)
         self._offer_stranded()
+        self.refresh_linked()
 
     # -- building the window ----------------------------------------------------------
 
@@ -88,6 +92,9 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         s0 = Gio.Menu()
         s0.append("Chapter Properties…", "win.rename")
         s0.append("Earlier Versions…", "win.versions")
+        sa = Gio.Menu()
+        sa.append("Assessments…", "win.assessments")
+        sa.append("Import Assessment Report…", "win.import-assessment")
         spell = Gio.Menu()
         spell.append("Check Spelling", "win.spell")
         langs = Gio.Menu()
@@ -107,7 +114,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         zoom_item.set_attribute_value("custom", GLib.Variant.new_string("zoom"))
         sz = Gio.Menu()
         sz.append_item(zoom_item)
-        for s in (sz, s0, s1, s2, s3):
+        for s in (sz, s0, sa, s1, s2, s3):
             menu.append_section(None, s)
         menu_btn = Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu, tooltip_text="Menu")
         # "−  100%  +" row at the top of the menu, as in other GNOME apps
@@ -180,6 +187,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.sidebar.connect("open-chapter", lambda _s, path: self._open_from_sidebar(path))
         self.sidebar.on_reorder = self._reorder_chapters
         self.sidebar.popup = self.editor.popup_menu
+        self.sidebar.has_assessment = self.has_assessment
         self.split = Adw.OverlaySplitView(sidebar=self.sidebar, content=tv)
         # Collapse when the text column doesn't fit beside the list; set_sidebar_width
         # keeps this condition in step with the list's width.
@@ -220,6 +228,8 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
                          ("prev-chapter", lambda *_: self.on_chapter_step(-1)),
                          ("next-chapter", lambda *_: self.on_chapter_step(1)),
                          ("rename", self.on_rename), ("versions", self.on_versions),
+                         ("assessments", self.on_assessments),
+                         ("import-assessment", lambda *_: self.assessments_window().choose_file()),
                          ("commands", self.on_commands),
                          ("find", lambda *_: self.on_find()), ("replace", lambda *_: self.on_find(replace=True)),
                          ("zoom-in", lambda *_: self.set_zoom(self._zoom + ZOOM_STEP)),
@@ -233,7 +243,9 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         for name, cb in (("chapter-props", self.on_chapter_props), ("book-rename", self.on_book_rename),
                          ("chapter-up", lambda path: self.on_chapter_move(path, -1)),
                          ("chapter-down", lambda path: self.on_chapter_move(path, 1)),
-                         ("chapter-trash", self.on_chapter_trash)):
+                         ("chapter-trash", self.on_chapter_trash),
+                         ("chapter-practice", self.on_chapter_practice),
+                         ("chapter-import", self.on_chapter_import)):
             a = Gio.SimpleAction.new(name, GLib.VariantType.new("s"))
             a.connect("activate", lambda _a, p, f=cb: f(p.get_string()))
             self.add_action(a)
@@ -407,6 +419,49 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.state.pop("last_file", None)
         save_state(self.state)
 
+    # -- assessments ---------------------------------------------------------------------
+
+    def assessments_window(self):
+        """The Assessments window, opened if it isn't."""
+        if self._assessments is None:
+            self._assessments = AssessmentsWindow(self.get_application(), on_changed=self.refresh_linked,
+                                                  on_closed=self._assessments_closed)
+        self._assessments.present()
+        return self._assessments
+
+    def _assessments_closed(self, win):
+        if self._assessments is win:
+            self._assessments = None
+
+    def on_assessments(self, *_):
+        """Assessments…: the open chapter's newest assessment, if it has one; else the list."""
+        folder = self._linked.get(_key(self.doc.path)) if self.doc and self.doc.path else None
+        win = self.assessments_window()
+        if folder is not None:
+            win.open_folder(folder)
+
+    def on_chapter_practice(self, path):
+        folder = self._linked.get(_key(path))
+        if folder is not None:
+            self.assessments_window().open_folder(folder)
+
+    def on_chapter_import(self, path):
+        self.assessments_window().choose_file(library.Chapter(*library.parse_name(Path(path).stem), Path(path)))
+
+    def has_assessment(self, path):
+        """Whether the chapter at path has an assessment (for its menu in the chapter list)."""
+        return _key(path) in self._linked
+
+    def refresh_linked(self):
+        """Find again which chapters have assessments (in the background)."""
+        WORKER.run(lambda root=assessments_root(), notes=notes_root(): _linked_chapters(root, notes),
+                   done=self._set_linked, failed=lambda _e: None)  # (no menu items: nothing else needs it)
+
+    def _set_linked(self, linked):
+        self._linked = linked
+        if self._assessments is not None and self._assessments.page is None:
+            self._assessments.refresh()
+
     # -- copy and find -----------------------------------------------------------------
 
     def on_copy(self, *_):
@@ -431,5 +486,17 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.findbar.open(replace=replace, prefill=prefill)
 
 
+def _key(path):
+    """A chapter's file as Window._linked knows it."""
+    return str(Path(path).resolve())
 
 
+def _linked_chapters(root, notes):
+    """{chapter file, resolved: the folder of its most recently completed assessment}
+    (for helpers.WORKER: no GTK)."""
+    found, _broken = assessments.list_all(root)
+    linked = {}
+    for a, ch in assessments.resolve_links(found, library.scan(notes), notes):
+        if ch is not None:
+            linked.setdefault(_key(ch.path), a.folder)  # (found is newest first)
+    return linked

@@ -51,6 +51,7 @@ class ChapterSidebar(Adw.Bin):
         self.expanded = set()    # book names shown open
         self._root = None
         self.popup = None        # set by the window: popup(menu_model, widget) shows a menu
+        self.has_assessment = None  # set by the window: has_assessment(chapter path) -> bool
         self.on_reorder = None   # set by the window: on_reorder(chapters in their new order)
 
         tv = Adw.ToolbarView()
@@ -194,14 +195,17 @@ class ChapterSidebar(Adw.Bin):
             m.append_item(item)
             return m
         target = GLib.Variant.new_string(str(row.path))
-        s1, s2, s3 = Gio.Menu(), Gio.Menu(), Gio.Menu()
+        s1, sa, s2, s3 = Gio.Menu(), Gio.Menu(), Gio.Menu(), Gio.Menu()
+        linked = self.has_assessment is not None and self.has_assessment(row.path)
         for menu, label, action in ((s1, "Chapter Properties…", "win.chapter-props"),
+                                    *([(sa, "Practice Assessment", "win.chapter-practice")] if linked else []),
+                                    (sa, "Import Assessment Report…", "win.chapter-import"),
                                     (s2, "Move Up", "win.chapter-up"), (s2, "Move Down", "win.chapter-down"),
                                     (s3, "Move to Trash", "win.chapter-trash")):
             item = Gio.MenuItem.new(label, None)
             item.set_action_and_target_value(action, target)
             menu.append_item(item)
-        for s in (s1, s2, s3):
+        for s in (s1, sa, s2, s3):
             m.append_section(None, s)
         return m
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import weakref
+from concurrent.futures import ThreadPoolExecutor
 
 from gi.repository import GLib
 
@@ -53,6 +54,53 @@ def set_class(widget, name, on):
 
 def notes_root():
     return paths.notes_root(glib_documents=GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS))
+
+
+def assessments_root():
+    return paths.assessments_dir(glib_documents=GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS))
+
+
+class Worker:
+    """One thread for file work that shouldn't hold up the window (assessments: reading,
+    parsing and writing their files). Jobs run one at a time, in the order they were
+    given, so one job's writes are on disk before the next reads. A job must never touch
+    GTK: its result, or its error, comes back on the main loop."""
+
+    def __init__(self):
+        self._pool = None
+        self.pending = 0  # jobs given whose results haven't come back yet
+
+    def run(self, job, done=None, failed=None):
+        """Run job() on the thread, then done(its result) or failed(its exception) on the
+        main loop. An exception without failed is raised there (and fails a UI test).
+        Returns the job's Future, for the rare caller that must wait for it."""
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="notterizmus-files")
+        self.pending += 1
+        future = self._pool.submit(job)
+        future.add_done_callback(lambda f: GLib.idle_add(run_once, self._finished, f, done, failed))
+        return future
+
+    def _finished(self, future, done, failed):
+        self.pending -= 1
+        try:
+            result = future.result()
+        except Exception as e:
+            if failed is None:
+                raise
+            failed(e)
+            return
+        if done is not None:
+            done(result)
+
+    def wait(self):
+        """Block until every job given so far has run (not their done callbacks): before
+        the app quits, so that drafts are on disk."""
+        if self._pool is not None:
+            self._pool.submit(lambda: None).result()
+
+
+WORKER = Worker()
 
 
 def load_state():

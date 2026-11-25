@@ -47,6 +47,12 @@ def atomic_write(path, binary=False):
     _sync_folder(path.parent)
 
 
+def sync_folder(folder):
+    """Make a rename in folder durable, as atomic_write does for the files it writes: for a
+    folder renamed into place (an assessment's import)."""
+    _sync_folder(folder)
+
+
 def _sync_folder(folder):
     """Make the new name in folder durable. Some filesystems can't sync a folder; the
     file's content is on the disk by then anyway."""

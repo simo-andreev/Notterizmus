@@ -10,9 +10,9 @@ from pathlib import Path
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from .. import backups, guide, library, paths
+from .. import assessments, backups, guide, library, paths
 from ..model import Document, chapter_filename
-from .helpers import notes_root, run_once, save_state
+from .helpers import WORKER, assessments_root, notes_root, run_once, save_state
 
 
 class WindowChapters:
@@ -281,6 +281,11 @@ class WindowChapters:
             backups.move(moved, notes_root(), paths.backups_dir())  # earlier versions follow
         except OSError:
             pass
+        if moved:  # and assessments, in the background
+            WORKER.run(lambda m=dict(moved), root=assessments_root(), notes=notes_root():
+                       assessments.follow_moves(root, m, notes),
+                       done=lambda _changed: self.refresh_linked(),
+                       failed=lambda e: self.toast(f"Assessments couldn't follow the chapter: {e}"))
         if self.doc and self.doc.path:
             new = next((n for o, n in moved.items() if library.same_file(o, self.doc.path)), None)
             if new is not None:

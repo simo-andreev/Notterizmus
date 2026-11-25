@@ -88,6 +88,12 @@ and get a version number when they ship.
 | R5 | **Zoom**: Ctrl+= / Ctrl+- / Ctrl+0, remembered | Text size is fixed in CSS | S. **Done** in 1.3.0; also Ctrl + scroll and a menu row |
 | R6 | **Unknown block types**: show them as a read-only "made with a newer version" row and leave them out of Copy for TopCoding | A file with a drawing (R12) opened in an older version would otherwise show an empty item; text typed there isn't saved | S. **Done** in 1.2.0. Also keeps unknown fields of known items (1.1 dropped them) |
 
+### Practicing assessments
+
+| ID | Item | Why | Size |
+|---|---|---|---|
+| R35 | **Assessment practice** (asked 2026-11-25): import a TopCoding chapter assessment's report from the `.txt` its page downloads, graded or not; practice each question from a blank answer, with your original answer, the score, the sample answer and the feedback behind Reveal; drafts saved as you type, finished attempts kept and compared with the sample answer | Recall practice for the chapter assessments, next to the chapter's notes | M. **Done** 2026-11-25, not released. Follow-ups: remove an assessment from the app (today: delete its folder in `.assessments`); spell checking in the answer editor; a key of its own for the window; merging drafts edited on two computers (today the other one is kept as an attempt) |
+
 ### Richer notes — not started
 
 | ID | Item | Why | Size |

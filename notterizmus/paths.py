@@ -39,6 +39,13 @@ def notes_root(env=None, glib_documents=None):
     return documents_dir(env, glib_documents) / "Notterizmus"
 
 
+def assessments_dir(env=None, glib_documents=None):
+    """Imported TopCoding assessment reports and the practice attempts on them: a hidden
+    folder in the notes folder, so they go where the notes go, but are never listed as a
+    book (library.scan() skips hidden folders)."""
+    return notes_root(env, glib_documents) / ".assessments"
+
+
 def _xdg_home(var, default, env=None):
     """An XDG base folder: $var when it is set and not empty, else <home>/<default>
     (home from $HOME, else the password database)."""

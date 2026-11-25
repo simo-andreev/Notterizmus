@@ -1,0 +1,300 @@
+Design a Rate Limiter - Online Assessment
+============================================================
+Difficulty: easy
+Completed: 23.11.2026 г., 19:05:51 ч.
+Time allocated: 60 min
+Time spent: 60 min
+Attempt: 1 of 1
+Final result: 7.10 / 19 (37.4%)
+
+Question 1
+------------------------------------------------------------
+Q: What is the purpose of a rate limiter in a distributed system?
+
+Your answer:
+To limit the number of requests a client can send in a limited amount of time (that will get processed).
+
+The purpose of which, in turn, is to:
+  - avoid malicious use, eg. DoS attacks or brute-forcing a login API by repeated requests
+  - enforce a usage limit on an API, eg. based on subscription tiers.
+  - avoid spikes in load
+
+Sample answer:
+A rate limiter controls how frequently users or systems can perform certain actions within a given timeframe. It helps prevent abuse (like API overuse), ensures fair resource distribution, and maintains system stability under high load.
+
+Score: 1 / 1
+Feedback:
+Excellent answer! You correctly identified the core function of limiting requests within a timeframe and provided strong, specific examples of why rate limiting matters: preventing DoS attacks, enforcing subscription tiers, and managing load spikes. Your response shows a solid understanding of both the mechanism and its practical purposes in distributed systems.
+
+Question 2
+------------------------------------------------------------
+Q: At what levels can a rate limiter be implemented, and what are the pros and cons of each?
+
+Your answer:
+A rate limiter can be implemented:
+1) At client-side:
+    pro: Cheap, since client does processing & tracking
+    con: Unreliable, since client can be modified or worked-around - i.e. acts as a 'soft' rate limiter
+    con: Might require re-implementation per client, which expands maintenance and can lead to bugs or different behavior per platform
+
+2) Server-side:
+    > Can be in many along the system, API Gateways are a good place, since they are aware of the APIs available and get hit by client requests reasonably early
+    pro: Reliable - server-side rate-limiting is harder to overcome/workaround
+    con: Needs storage and compute to run
+   
+
+Sample answer:
+Client-side: simple and responsive but unreliable against malicious users. API Gateway: centralized and easy to manage but adds latency. Application level: allows business-specific logic but increases code complexity. Database level: ensures strict consistency but is inefficient and expensive.
+
+Score: 0.75 / 1
+Feedback:
+You correctly identified client side and server side implementation with solid reasoning about reliability and cost tradeoffs. Your point about client side requiring reimplementation per platform is insightful. You also mentioned API Gateway as a good server side option. However, you missed discussing application level (within the service itself, allowing business specific logic but adding code complexity) and database level (ensuring strict consistency but being inefficient and expensive). Covering these additional levels would make your answer more complete.
+
+Question 3
+------------------------------------------------------------
+Q: What is the difference between Fixed Window and Sliding Window algorithms in rate limiting?
+
+Your answer:
+The Fixed Window counts (and limits) requests within discrete windows, meaning a burst at the end of one and start of the next window, can pass through 200% of the allowed number of requests before it 429s
+
+The Sliding Window algorithms instead look at the number of requests in a time widow relative to current time.
+
+Sample answer:
+Fixed Window resets counters at fixed intervals, making it simple but vulnerable to burst traffic at window boundaries. Sliding Window smooths traffic by calculating limits based on a moving time range, offering more accurate enforcement but higher computational overhead.
+
+Score: 1 / 1
+Feedback:
+Excellent answer! You clearly explained the key weakness of Fixed Window (the burst problem at boundaries allowing up to 200% of the limit) and correctly described how Sliding Window solves this by using a moving time range relative to the current moment. You captured both the core difference and the practical implications perfectly.
+
+Question 4
+------------------------------------------------------------
+Q: How does the Token Bucket algorithm work in rate limiting?
+
+Your answer:
+A client's "bucket" holds "tokens".
+
+Each request the client makes, costs a token.
+
+If the bucket has fewer tokens than needed for the request, it gets rejected.
+
+The bucket refills by `T` tokens every `N` seconds, up a predefined max/capacity `M`.
+
+`T`, `N` & `M` are the tuning points of the rate limiter.
+
+Sample answer:
+Tokens accumulate in a bucket at a constant rate. Each request consumes one token. If the bucket is empty, requests are rejected or delayed. This approach allows short bursts while maintaining an average rate over time.
+
+Score: 0.95 / 1
+Feedback:
+Excellent answer! You clearly explained the core mechanism: tokens accumulate in a bucket, requests consume tokens, and requests are rejected when insufficient tokens are available. You also correctly identified the refill mechanism and the key tuning parameters (refill rate T, time interval N, and max capacity M). The only minor detail is that the standard description mentions tokens accumulate at a constant rate (which your T/N captures), and the original answer also notes this allows bursts while maintaining average rate over time. Overall, very thorough and accurate.
+
+Question 5
+------------------------------------------------------------
+Q: How does the Leaky Bucket algorithm differ from Token Bucket?
+
+Your answer:
+The Leaky Bucket holds up-to a set number of requests in queue and process requests from it at a fixed rate.
+
+Instead of tokens and refills, it is configured by tuning how many requests are ingested per second and how many requests the queue can hold.
+
+Sample answer:
+The Leaky Bucket enforces a fixed outflow rate, effectively smoothing out bursts by queuing incoming requests. Token Bucket allows temporary bursts as long as tokens are available, making it more flexible for varying workloads.
+
+Score: 0.75 / 1
+Feedback:
+You correctly identified that Leaky Bucket processes requests at a fixed rate and uses a queue with a maximum capacity. However, you missed the key contrast with Token Bucket: Token Bucket allows bursts when tokens are available, making it more flexible for variable traffic, while Leaky Bucket strictly smooths out bursts. Including this distinction would strengthen your answer.
+
+Question 6
+------------------------------------------------------------
+Q: What happens if the cache instance (e.g., Redis) used for rate limiting fails?
+
+Your answer:
+Depends on fail-over availability and implemented fail strategy.
+
+If a replica of the failed Redis is available and fail detection and fail-over is condfigured, it takes over.
+Some recent counters are likely to be lost, effectively expanding some quotas for a bit.
+
+During the transition or if no replicate is available, depending on fail strategy:
+  a) API access could block access - generally for sensitive APIs, like authentication.
+  b) API limiting could be dropped temporarily - extra traffic and/or some subscription freebies can be an acceptable cost to avoid service outages.
+Decision should (generally) be made per-endpoint, since only some APIs need constant hard limiting.
+
+If none of those are available - service goes down and users get 5xx errors.
+
+Sample answer:
+If the cache fails, the system may either allow all traffic (fail-open) or block all traffic (fail-closed). A robust design uses local in-memory fallback counters or circuit breakers to maintain partial functionality until recovery.
+
+Score: 0.85 / 1
+Feedback:
+Excellent answer! You correctly identified the two main failure strategies (fail closed for sensitive endpoints and fail open to maintain availability) and explained the tradeoff between security and uptime. You also covered failover to replicas and the realistic consequence of losing recent counters. The per endpoint decision making shows strong architectural thinking. The only minor gap is that you didn't explicitly mention local in memory fallback counters or circuit breakers as mitigation strategies, which can provide partial functionality during outages. Overall, very thorough and practical response.
+
+Question 7
+------------------------------------------------------------
+Q: How can you ensure rate limiting consistency across multiple servers or regions?
+
+Your answer:
+Keep counters in dedicated, separate/dedicated mem cache like Redis, not in web servers.
+
+From there, in a geographically distributed system, a "home" region can be set for each user. 
+That region's mem cache will always maintain the user's rate limiters, providing consistency.
+
+Sample answer:
+Use distributed storage like Redis or DynamoDB to share counters, apply sharding based on user IDs, and consider eventual consistency models. For global systems, implement regional limits combined with local enforcement.
+
+Score: 0.85 / 1
+Feedback:
+Great answer! You correctly identified using a centralized memory cache like Redis to maintain consistency across servers, which is the core solution. Your point about assigning a home region per user is a smart approach for geographic distribution and ensures a single source of truth. To make this even stronger, you could mention sharding strategies (like by user ID) to distribute load on the cache itself, and acknowledge tradeoffs like potential latency when users access from non home regions or how to handle cache failures. Overall, you demonstrated solid understanding of the key architectural patterns.
+
+Question 8
+------------------------------------------------------------
+Q: What are some strategies for handling rate limiter synchronization in distributed environments?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Use atomic operations (e.g., Redis INCR), distributed locks, or approximate counters like Count-Min Sketch. For high-scale systems, probabilistic algorithms can reduce contention and improve performance.
+
+Score: 0 / 1
+
+Question 9
+------------------------------------------------------------
+Q: What are common edge cases to consider when implementing a rate limiter?
+
+Your answer:
+Burst traffic along window boundaries.
+
+Legitimate traffic from different clients w/t same identifier, e.g. if tracking IP - same household, multiple people.
+
+Identifier spoofing or faking to avoid limits, e.g. IP spoofing, making fake accounts to abuse free trials
+
+Clock issues, e.g. misaligned clocks breaking request time log or non-slew NTP causing a clock to reverse, either blocking legitimate requests because of overlap or allowing illegitimate ones because of reset windows. 
+
+Atomicity of writes and checks. e.g. in Redis, a Lua script can be used to perform the counter or log write and check in an atomic synchronized way to avoid race conditions giving false results. 
+
+Sample answer:
+Clock drift between servers, retry storms after resets, inconsistent key distribution in sharded caches, and traffic bursts caused by window resets are common pitfalls to account for in production designs.
+
+Score: 0.95 / 1
+Feedback:
+Excellent answer! You covered the key edge cases thoroughly: burst traffic at window boundaries, shared identifiers like IPs from the same household, identifier spoofing, clock drift and synchronization issues, and race conditions requiring atomic operations. Your Redis Lua script example shows practical understanding. You captured all the main points from the reference answer and added valuable detail about NTP and atomicity solutions. Really strong response overall.
+
+Question 10
+------------------------------------------------------------
+Q: How can you monitor and debug rate limiter performance?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Collect metrics such as hit/miss ratios, rejection rates, and latency. Use structured logging and alerts for anomalies. Visual dashboards and tracing can reveal hotspots and underutilized resources.
+
+Score: 0 / 1
+
+Question 11
+------------------------------------------------------------
+Q: What is a 'grace period' or 'soft limit' in rate limiting, and when is it useful?
+
+Your answer:
+No answer provided
+
+Sample answer:
+A grace period temporarily allows users to exceed their limit by a small amount before strict enforcement resumes. It helps smooth over minor traffic spikes and improves user experience in low-risk scenarios.
+
+Score: 0 / 1
+
+Question 12
+------------------------------------------------------------
+Q: How can you prevent unfair throttling of legitimate users in shared environments?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Implement per-user or per-tenant quotas, apply weighted limits based on plan tiers, and isolate heavy users from shared pools using fair queueing algorithms.
+
+Score: 0 / 1
+
+Question 13
+------------------------------------------------------------
+Q: What’s the role of approximate counting algorithms like Bloom filters or Count-Min Sketch in rate limiting?
+
+Your answer:
+No answer provided
+
+Sample answer:
+They allow efficient rate limiting for large-scale systems by approximating request frequencies with small memory usage and acceptable error margins, trading off precision for scalability.
+
+Score: 0 / 1
+
+Question 14
+------------------------------------------------------------
+Q: How would you test and validate a rate limiter implementation?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Use load testing to simulate bursts, concurrency tests for atomicity, and chaos testing to validate fault tolerance. Also verify limit resets, distributed sync, and fallback behavior under failure.
+
+Score: 0 / 1
+
+Question 15
+------------------------------------------------------------
+Q: What metrics indicate that a rate limiter is effective?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Low rejection rate under normal conditions, consistent latency, smooth traffic distribution, predictable response to spikes, and stable system performance without cascading failures.
+
+Score: 0 / 1
+
+Question 16
+------------------------------------------------------------
+Q: How can a rate limiter support different APIs or tenants with varying limits?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Use dynamic configuration where limits are defined per API key, user, or service plan. Store configurations in a database or config service and load them into the limiter at runtime.
+
+Score: 0 / 1
+
+Question 17
+------------------------------------------------------------
+Q: What are common performance bottlenecks in rate limiter systems and how can they be mitigated?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Bottlenecks often come from centralized data stores (e.g., Redis contention) or excessive locking. Mitigate with sharding, pipelining, caching, and local counters synced asynchronously.
+
+Score: 0 / 1
+
+Question 18
+------------------------------------------------------------
+Q: What’s the difference between global and local rate limits?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Global limits apply across all instances or regions (useful for APIs and shared services). Local limits are enforced per instance for lightweight control. Many systems combine both to balance precision and performance.
+
+Score: 0 / 1
+
+Question 19
+------------------------------------------------------------
+Q: How would you handle dynamic scaling of rate-limited services (e.g., auto-scaling up or down)?
+
+Your answer:
+No answer provided
+
+Sample answer:
+Ensure each new instance registers itself with the distributed limiter backend, synchronize counters, and possibly rehash user keys to maintain balanced rate enforcement during scaling events.
+
+Score: 0 / 1

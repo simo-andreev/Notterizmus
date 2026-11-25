@@ -13,7 +13,7 @@ BOOK = "Notterizmus"
 # Words the English dictionary flags in the guide; ignored for the session while it's open.
 # "misspeled" stays flagged: it's an exercise.
 SPELL_IGNORE = ("Ctrl", "Esc", "PgUp", "PgDn", "Notterizmus", "Notterizmus's", "TopCoding",
-                "TopCoding's", "compl")
+                "TopCoding's", "compl", "txt")
 
 
 def key(text):
@@ -166,6 +166,18 @@ def build(rules=None):
           b(("Text without outline markers, such as paragraphs from a PDF, joins the current item. ",
              key("Ctrl+Shift+V"), " always pastes as plain text.")),
           b("Show Plain Text in the menu shows the chapter as plain text.")),
+
+        h("Practicing assessments",
+          b("On a TopCoding assessment report, choose Download .txt. Import Assessment Report in the menu brings "
+            "the file in and asks which chapter it goes with; you can also drop the file on the Assessments "
+            "window."),
+          b("Each question starts with a blank answer, to write from memory. Reveal shows the answer you gave, "
+            "its score, the sample answer and the feedback; Load My Original Answer puts your answer in the "
+            "editor. Answers are saved as you type."),
+          b((key("Ctrl+PgUp"), " or ", key("Ctrl+PgDn"), " goes to the previous or next question, and ",
+             key("F9"), " shows or hides the question list.")),
+          b("Finish Attempt keeps your answers in Earlier Attempts, where you can compare them with the sample "
+            "answer, and starts a blank attempt.")),
 
         h("More",
           b((key("Ctrl+N"), " creates a chapter and ", key("Ctrl+O"), " opens one. Each chapter of a book is "
