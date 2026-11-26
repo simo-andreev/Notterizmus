@@ -36,6 +36,16 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.8.1" date="2026-11-26">
+      <description>
+        <p>Assessments from the chapter list, scores in TopCoding's colors, and a question list you can resize.</p>
+        <ul>
+          <li>Each chapter in the chapter list ends in a button that opens its assessment, or imports a report for that chapter without asking which chapter.</li>
+          <li>Revealed scores are colored as TopCoding colors them, in the question list too, and the original score by its percentage. A button in the header bar turns the colors off.</li>
+          <li>The question list of an assessment can be dragged wider or narrower.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.8.0" date="2026-11-25">
       <description>
         <p>Practice TopCoding chapter assessments, and pastes that replace the selected text.</p>

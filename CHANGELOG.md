@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.1 — 2026-11-26
 
 - **Assessments from the chapter list**: each chapter ends in a button that opens its assessment. A chapter without one gets a button that imports a report for that chapter, without asking which chapter, and opens it.
 - Revealed scores are colored as TopCoding colors them: green from 0.8, amber from 0.5, red below, so an unanswered question is red. They also show in the question list now, and the original score at the top is colored by its percentage: green from 80%, amber from 65%. The color button in the header bar turns the colors off until the window opens again; the scores stay.

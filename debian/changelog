@@ -1,3 +1,12 @@
+notterizmus (1.8.1) resolute; urgency=medium
+
+  * Open or import a chapter's assessment from its button in the chapter
+    list.
+  * Color assessment scores as TopCoding does, with a toggle.
+  * Make the assessment question list resizable.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Thu, 26 Nov 2026 15:55:14 +0200
+
 notterizmus (1.8.0) resolute; urgency=medium
 
   * Practice TopCoding chapter assessments imported from their .txt
