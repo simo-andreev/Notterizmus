@@ -32,11 +32,14 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 ## Where things stand
 
-As of 2026-11-25:
+As of 2026-11-26:
 
-- 1.8.0 was uploaded to the PPA on 2026-11-25, for Ubuntu 26.04 only: assessment
-  practice (R35), pastes that replace the selected text, and bullets after a numbered
-  sub-item set apart. Its build on Launchpad is still to be confirmed.
+- 1.8.1 was uploaded to the PPA on 2026-11-26, for Ubuntu 26.04 only: follow-ups to
+  assessment practice (R35): a button for each chapter's assessment in the chapter
+  list, scores in TopCoding's colors, and a resizable question list. Its build on
+  Launchpad is still to be confirmed.
+- 1.8.0 was uploaded the day before: assessment practice (R35), pastes that replace
+  the selected text, and bullets after a numbered sub-item set apart.
 - 1.7.0 was on the PPA before it, built 2026-11-19 (its log shows the
   unit tests ran: 426 tests, OK): phases 5–7 of CODE_REVIEW.md (performance, the test
   suite, code health), top-level bullets (CR11's decision) and TopCoding's header cells
