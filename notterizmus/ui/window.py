@@ -449,13 +449,14 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.assessments_window().choose_file(library.Chapter(*library.parse_name(Path(path).stem), Path(path)))
 
     def has_assessment(self, path):
-        """Whether the chapter at path has an assessment (for its menu in the chapter list)."""
+        """Whether the chapter at path has an assessment (for its button and menu in the
+        chapter list)."""
         return _key(path) in self._linked
 
     def refresh_linked(self):
         """Find again which chapters have assessments (in the background)."""
         WORKER.run(lambda root=assessments_root(), notes=notes_root(): _linked_chapters(root, notes),
-                   done=self._set_linked, failed=lambda _e: None)  # (no menu items: nothing else needs it)
+                   done=self._set_linked, failed=lambda _e: None)  # (the chapter list stays as it was)
 
     def _set_linked(self, linked):
         self._linked = linked

@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from notterizmus.assessment_txt import Points
 from notterizmus.library import Chapter
 from notterizmus.model import Document
 
@@ -256,10 +257,60 @@ class AssessmentsTest(ui.UITestCase):
         drag_edge_to(20)
         self.assertEqual(paned.get_position(), LIST_MIN)
         drag_edge_to(paned.get_width() - 20)
-        self.assertEqual(paned.get_position(), paned.props.max_position)
+        widest = paned.props.max_position
+        self.assertEqual(paned.get_position(), widest)
         ui.frames(2)
         least = page.question_pane.measure(ui.Gtk.Orientation.HORIZONTAL, -1)[0]
         self.assertEqual(page.question_pane.get_width(), least, "the question keeps its minimum width")
+        ui.real_key("F9")
+        ui.real_key("F9")
+        ui.frames(2)
+        self.assertEqual(paned.get_position(), widest, "it comes back as wide as it was dragged")
+
+    def test_f9_takes_the_focus_to_the_side_it_shows(self):
+        """GTK moved the focus out of the side F9 hid to the paned, whose arrow keys moved
+        the hidden handle: in a narrow window, they chose no question."""
+        from notterizmus.ui.assessment_page import LIST_WIDTH
+        page = self.imported()
+        page.rows[1].grab_focus()
+        ui.wait_for(page.rows[1].has_focus, "the question list")
+        ui.real_key("F9")  # the list goes from under the focus
+        self.assertFalse(page.list_pane.get_visible())
+        self.assertTrue(page.view.has_focus(), "the answer")
+        ui.real_key("F9")
+        self.assertTrue(page.view.has_focus(), "the list beside it leaves the focus in the answer")
+        self.aw.set_default_size(640, 700)
+        ui.wait_for(lambda: page.bin.get_current_breakpoint() is page.narrow, "the narrow layout")
+        page.view.grab_focus()  # (the change of layout took it to the header bar)
+        ui.wait_for(page.view.has_focus, "the answer")
+        ui.real_key("F9")  # the list in the question's place
+        self.assertEqual((page.list_pane.get_visible(), page.question_pane.get_visible()), (True, False))
+        self.assertTrue(page.rows[1].has_focus(), "the question chosen in the list")
+        ui.real_key("Down")
+        self.assertEqual(page.current, 2, "the arrow keys choose a question")
+        ui.real_key("F9")  # the question in the list's place again
+        self.assertEqual((page.list_pane.get_visible(), page.question_pane.get_visible()), (False, True))
+        self.assertTrue(page.view.has_focus(), "the answer again")
+        self.assertEqual(page.paned.get_position(), LIST_WIDTH, "the hidden handle stayed where it was")
+
+    def test_the_list_and_the_question_fit_side_by_side_or_take_turns_at_any_text_size(self):
+        """The narrow layout began at 720sp alone: with smaller text that was narrower than
+        the list (whose minimum doesn't shrink) and the question need, and a window a little
+        wider cut the question off."""
+        settings = ui.Gtk.Settings.get_default()
+        self.addCleanup(settings.set_property, "gtk-xft-dpi", settings.props.gtk_xft_dpi)
+        page = self.imported()
+        content = page.bin.get_child()
+        for scale, width in ((0.9, 660), (0.9, 730), (1.25, 890), (1.25, 910)):
+            settings.set_property("gtk-xft-dpi", round(96 * 1024 * scale))
+            self.aw.set_default_size(width, 700)
+            ui.wait_for(lambda: self.aw.get_width() == width, f"the window to be {width} px wide")
+            narrow = width <= 720 * max(scale, 1)  # 720 px, or 720sp with larger text
+            ui.wait_for(lambda: (page.bin.get_current_breakpoint() is page.narrow) == narrow,
+                        f"the {'narrow' if narrow else 'wide'} layout at {width} px with {scale:g}× text")
+            ui.frames(2)
+            self.assertGreaterEqual(page.bin.get_width(), content.measure(ui.Gtk.Orientation.HORIZONTAL, -1)[0],
+                                    f"room for what is shown at {width} px with {scale:g}× text")
 
     def test_a_narrow_window_shows_the_list_or_the_question_and_widening_brings_both_back(self):
         from notterizmus.ui.assessment_page import LIST_WIDTH
@@ -304,6 +355,8 @@ class AssessmentsTest(ui.UITestCase):
         self.assertEqual(final_score(), ("Original score 7.10 / 19 (37.4%)", ["result-poor"]))
         self.assertEqual(scores(), [("1", ["result-good"]), ("0.75", ["result-partial"]), ("0", ["result-poor"])])
         self.assertFalse(page.rows[3].score.get_visible(), "not revealed: no score")
+        page.rows[3].set_state(False, True, Points("2", "5"))  # (TopCoding's are out of 1)
+        self.assertEqual(page.rows[3].score.get_label(), "2 / 5", "a score out of more says so")
         self.assertEqual(answer_block(), (["Your Original Answer", "Score 0 / 1", "No answer provided"],
                                           ["result-poor"]))
         toggle = next(w for w in ui.walk(page) if isinstance(w, ui.Gtk.ToggleButton)

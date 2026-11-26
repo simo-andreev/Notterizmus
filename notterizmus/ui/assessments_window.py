@@ -47,8 +47,8 @@ class AssessmentsWindow(Adw.ApplicationWindow):
     __gtype_name__ = "NtzAssessmentsWindow"
 
     def __init__(self, app, on_changed=None, on_closed=None):
-        """on_changed() after an import or a changed link (the main window's chapter menus
-        offer an assessment's chapter); on_closed(window) once it is closed."""
+        """on_changed() after an import or a changed link (the main window's chapter buttons
+        and menus open an assessment's chapter); on_closed(window) once it is closed."""
         super().__init__(application=app, title="Assessments", default_width=1040, default_height=780)
         self.set_size_request(400, 360)
         self.on_changed, self.on_closed = on_changed, on_closed
@@ -207,7 +207,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
 
     def assessments_changed(self):
         """An import, a Replace, a finished attempt or a new link: the list and the main
-        window's chapter menus show it."""
+        window's chapter buttons and menus show it."""
         if self.on_changed is not None:
             self.on_changed()
 

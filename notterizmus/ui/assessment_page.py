@@ -86,12 +86,13 @@ class QuestionRow(Gtk.ListBoxRow):
 
     def set_state(self, drafted, revealed, score=None, highlight=True):
         """score: the original score (None if ungraded), shown once the question is
-        revealed; in TopCoding's color for it if highlight (the page's toggle)."""
+        revealed, as "0.75" when it is out of 1 (TopCoding's are); in TopCoding's color for
+        it if highlight (the page's toggle)."""
         self.drafted.set_visible(drafted)
         self.revealed.set_visible(revealed)
         shown = revealed and score is not None
         self.score.set_visible(shown)
-        self.score.set_label(score.got if shown else "")
+        self.score.set_label((score.got if score.maximum == 1 else str(score)) if shown else "")
         _show_result(self.score, store.result_category(score) if shown and highlight else None)
         state = ("drafted" if drafted else "unanswered") + (", revealed" if revealed else "") \
             + (f", original score {score}" if shown else "")
@@ -130,14 +131,16 @@ class PracticePage(Adw.NavigationPage):
         self._list_width = LIST_WIDTH  # as last dragged: it comes back with the list
         for obj, signal, method in ((self.list_pane, "notify::visible", self._list_shown),
                                     (self.paned, "notify::position", self._list_resized),
-                                    (self.paned, "notify::max-position", self._room_changed)):
+                                    (self.paned, "notify::max-position", self._room_changed),
+                                    (window, "notify::focus-widget", self._keep_focus)):
             self._handlers.append((obj, obj.connect(signal, weak_handler(method))))
         tv.set_content(self.paned)
         # A narrow window shows the list or the question, not both (show_list); widened, it
         # has the list as before. The breakpoint is the page's own: one added to the window
-        # would hold the page after it is gone. In sp, as the question's minimum width grows
-        # with the text size.
-        self.narrow = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 720sp"))
+        # would hold the page after it is gone. Up to 720 px, or 720sp with larger text: the
+        # question's minimum width grows with the text size, but the list's (LIST_MIN) doesn't
+        # shrink with smaller text.
+        self.narrow = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 720px or max-width: 720sp"))
         self.narrow.add_setter(self.list_pane, "visible", False)
         self.narrow.add_setter(self.question_pane, "visible", True)
         self.bin = Adw.BreakpointBin(child=tv, width_request=360, height_request=320)
@@ -637,14 +640,30 @@ class PracticePage(Adw.NavigationPage):
             action.set_state(GLib.Variant.new_boolean(pane.get_visible()))
         if pane.get_visible():
             self.paned.set_position(self._list_width)
+        self._keep_focus()  # the paned may have the focus already (F8): no focus change tells then
+
+    def _keep_focus(self, *_):
+        # GTK moves the focus out of a side that is hidden (F9, a narrow window) to the paned,
+        # on the next frame, where the arrow keys would move the hidden handle: it goes to the
+        # side shown instead, to the answer or else to the question chosen in the list. With
+        # both sides shown, the paned keeps it (F8: the handle, moved with the arrow keys).
+        if self.win.get_focus() is not self.paned or (self.list_pane.get_visible()
+                                                       and self.question_pane.get_visible()):
+            return
+        if self.question_pane.get_visible():
+            self.view.grab_focus()
+        elif (row := self.list.get_selected_row()) is not None:
+            row.grab_focus()
 
     def _list_resized(self, paned, _pspec):
         # Not a width a narrower window cut the list down to (GTK keeps the position at most
-        # max-position), nor one it leaves no room to change: a window that narrows by much
+        # max-position): at max-position, only a width wider than before, which is a drag as
+        # far as it goes. Nor one it leaves no room to change: a window that narrows by much
         # at once (unmaximized, tiled) is too narrow for both sides until the breakpoint
         # drops the list.
-        if paned.props.min_position < paned.props.max_position and paned.get_position() < paned.props.max_position:
-            self._list_width = paned.get_position()
+        position, most = paned.get_position(), paned.props.max_position
+        if paned.props.min_position < most and (position < most or position > self._list_width):
+            self._list_width = position
 
     def _room_changed(self, paned, _pspec):
         # The window widened: the list grows back to the width a narrower one took from it.
