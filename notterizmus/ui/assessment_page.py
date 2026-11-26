@@ -10,7 +10,9 @@ text winning. Finish Attempt keeps it among the attempts and starts a blank one;
 Attempts (attempts.py) shows them.
 
 The window's actions drive the page: win.prev-question and win.next-question (Ctrl+PgUp,
-Ctrl+PgDn), win.sidebar (F9: the question list), win.finish, win.attach and win.attempts."""
+Ctrl+PgDn), win.sidebar (F9: the question list), win.finish, win.attach, win.attempts and
+win.highlights (the original scores in TopCoding's colors: assessments.result_category and
+final_category)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,9 +22,11 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango
 from .. import assessments as store
 from ..assessments import Answer, Attempt
 from .attempts import AttemptsDialog
-from .helpers import WORKER, weak_handler
+from .helpers import WORKER, set_class, weak_handler
 
 SAVE_DELAY = 800  # ms after the last change, as for chapters
+LIST_WIDTH = 260  # px: the question list's width when a page opens (it isn't kept)
+LIST_MIN = 200    # px: neither the list nor the question can be dragged narrower than its minimum
 
 
 class DraftFile:
@@ -62,8 +66,8 @@ class DraftBuffer(Gtk.TextBuffer):
 
 
 class QuestionRow(Gtk.ListBoxRow):
-    """A question in the list: its number, its prompt, and icons for what you did with it
-    in this attempt (answered it, revealed it)."""
+    """A question in the list: its number, its prompt, icons for what you did with it in
+    this attempt (answered it, revealed it) and, once revealed, its original score."""
 
     def __init__(self, question, **props):
         super().__init__(**props)
@@ -74,15 +78,23 @@ class QuestionRow(Gtk.ListBoxRow):
                            ellipsize=Pango.EllipsizeMode.END)
         self.drafted = Gtk.Image(icon_name="document-edit-symbolic", visible=False)
         self.revealed = Gtk.Image(icon_name="view-reveal-symbolic", visible=False)
-        for w in (num, prompt, self.drafted, self.revealed):
+        self.score = Gtk.Label(visible=False, css_classes=["numeric"])
+        for w in (num, prompt, self.drafted, self.revealed, self.score):
             box.append(w)
         self.set_child(box)
         self.set_state(False, False)
 
-    def set_state(self, drafted, revealed):
+    def set_state(self, drafted, revealed, score=None, highlight=True):
+        """score: the original score (None if ungraded), shown once the question is
+        revealed; in TopCoding's color for it if highlight (the page's toggle)."""
         self.drafted.set_visible(drafted)
         self.revealed.set_visible(revealed)
-        state = ("drafted" if drafted else "unanswered") + (", revealed" if revealed else "")
+        shown = revealed and score is not None
+        self.score.set_visible(shown)
+        self.score.set_label(score.got if shown else "")
+        _show_result(self.score, store.result_category(score) if shown and highlight else None)
+        state = ("drafted" if drafted else "unanswered") + (", revealed" if revealed else "") \
+            + (f", original score {score}" if shown else "")
         self.set_tooltip_text(f"Question {self.number}: {state}")
         self.update_property([Gtk.AccessibleProperty.DESCRIPTION], [state])
 
@@ -111,18 +123,26 @@ class PracticePage(Adw.NavigationPage):
         self._drafted = set()  # questions with an answer in this attempt
         tv = Adw.ToolbarView()
         tv.add_top_bar(self._build_header(chapter_label))
-        self.split = Adw.OverlaySplitView(sidebar=self._build_list(), content=self._build_content(),
-                                          min_sidebar_width=220, max_sidebar_width=320)
-        for signal, method in (("notify::show-sidebar", self._sidebar_shown), ("notify::collapsed", self._collapsed)):
-            self._handlers.append((self.split, self.split.connect(signal, weak_handler(method))))
-        tv.set_content(self.split)
-        # A narrow window shows the question list over the question. The breakpoint is the
-        # page's own: one added to the window would hold the page after it is gone.
-        narrow = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 720px"))
-        narrow.add_setter(self.split, "collapsed", True)
-        bin_ = Adw.BreakpointBin(child=tv, width_request=360, height_request=320)
-        bin_.add_breakpoint(narrow)
-        self.set_child(bin_)
+        # The question list beside the question, as wide as you drag the handle between them.
+        self.list_pane, self.question_pane = self._build_list(), self._build_content()
+        self.paned = Gtk.Paned(start_child=self.list_pane, end_child=self.question_pane, position=LIST_WIDTH,
+                               resize_start_child=False, shrink_start_child=False, shrink_end_child=False)
+        self._list_width = LIST_WIDTH  # as last dragged: it comes back with the list
+        for obj, signal, method in ((self.list_pane, "notify::visible", self._list_shown),
+                                    (self.paned, "notify::position", self._list_resized),
+                                    (self.paned, "notify::max-position", self._room_changed)):
+            self._handlers.append((obj, obj.connect(signal, weak_handler(method))))
+        tv.set_content(self.paned)
+        # A narrow window shows the list or the question, not both (show_list); widened, it
+        # has the list as before. The breakpoint is the page's own: one added to the window
+        # would hold the page after it is gone. In sp, as the question's minimum width grows
+        # with the text size.
+        self.narrow = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 720sp"))
+        self.narrow.add_setter(self.list_pane, "visible", False)
+        self.narrow.add_setter(self.question_pane, "visible", True)
+        self.bin = Adw.BreakpointBin(child=tv, width_request=360, height_request=320)
+        self.bin.add_breakpoint(self.narrow)
+        self.set_child(self.bin)
         self.set_report(assessment)
         WORKER.run(self.file.read, done=self._loaded, failed=self._load_failed)
 
@@ -134,6 +154,8 @@ class PracticePage(Adw.NavigationPage):
         header.set_title_widget(self.title)
         header.pack_start(Gtk.ToggleButton(icon_name="sidebar-show-symbolic", tooltip_text="Questions (F9)",
                                            action_name="win.sidebar"))
+        header.pack_start(Gtk.ToggleButton(icon_name="preferences-color-symbolic", action_name="win.highlights",
+                                           tooltip_text="Color the original scores as TopCoding does"))
         menu = Gio.Menu()
         menu.append("Earlier Attempts…", "win.attempts")
         menu.append("Attach to Chapter…", "win.attach")
@@ -150,7 +172,8 @@ class PracticePage(Adw.NavigationPage):
             self.list.append(row)
         self.list.connect("row-selected", _row_selected)
         self.list.connect("row-activated", _row_activated)
-        return Gtk.ScrolledWindow(child=self.list, hscrollbar_policy=Gtk.PolicyType.NEVER)
+        return Gtk.ScrolledWindow(child=self.list, hscrollbar_policy=Gtk.PolicyType.NEVER, width_request=LIST_MIN,
+                                  css_classes=["sidebar-pane", "assessment-questions"])
 
     def _build_content(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -209,14 +232,19 @@ class PracticePage(Adw.NavigationPage):
     def _build_summary(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=10, margin_bottom=10,
                       margin_start=18, margin_end=18)
-        self.facts = Gtk.Label(xalign=0, wrap=True, css_classes=["dim-label"])
+        self.facts = Gtk.Label(xalign=0, wrap=True, hexpand=True, css_classes=["dim-label"])
+        # the original score: on its own, to show in TopCoding's color for it (_show_result)
+        self.final_score = Gtk.Label(valign=Gtk.Align.START, css_classes=["numeric"])
+        about = Gtk.Box(spacing=12)
+        about.append(self.facts)
+        about.append(self.final_score)
         self.grading = Gtk.Label(xalign=0, wrap=True, css_classes=["warning"])
         line = Gtk.Box(spacing=12)
         self.progress_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         self.progress = Gtk.ProgressBar(valign=Gtk.Align.CENTER, width_request=160)
         line.append(self.progress_label)
         line.append(self.progress)
-        for w in (self.facts, self.grading, line):
+        for w in (about, self.grading, line):
             box.append(w)
         return box
 
@@ -235,15 +263,30 @@ class PracticePage(Adw.NavigationPage):
                  f"Completed {when}" if when else "",
                  f"Time spent {r.time_spent} of {r.time_allocated}" if r.time_spent and r.time_allocated
                  else (f"Time spent {r.time_spent}" if r.time_spent else ""),
-                 f"TopCoding attempt {r.attempt}" if r.attempt else "",
-                 f"Original score {_score(r)}" if r.final_result else ""]
+                 f"TopCoding attempt {r.attempt}" if r.attempt else ""]
         self.facts.set_label(" · ".join(f for f in facts if f))
+        self.final_score.set_label(f"Original score {_score(r)}" if r.final_result else "")
+        self.final_score.set_visible(r.final_result is not None)
+        self._show_final_score()
         self.grading.set_label("" if r.graded else "Not graded in this file. Import the report again after "
                                                    "TopCoding grades it to see your scores and feedback.")
         self.grading.set_visible(not r.graded)
         if self.current is not None:
             self._fill_details(self.questions[self.current])
+        for n in self.rows:  # the scores a Replace brought
+            self._update_row(n)
         self._update_progress()
+
+    def show_highlights(self):
+        """The scores' colors were turned on or off (win.highlights)."""
+        self._show_final_score()
+        for n in self.rows:
+            self._update_row(n)
+        if self.current is not None:
+            self._fill_details(self.questions[self.current])
+
+    def _show_final_score(self):
+        _show_result(self.final_score, store.final_category(self.a.report) if self.win.highlights else None)
 
     # -- the attempt ------------------------------------------------------------------
 
@@ -538,7 +581,8 @@ class PracticePage(Adw.NavigationPage):
             self.details.remove(child)
         graded = self.a.report.graded
         score = f"Score {q.score}" if q.score is not None else ("" if graded else "Not graded in this file")
-        self.details.append(_section("Your Original Answer", q.answer, "No answer provided", aside=score))
+        self.details.append(_section("Your Original Answer", q.answer, "No answer provided", aside=score,
+                                     result=store.result_category(q.score) if self.win.highlights else None))
         self.details.append(_section("Sample Answer", q.sample, "This report has no sample answer for it."))
         if q.feedback is not None:
             self.details.append(_section("Feedback", q.feedback, ""))
@@ -564,7 +608,9 @@ class PracticePage(Adw.NavigationPage):
             self._drafted.add(number)
         else:
             self._drafted.discard(number)
-        self.rows[number].set_state(drafted, self.attempt.answer(number).revealed)
+        q = self.questions.get(number)
+        self.rows[number].set_state(drafted, self.attempt.answer(number).revealed, q.score if q else None,
+                                    self.win.highlights)
 
     def _update_progress(self):
         if self.attempt is None:
@@ -578,14 +624,33 @@ class PracticePage(Adw.NavigationPage):
                                       f"{revealed} revealed")
         self.progress.set_fraction(drafted / total if total else 0)
 
-    def _sidebar_shown(self, split, _pspec):
+    def show_list(self, show):
+        """F9: show or hide the question list. A narrow window shows it in the question's
+        place, until a question is chosen."""
+        self.list_pane.set_visible(show)
+        if self.bin.get_current_breakpoint() is self.narrow:
+            self.question_pane.set_visible(not show)
+
+    def _list_shown(self, pane, _pspec):
         action = self.win.lookup_action("sidebar")
         if action is not None:
-            action.set_state(GLib.Variant.new_boolean(split.get_show_sidebar()))
+            action.set_state(GLib.Variant.new_boolean(pane.get_visible()))
+        if pane.get_visible():
+            self.paned.set_position(self._list_width)
 
-    def _collapsed(self, split, _pspec):
-        if split.get_collapsed():  # the list would cover the question
-            split.set_show_sidebar(False)
+    def _list_resized(self, paned, _pspec):
+        # Not a width a narrower window cut the list down to (GTK keeps the position at most
+        # max-position), nor one it leaves no room to change: a window that narrows by much
+        # at once (unmaximized, tiled) is too narrow for both sides until the breakpoint
+        # drops the list.
+        if paned.props.min_position < paned.props.max_position and paned.get_position() < paned.props.max_position:
+            self._list_width = paned.get_position()
+
+    def _room_changed(self, paned, _pspec):
+        # The window widened: the list grows back to the width a narrower one took from it.
+        width = min(self._list_width, paned.props.max_position)
+        if self.list_pane.get_visible() and paned.get_position() < width:
+            paned.set_position(width)
 
     # -- going ------------------------------------------------------------------------
 
@@ -612,9 +677,10 @@ class PracticePage(Adw.NavigationPage):
         self._handlers = []
         self.buffers.clear()
         self.set_child(None)
-        self.split = self.list = self.rows = self.stack = self.view = self.scroller = self.details = None
+        self.paned = self.list_pane = self.question_pane = self.bin = self.narrow = None
+        self.list = self.rows = self.stack = self.view = self.scroller = self.details = None
         self.revealer = self.reveal_btn = self.load_btn = self.prev_btn = self.next_btn = self.problem = None
-        self.heading = self.prompt = self.counts = self.saved = self.facts = self.grading = None
+        self.heading = self.prompt = self.counts = self.saved = self.facts = self.final_score = self.grading = None
         self.progress = self.progress_label = self.title = self.win = None
 
 
@@ -637,8 +703,8 @@ def _row_selected(listbox, row):
 def _row_activated(listbox, _row):
     page = _page(listbox)
     if page is not None:
-        if page.split.get_collapsed():
-            page.split.set_show_sidebar(False)
+        if not page.question_pane.get_visible():  # a narrow window shows the list in its place
+            page.show_list(False)
         page.view.grab_focus()
 
 
@@ -654,13 +720,29 @@ def _reveal_toggled(button):
         page.toggle_details(button.get_active())
 
 
-def _section(title, text, missing, aside=""):
-    """A part of what Reveal shows: its title (and score), then the text, or `missing`."""
+def _show_result(score_label, result):
+    """A score's look: in TopCoding's color for it (result: assessments.result_category or
+    final_category), or plain (None: highlights off, or ungraded). Its text says the same
+    either way."""
+    for category in (store.GOOD, store.PARTIAL, store.POOR):
+        set_class(score_label, f"result-{category}", category == result)
+    set_class(score_label, "result-score", result is not None)
+    set_class(score_label, "dim-label", result is None)
+
+
+def _section(title, text, missing, aside="", result=None):
+    """A part of what Reveal shows: its title (and score), then the text, or `missing`.
+    result: the score's category (assessments.result_category), coloring the part too."""
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    if result is not None:
+        box.add_css_class("assessment-result")
+        box.add_css_class(f"result-{result}")
     head = Gtk.Box(spacing=12)
     head.append(Gtk.Label(label=title, xalign=0, hexpand=True, css_classes=["heading"]))
     if aside:
-        head.append(Gtk.Label(label=aside, css_classes=["dim-label", "numeric"]))
+        label = Gtk.Label(label=aside, css_classes=["numeric"])
+        _show_result(label, result)
+        head.append(label)
     box.append(head)
     body = Gtk.Label(label=text if text is not None else missing, xalign=0, wrap=True,
                      wrap_mode=Pango.WrapMode.WORD_CHAR, selectable=True, css_classes=["assessment-text"])

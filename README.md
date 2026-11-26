@@ -102,16 +102,22 @@ drawings along, in their places; a drawing copied by itself is added after the i
 **Practicing assessments.** On a TopCoding assessment report, choose **Download
 .txt**, then menu → **Import Assessment Report…** (or drop the file on the
 Assessments window). The app suggests the chapter whose title matches the report;
-confirm it or pick another (or none). Each question starts with a blank answer, to
-write from memory; **Reveal** shows the answer you gave, its score, the sample answer
-and the feedback, and **Load My Original Answer** puts your answer in the editor
-(Ctrl+Z takes it back). Answers are saved as you type. **Finish Attempt** keeps them
-in **Earlier Attempts**, where **Compare with Sample Answer** shows one beside the
-sample, and starts a blank attempt. A report downloaded before TopCoding graded it
-has no scores or feedback; import the graded download later and choose **Replace**:
-your drafts and attempts stay. Right-click a chapter in the list for **Practice
-Assessment** and **Import Assessment Report…**. The app reads only the downloaded
-file; it never contacts TopCoding and doesn't grade your practice answers.
+confirm it or pick another (or none). The button at the end of each chapter in the
+chapter list opens its assessment, or imports one for that chapter without asking.
+Each question starts with a blank answer, to write from memory; **Reveal** shows the
+answer you gave, its score, the sample answer and the feedback, and **Load My
+Original Answer** puts your answer in the editor (Ctrl+Z takes it back). A revealed
+score also shows in the question list, in TopCoding's colors (green from 0.8, amber
+from 0.5, red below, an unanswered question included), and the original score at the
+top by its percentage (green from 80%, amber from 65%); the color button in the
+header bar turns the colors off, and the scores stay. Drag the list's edge to make
+it wider. Answers are saved as you type. **Finish Attempt** keeps them in **Earlier
+Attempts**, where **Compare with Sample Answer** shows one beside the sample, and
+starts a blank attempt. A report downloaded before TopCoding graded it has no scores
+or feedback; import the graded download later and choose **Replace**: your drafts
+and attempts stay. Right-click a chapter in the list for **Practice Assessment** and
+**Import Assessment Report…**. The app reads only the downloaded file; it never
+contacts TopCoding and doesn't grade your practice answers.
 
 **Spelling.** The language button in the header bar (e.g. `EN-US`) switches
 language or turns checking off. A new chapter picks its language from its text,

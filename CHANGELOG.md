@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Assessments from the chapter list**: each chapter ends in a button that opens its assessment. A chapter without one gets a button that imports a report for that chapter, without asking which chapter, and opens it.
+- Revealed scores are colored as TopCoding colors them: green from 0.8, amber from 0.5, red below, so an unanswered question is red. They also show in the question list now, and the original score at the top is colored by its percentage: green from 80%, amber from 65%. The color button in the header bar turns the colors off until the window opens again; the scores stay.
+- The question list of an assessment can be dragged wider or narrower; its width was fixed. **Import Assessment Report…** in a chapter's right-click menu no longer asks which chapter.
+
 ## 1.8.0 — 2026-11-25
 
 - **Assessments**: practice a TopCoding chapter assessment from the report you download from it as `.txt`. Menu → **Import Assessment Report…** reads the file, graded or not yet graded, and attaches it to the chapter it goes with. Each question starts with a blank answer; **Reveal** shows the answer you gave, its score, the sample answer and the feedback, and **Load My Original Answer** brings yours back. Answers are saved as you type; **Finish Attempt** keeps them in **Earlier Attempts**, where you can compare them with the sample answer. Importing the graded download of a report you imported before grading adds its scores and keeps your practice.

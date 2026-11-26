@@ -170,12 +170,17 @@ def build(rules=None):
         h("Practicing assessments",
           b("On a TopCoding assessment report, choose Download .txt. Import Assessment Report in the menu brings "
             "the file in and asks which chapter it goes with; you can also drop the file on the Assessments "
-            "window."),
+            "window. The button at the end of a chapter in the chapter list opens its assessment or, if it has "
+            "none, imports one for that chapter without asking."),
           b("Each question starts with a blank answer, to write from memory. Reveal shows the answer you gave, "
             "its score, the sample answer and the feedback; Load My Original Answer puts your answer in the "
             "editor. Answers are saved as you type."),
+          b("A revealed score also shows in the question list, in TopCoding's colors: green from 0.8, amber "
+            "from 0.5 and red below, which includes a question left unanswered. The original score at the top "
+            "is colored by its percentage: green from 80%, amber from 65% and red below. The color button in "
+            "the header bar turns the colors off; the scores stay."),
           b((key("Ctrl+PgUp"), " or ", key("Ctrl+PgDn"), " goes to the previous or next question, and ",
-             key("F9"), " shows or hides the question list.")),
+             key("F9"), " shows or hides the question list. Drag the edge of the list to make it wider.")),
           b("Finish Attempt keeps your answers in Earlier Attempts, where you can compare them with the sample "
             "answer, and starts a blank attempt.")),
 

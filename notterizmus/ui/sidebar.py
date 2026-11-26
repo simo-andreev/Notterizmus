@@ -6,7 +6,10 @@ from pathlib import Path
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Graphene, Gtk, Pango
 
 from .. import library
+from .helpers import set_class
 
+PRACTICE_ICON = "x-office-document-symbolic"  # an assessment, as in the Assessments window
+IMPORT_ICON = "list-add-symbolic"  # add one (Open Chapter's icon, as Import Report… has, would read as opening it)
 
 
 # A chapter row's drag handlers find the row through their controller when a drag starts.
@@ -36,8 +39,25 @@ class BookRow(SidebarRow):
 
 
 class ChapterRow(SidebarRow):
-    def __init__(self, ch, **props):
+    """A chapter's row, ending in a button for its assessment (set_assessment)."""
+
+    def __init__(self, ch, assessment_button=None, **props):
         super().__init__(ch.path.parent, path=ch.path, **props)
+        self.assessment_button = assessment_button
+
+    def set_assessment(self, linked):
+        """The button: Practice Assessment when the chapter has one, else Import Assessment
+        Report… for it, as in its menu. They are the window's actions, so the button needs
+        no handler of its own (one would hold the row, CR18)."""
+        b = self.assessment_button
+        if b is None:
+            return
+        b.set_action_name("win.chapter-practice" if linked else "win.chapter-import")
+        b.set_action_target_value(GLib.Variant.new_string(str(self.path)))
+        b.set_icon_name(PRACTICE_ICON if linked else IMPORT_ICON)
+        b.set_tooltip_text("Practice this chapter's assessment" if linked
+                           else "Import an assessment report for this chapter…")
+        set_class(b, "dim-label", not linked)  # so the chapters that have one stand out
 
 
 class ChapterSidebar(Adw.Bin):
@@ -148,12 +168,26 @@ class ChapterSidebar(Adw.Bin):
         num.add_css_class("numeric")
         box.append(num)
         box.append(Gtk.Label(label=ch.label, xalign=0, hexpand=True, ellipsize=Pango.EllipsizeMode.END))
-        row = ChapterRow(ch, child=box, tooltip_text=f"{ch.path.name}\nDrag to reorder · right-click for more")
+        # (a click leaves the keyboard where it was, as the button opens another window)
+        button = Gtk.Button(valign=Gtk.Align.CENTER, focus_on_click=False, css_classes=["flat", "chapter-assessment"])
+        box.append(button)
+        row = ChapterRow(ch, button, child=box, tooltip_text=f"{ch.path.name}\nDrag to reorder · right-click for more")
+        row.set_assessment(self._linked(ch.path))
         drag = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
         drag.connect("prepare", _drag_prepare)
         drag.connect("drag-begin", _drag_begin)
         row.add_controller(drag)
         return row
+
+    def _linked(self, path):
+        return self.has_assessment is not None and self.has_assessment(path)
+
+    def update_assessments(self):
+        """Show again which chapters have an assessment: after an import, a new link or a
+        chapter moved (the window found them again)."""
+        for row in self.rows():
+            if isinstance(row, ChapterRow):
+                row.set_assessment(self._linked(row.path))
 
     # -- input ------------------------------------------------------------------------------
 
@@ -196,7 +230,7 @@ class ChapterSidebar(Adw.Bin):
             return m
         target = GLib.Variant.new_string(str(row.path))
         s1, sa, s2, s3 = Gio.Menu(), Gio.Menu(), Gio.Menu(), Gio.Menu()
-        linked = self.has_assessment is not None and self.has_assessment(row.path)
+        linked = self._linked(row.path)
         for menu, label, action in ((s1, "Chapter Properties…", "win.chapter-props"),
                                     *([(sa, "Practice Assessment", "win.chapter-practice")] if linked else []),
                                     (sa, "Import Assessment Report…", "win.chapter-import"),

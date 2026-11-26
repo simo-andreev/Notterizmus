@@ -191,15 +191,16 @@ class BroadwayInput:
         return stamp
 
     def main_surface(self):
-        """(id, x, y) of the biggest surface: the app window (popovers are smaller ones)."""
+        """(id, x, y, width, height) of the biggest surface: the app window (popovers are
+        smaller ones)."""
         with self._surfaces:
             if not self.surfaces:
                 raise ConnectionError("Broadway has shown no window yet")
             sid = max(self.surfaces, key=lambda s: self.surfaces[s][2] * self.surfaces[s][3])
-            return sid, self.surfaces[sid][0], self.surfaces[sid][1]
+            return (sid, *self.surfaces[sid])
 
     def _pointer(self, event, x, y, *extra):
-        sid, sx, sy = self.main_surface()
+        sid, sx, sy, _w, _h = self.main_surface()
         x, y = round(x), round(y)
         self.pos = (x, y)
         return self.send(event, sid, sid, sx + x, sy + y, x, y, self.buttons, *extra)

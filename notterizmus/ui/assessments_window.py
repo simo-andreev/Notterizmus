@@ -20,7 +20,7 @@ from ..assessment_txt import Report
 from .assessment_page import PracticePage
 from .helpers import WORKER, assessments_root, notes_root
 
-PRACTICE_ACTIONS = ("prev-question", "next-question", "sidebar", "finish", "attach", "attempts")
+PRACTICE_ACTIONS = ("prev-question", "next-question", "sidebar", "finish", "attach", "attempts", "highlights")
 
 
 class AssessmentRow(Adw.ActionRow):
@@ -40,6 +40,7 @@ class Import:
     duplicate: store.Assessment | None  # the assessment it is another download of
     books: list                         # library.scan()'s, to pick its chapter from
     chapter: library.Chapter | None     # the chapter to offer: its title's, or the one it was imported for
+    for_chapter: bool = False           # imported for that chapter (from the chapter list): not asked
 
 
 class AssessmentsWindow(Adw.ApplicationWindow):
@@ -113,8 +114,23 @@ class AssessmentsWindow(Adw.ApplicationWindow):
             self.add_action(a)
         # F9 (the app's key for win.sidebar): the question list
         a = Gio.SimpleAction.new_stateful("sidebar", None, GLib.Variant.new_boolean(True))
-        a.connect("activate", lambda act, _p: self.page.split.set_show_sidebar(not act.get_state().get_boolean()))
+        a.connect("activate", lambda act, _p: self.page.show_list(not act.get_state().get_boolean()))
         self.add_action(a)
+        # The original scores in TopCoding's colors: on each time the window opens (not saved)
+        a = Gio.SimpleAction.new_stateful("highlights", None, GLib.Variant.new_boolean(True))
+        a.connect("activate", lambda act, _p: self.set_highlights(not act.get_state().get_boolean()))
+        self.add_action(a)
+
+    @property
+    def highlights(self):
+        """Whether the original scores are shown in TopCoding's colors (win.highlights)."""
+        a = self.lookup_action("highlights")
+        return a is None or a.get_state().get_boolean()
+
+    def set_highlights(self, on):
+        self.lookup_action("highlights").set_state(GLib.Variant.new_boolean(on))
+        if self.page is not None:
+            self.page.show_highlights()
 
     def update_actions(self):
         """The practice page's actions work while it is shown and its draft was read."""
@@ -130,7 +146,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
             self.lookup_action("next-question").set_enabled(i + 1 < len(page.numbers))
         self.lookup_action("finish").set_enabled(ready and page.can_finish())
         if page is not None:
-            self.lookup_action("sidebar").set_state(GLib.Variant.new_boolean(page.split.get_show_sidebar()))
+            self.lookup_action("sidebar").set_state(GLib.Variant.new_boolean(page.list_pane.get_visible()))
 
     def toast(self, msg, button=None, callback=None):
         if self.released:
@@ -226,7 +242,8 @@ class AssessmentsWindow(Adw.ApplicationWindow):
     # -- importing --------------------------------------------------------------------
 
     def choose_file(self, chapter=None):
-        """Import Report…: pick a .txt file (chapter: offered as its chapter)."""
+        """Import Report…: pick a .txt file. chapter: the chapter it is imported for (its
+        button or menu in the chapter list), which it then goes with without asking."""
         fd = Gtk.FileDialog(title="Import Assessment Report", modal=True)
         downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
         if downloads:
@@ -250,8 +267,9 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         fd.open(self, None, done)
 
     def import_file(self, gfile, chapter=None):
-        """Read the file, then ask what to do with it: its chapter, or whether to replace
-        the report it is another download of. Nothing is written before that."""
+        """Read the file, then ask what to do with it: its chapter (unless it is imported
+        for one: chapter, as in choose_file), or whether to replace the report it is
+        another download of. Nothing is written before that."""
         path = gfile.get_path()
         if path is None:  # not a file on this computer (CR27)
             self.toast(f"{gfile.get_basename() or gfile.get_uri()} isn't on this computer, so it can't be imported")
@@ -265,6 +283,9 @@ class AssessmentsWindow(Adw.ApplicationWindow):
             return
         if imp.duplicate is not None:
             self._ask_replace(imp)
+            return
+        if imp.for_chapter:
+            self._import(imp, imp.chapter)
             return
         r = imp.report
         body = (f"{len(r.questions)} question{'s' if len(r.questions) != 1 else ''}"
@@ -475,7 +496,7 @@ def _prepare(path, root, notes, chapter=None):
     books = library.scan(notes)
     duplicate = store.find_duplicate(found, report)
     offered = chapter if chapter is not None else store.suggest(report.title, books)
-    return Import(path, data, report, duplicate, books, offered)
+    return Import(path, data, report, duplicate, books, offered, for_chapter=chapter is not None)
 
 
 def _replaced(imp, notes):
