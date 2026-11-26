@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from notterizmus import assessments as store, library
-from notterizmus.assessment_txt import PARSER_VERSION, ReportError, parse
+from notterizmus.assessment_txt import PARSER_VERSION, Points, Report, ReportError, parse
 from notterizmus.assessments import Answer, Attempt, Link
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -480,6 +480,77 @@ class ChapterTest(StoreTest):
             Link("New Book/01 Three.notz", "New Book", 1, "Three")])
         self.assertEqual(store.follow_moves(self.root, {self.chapter("Book", "09 X"): self.chapter("Book", "10 X")},
                                             self.notes), [])
+
+
+class ResultCategoryTest(unittest.TestCase):
+    """A question's score in TopCoding's colors, as its report page gives them (read from
+    report 24 on 2026-11-26): 0.8 and up good, 0.5 and up partial, below that poor, which
+    includes an unanswered question (scored 0); an ungraded question has none."""
+
+    def category(self, got, out_of="1"):
+        return store.result_category(Points(got, out_of))
+
+    def check(self, cases):
+        for got, out_of, expected in cases:
+            with self.subTest(score=f"{got} / {out_of}"):
+                self.assertEqual(self.category(got, out_of), expected)
+
+    def test_a_score_on_a_boundary_takes_the_better_color(self):
+        self.check([("0.8", "1", store.GOOD), ("0.80", "1", store.GOOD), ("0.5", "1", store.PARTIAL),
+                    ("0.50", "1", store.PARTIAL)])
+
+    def test_a_score_just_below_a_boundary_takes_the_lower_one(self):
+        self.check([("0.79", "1", store.PARTIAL), ("0.7999", "1", store.PARTIAL), ("0.49", "1", store.POOR),
+                    ("0.4999", "1", store.POOR)])
+
+    def test_whole_and_fractional_scores(self):
+        self.check([("1", "1", store.GOOD), ("1.0", "1", store.GOOD), ("0.95", "1", store.GOOD),
+                    ("0.85", "1", store.GOOD), ("0.75", "1", store.PARTIAL), ("0.6", "1", store.PARTIAL),
+                    ("0.25", "1", store.POOR), ("0.05", "1", store.POOR), ("0", "1", store.POOR),
+                    ("0.00", "1", store.POOR)])
+
+    def test_a_decimal_comma_and_scores_out_of_more_than_one(self):
+        # 2.4 / 3 is 0.8 exactly, which binary floating point makes 0.7999999999999999
+        self.check([("0,8", "1", store.GOOD), ("0,45", "1", store.POOR), ("1.6", "2", store.GOOD),
+                    ("2.4", "3", store.GOOD), ("1.5", "3", store.PARTIAL), ("1.4", "3", store.POOR)])
+
+    def test_an_ungraded_question_or_a_score_no_report_has_gets_no_color(self):
+        self.assertIsNone(store.result_category(None))
+        self.check([("1", "0", None), ("n/a", "1", None), ("", "1", None)])
+
+    def test_an_unanswered_question_is_poor_once_graded_and_has_no_color_before(self):
+        graded, ungraded = parse(GRADED).questions[7], parse(UNGRADED).questions[7]
+        self.assertEqual((graded.number, graded.answer, str(graded.score)), (8, None, "0 / 1"))
+        self.assertEqual(store.result_category(graded.score), store.POOR)
+        self.assertEqual((ungraded.number, ungraded.answer, ungraded.score), (8, None, None))
+        self.assertIsNone(store.result_category(ungraded.score))
+
+
+class FinalCategoryTest(unittest.TestCase):
+    """A report's final result in TopCoding's colors: by its percentage to one decimal, as
+    the page shows it, 80 and up good, 65 and up partial, below that poor; none while it is
+    ungraded (the page's blue)."""
+
+    def check(self, cases):
+        for got, out_of, percent, expected in cases:
+            with self.subTest(result=f"{got} / {out_of} ({percent}%)"):
+                report = Report("A Report", final_result=Points(got, out_of), final_percent=percent)
+                self.assertEqual(store.final_category(report), expected)
+
+    def test_the_files_percentage_on_and_just_below_each_boundary(self):
+        self.check([("15.20", "19", "80.0", store.GOOD), ("15.18", "19", "79.9", store.PARTIAL),
+                    ("12.35", "19", "65.0", store.PARTIAL), ("12.33", "19", "64.9", store.POOR),
+                    ("19", "19", "100.0", store.GOOD), ("0", "19", "0.0", store.POOR), ("0,00", "19", "0,0", store.POOR)])
+
+    def test_without_the_files_percentage_it_is_worked_out_and_rounded_as_the_page_does(self):
+        # 15.195 / 19 is 79.97 %, which the page shows and colors as 80.0
+        self.check([("15.195", "19", None, store.GOOD), ("15.19", "19", None, store.PARTIAL),
+                    ("12.34", "19", None, store.POOR), ("13", "20", None, store.PARTIAL)])
+
+    def test_the_fixtures_result_and_an_ungraded_report(self):
+        self.assertEqual(store.final_category(parse(GRADED)), store.POOR)  # 7.10 / 19 (37.4%)
+        self.assertIsNone(store.final_category(parse(UNGRADED)))
+        self.check([("1", "0", None, None), ("7.10", "19", "n/a", None)])
 
 
 if __name__ == "__main__":

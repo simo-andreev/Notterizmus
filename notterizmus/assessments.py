@@ -39,6 +39,7 @@ import time
 import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
+from fractions import Fraction
 from pathlib import Path
 
 from . import assessment_txt, library
@@ -217,6 +218,50 @@ class AttemptFile:
 
 def count_words(text):
     return len(text.split())
+
+
+# How TopCoding's report page colors scores (its script, read on 2026-11-26 from report
+# 24). A question's: 0.8 and up green, 0.5 and up amber, below that red; an unanswered
+# question scores 0, so it is red too, and an ungraded one has no color. The final
+# result's: by its percentage to one decimal, as the page shows it, 80 and up green, 65
+# and up amber, below that red (the page's blue while it is ungraded: no color here).
+GOOD, PARTIAL, POOR = "good", "partial", "poor"
+GOOD_FROM, PARTIAL_FROM = Fraction(4, 5), Fraction(1, 2)
+FINAL_GOOD_FROM, FINAL_PARTIAL_FROM = 80, 65  # percent
+
+
+def result_category(score):
+    """GOOD, PARTIAL or POOR for a question's original score (assessment_txt.Points), as
+    TopCoding colors it; None for an ungraded question (no score). TopCoding's questions
+    are out of 1; a score out of more counts as its share of that. Exact, as the file
+    writes it: 0.8 is GOOD and 0.79 PARTIAL, whatever binary floating point would make of
+    them."""
+    if score is None:
+        return None
+    try:
+        share = _share(score)
+    except (ValueError, ZeroDivisionError):  # not a score a report can have
+        return None
+    return GOOD if share >= GOOD_FROM else PARTIAL if share >= PARTIAL_FROM else POOR
+
+
+def final_category(report):
+    """GOOD, PARTIAL or POOR for a report's final result, as TopCoding colors it; None while
+    it is ungraded. By the percentage to one decimal that the page shows and compares: the
+    file's own ("37.4"), else worked out from the points, rounded half up."""
+    if report.final_result is None:
+        return None
+    try:
+        percent = (Fraction(report.final_percent.replace(",", ".")) if report.final_percent
+                   else Fraction(int(_share(report.final_result) * 1000 + Fraction(1, 2)), 10))
+    except (ValueError, ZeroDivisionError):  # not a result a report can have
+        return None
+    return GOOD if percent >= FINAL_GOOD_FROM else PARTIAL if percent >= FINAL_PARTIAL_FROM else POOR
+
+
+def _share(points):
+    """got / out_of, exact as the file writes them (a decimal comma too)."""
+    return Fraction(points.got.replace(",", ".")) / Fraction(points.out_of.replace(",", "."))
 
 
 # -- assessments --------------------------------------------------------------------------

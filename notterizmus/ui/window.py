@@ -459,6 +459,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
 
     def _set_linked(self, linked):
         self._linked = linked
+        self.sidebar.update_assessments()
         if self._assessments is not None and self._assessments.page is None:
             self._assessments.refresh()
 

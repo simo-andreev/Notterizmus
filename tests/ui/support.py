@@ -459,6 +459,17 @@ def surface_point(widget, x, y):
     return p.x + tx, p.y + ty
 
 
+def pointer_to(win):
+    """Wait until real pointer input goes to win. broadway_input sends it to the biggest
+    surface, and a bigger window of ours (the Assessments window is) still counts for a
+    few frames after it has closed."""
+    if _keyboard is None:
+        raise unittest.SkipTest("real mouse input needs the Broadway display (the default runner)")
+    surface = win.get_surface()
+    wait_for(lambda: _keyboard.main_surface()[3:] == (surface.get_width(), surface.get_height()),
+             "real pointer input to go to the window")
+
+
 def real_drag(*points, steps=6, wait=0.02, hold=False):
     """Drag with the left mouse button for real (Broadway): press at the first point, move
     through the others in small steps, release at the last (unless hold). Each point is

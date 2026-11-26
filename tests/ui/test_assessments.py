@@ -43,6 +43,11 @@ def labels(widget):
     return [w.get_label() for w in ui.walk(widget) if isinstance(w, ui.Gtk.Label) and w.get_label()]
 
 
+def paned_settled(paned):
+    """The paned has room for both sides again: its position is no longer squeezed."""
+    return paned.props.max_position > paned.props.min_position
+
+
 class AssessmentsTest(ui.UITestCase):
     def setUp(self):
         super().setUp()
@@ -89,7 +94,9 @@ class AssessmentsTest(ui.UITestCase):
     def page(self):
         ui.wait_for(lambda: self.aw.page is not None and self.aw.page.attempt is not None, "the practice page")
         idle()
-        return self.aw.page
+        page = self.aw.page
+        ui.wait_for(lambda: ui.point_in(page, self.aw.nav) == (0, 0), "the practice page to slide in")
+        return page
 
     def imported(self, path=GRADED):
         self.import_file(path)
@@ -114,6 +121,12 @@ class AssessmentsTest(ui.UITestCase):
     def toasts(self):
         return [w.get_label() for w in ui.walk(self.aw.toasts) if isinstance(w, ui.Gtk.Label) and w.get_label()]
 
+    def real_clicks_here(self):
+        """Make real clicks go to the Assessments window: they go to the biggest window
+        (broadway_input), and the main window is bigger."""
+        self.aw.set_default_size(self.win.get_width() + 40, self.win.get_height() + 20)
+        ui.pointer_to(self.aw)
+
     # -- tests ------------------------------------------------------------------------
 
     def test_with_nothing_imported_the_window_says_how_to_start(self):
@@ -137,7 +150,8 @@ class AssessmentsTest(ui.UITestCase):
         self.assertEqual(page.prompt.get_label(), "What is the purpose of a rate limiter in a distributed system?")
         self.assertFalse(page.revealer.get_reveal_child())
         self.assertEqual(page.title.get_subtitle(), f"{BOOK} · Chapter 3")
-        self.assertIn("Original score 7.10 / 19 (37.4%)", page.facts.get_label())
+        self.assertEqual(page.final_score.get_label(), "Original score 7.10 / 19 (37.4%)")
+        self.assertNotIn("Original score", page.facts.get_label())
         self.assertFalse(page.grading.get_visible())
         self.assertEqual(page.progress_label.get_label(), "Practice attempt 1 · 0 of 19 drafted · 0 revealed")
         ui.wait_for(lambda: self.win.has_assessment(self.chapter), "the chapter to know its assessment")
@@ -220,9 +234,98 @@ class AssessmentsTest(ui.UITestCase):
         self.assertEqual((page.prev_btn.get_sensitive(), page.next_btn.get_sensitive()), (True, False))
         page.show_question(page.numbers[0])
         ui.real_key("F9")
-        self.assertFalse(page.split.get_show_sidebar())
+        self.assertFalse(page.list_pane.get_visible())
         ui.real_key("F9")
-        self.assertTrue(page.split.get_show_sidebar())
+        self.assertTrue(page.list_pane.get_visible())
+
+    def test_the_question_list_is_resized_by_dragging_its_edge_within_both_minimums(self):
+        """Its width was fixed: the list was the sidebar of an Adw.OverlaySplitView."""
+        from notterizmus.ui.assessment_page import LIST_MIN, LIST_WIDTH
+        page = self.imported()
+        self.real_clicks_here()
+        paned, y = page.paned, page.paned.get_height() / 2
+        self.assertEqual(paned.get_position(), LIST_WIDTH)
+
+        def drag_edge_to(x):
+            ui.real_drag((paned, paned.get_position() + 0.5, y), (paned, x, y))
+            ui.past_double_click()
+
+        drag_edge_to(LIST_WIDTH + 80)
+        self.assertAlmostEqual(paned.get_position(), LIST_WIDTH + 80, delta=1)
+        ui.wait_for(lambda: abs(page.list_pane.get_width() - paned.get_position()) <= 1, "the list to follow")
+        drag_edge_to(20)
+        self.assertEqual(paned.get_position(), LIST_MIN)
+        drag_edge_to(paned.get_width() - 20)
+        self.assertEqual(paned.get_position(), paned.props.max_position)
+        ui.frames(2)
+        least = page.question_pane.measure(ui.Gtk.Orientation.HORIZONTAL, -1)[0]
+        self.assertEqual(page.question_pane.get_width(), least, "the question keeps its minimum width")
+
+    def test_a_narrow_window_shows_the_list_or_the_question_and_widening_brings_both_back(self):
+        from notterizmus.ui.assessment_page import LIST_WIDTH
+        page = self.imported()
+
+        def shown():
+            return page.list_pane.get_visible(), page.question_pane.get_visible()
+
+        self.aw.set_default_size(640, 700)
+        ui.wait_for(lambda: page.bin.get_current_breakpoint() is page.narrow, "the narrow layout")
+        self.assertEqual(shown(), (False, True))
+        self.aw.lookup_action("sidebar").activate(None)  # F9
+        self.assertEqual(shown(), (True, False))
+        page.rows[3].activate()  # a question chosen in the list takes its place
+        self.assertEqual((page.current, shown()), (3, (False, True)))
+        for width in (735, 800, 1040):  # widened slowly, as by dragging its edge
+            self.aw.set_default_size(width, 780)
+            ui.wait_for(lambda: self.aw.get_width() == width, f"the window to be {width} px wide")
+        ui.wait_for(lambda: page.bin.get_current_breakpoint() is None, "the wide layout")
+        self.assertEqual(shown(), (True, True))
+        ui.wait_for(lambda: paned_settled(page.paned), "the list to be laid out")
+        self.assertEqual(page.paned.get_position(), LIST_WIDTH, "its width comes back with it")
+
+    def test_revealed_scores_show_in_topcodings_colors_until_the_toggle_turns_them_off(self):
+        page = self.imported()
+        for n in (1, 2, 8):  # 1 / 1, 0.75 / 1, and 0 / 1 where no answer was given
+            page.show_question(n)
+            page.reveal_btn.set_active(True)
+        colors = ("result-good", "result-partial", "result-poor")
+
+        def scores():
+            return [(page.rows[n].score.get_label(), [c for c in colors if page.rows[n].score.has_css_class(c)])
+                    for n in (1, 2, 8)]
+
+        def answer_block():  # "Your Original Answer", here for question 8
+            block = page.details.get_first_child()
+            return labels(block)[:3], [c for c in colors if block.has_css_class(c)]
+
+        def final_score():  # 37.4 %: red, below 65 %
+            return page.final_score.get_label(), [c for c in colors if page.final_score.has_css_class(c)]
+
+        self.assertEqual(final_score(), ("Original score 7.10 / 19 (37.4%)", ["result-poor"]))
+        self.assertEqual(scores(), [("1", ["result-good"]), ("0.75", ["result-partial"]), ("0", ["result-poor"])])
+        self.assertFalse(page.rows[3].score.get_visible(), "not revealed: no score")
+        self.assertEqual(answer_block(), (["Your Original Answer", "Score 0 / 1", "No answer provided"],
+                                          ["result-poor"]))
+        toggle = next(w for w in ui.walk(page) if isinstance(w, ui.Gtk.ToggleButton)
+                      and w.get_action_name() == "win.highlights")
+        self.assertTrue(toggle.get_active(), "on when the window opens")
+        self.real_clicks_here()
+        ui.real_drag((toggle, toggle.get_width() / 2, toggle.get_height() / 2))
+        self.assertFalse(toggle.get_active())
+        self.assertEqual(scores(), [("1", []), ("0.75", []), ("0", [])], "the scores stay, without colors")
+        self.assertEqual(final_score(), ("Original score 7.10 / 19 (37.4%)", []))
+        self.assertEqual(answer_block(), (["Your Original Answer", "Score 0 / 1", "No answer provided"], []))
+        page.show_question(1)
+        self.assertEqual(answer_block()[1], [], "nor on a question shown after")
+        self.aw.lookup_action("highlights").activate(None)
+        self.assertEqual(answer_block()[1], ["result-good"])
+        self.assertEqual(scores()[0], ("1", ["result-good"]))
+        self.assertEqual(final_score()[1], ["result-poor"])
+        self.aw.lookup_action("highlights").activate(None)
+        self.aw.close()  # off is not kept
+        ui.wait_for(lambda: self.win._assessments is None, "the window to close")
+        self.aw = self.win.assessments_window()
+        self.assertTrue(self.aw.highlights)
 
     def test_finishing_an_attempt_keeps_it_and_starts_a_blank_one(self):
         page = self.imported()
@@ -288,6 +391,8 @@ class AssessmentsTest(ui.UITestCase):
         shown = labels(page.details)
         self.assertIn("Not graded in this file", shown)
         self.assertIn("Not graded in this file: import the report again once TopCoding has graded it.", shown)
+        self.assertFalse(page.rows[1].score.get_visible(), "no score in the list, so no color")
+        self.assertFalse(page.final_score.get_visible(), "nor an original score")
 
     def test_a_file_that_is_not_a_whole_report_is_refused_with_where_and_why(self):
         lines = GRADED.read_text(encoding="utf-8").split("\n")
@@ -326,6 +431,81 @@ class AssessmentsTest(ui.UITestCase):
                  for j in range(menu.get_item_link(i, "section").get_n_items())]
         self.assertIn("Practice Assessment", items)
         self.assertIn("Import Assessment Report…", items)
+
+    def chapter_button(self, path):
+        """The button at the end of a chapter's row in the chapter list, its book unfolded."""
+        from notterizmus.ui.sidebar import ChapterRow
+        sidebar = self.win.sidebar
+        self.win._reload_sidebar()
+        sidebar.expanded.add(BOOK)
+        sidebar._rebuild()
+        ui.frames(2)
+        row = next(r for r in sidebar.rows() if isinstance(r, ChapterRow) and r.path == path)
+        ok, bounds = row.compute_bounds(sidebar.list)
+        row.get_ancestor(ui.Gtk.ScrolledWindow).get_vadjustment().set_value(bounds.get_y())  # where a click finds it
+        ui.frames(2)
+        return row.assessment_button
+
+    def close_for_real_clicks(self):
+        """Close the Assessments window: real clicks go to the biggest window, which it is."""
+        self.aw.close()
+        ui.wait_for(lambda: self.win._assessments is None, "the Assessments window to close")
+        ui.pointer_to(self.win)
+
+    def test_a_chapter_without_an_assessment_imports_one_for_itself_from_its_button(self):
+        """The import goes with the chapter whose button it came from, without asking,
+        though the report's title matches another chapter; then the report opens."""
+        from unittest import mock
+        from notterizmus.ui.assessments_window import AssessmentsWindow
+        other = notes_root() / BOOK / "04 Leaky Buckets.notz"
+        Document.new(BOOK, 4, "Leaky Buckets", other).save()
+        self.addCleanup(other.unlink, missing_ok=True)
+        self.close_for_real_clicks()
+        button = self.chapter_button(other)
+        self.assertEqual((button.get_action_name(), button.get_action_target_value().get_string()),
+                         ("win.chapter-import", str(other)))
+        self.assertEqual(button.get_tooltip_text(), "Import an assessment report for this chapter…")
+        self.assertTrue(button.has_css_class("dim-label"))
+        opened = self.win.doc.path if self.win.doc else None
+        chosen = []
+
+        def choose_file(aw, chapter=None):  # the file dialog, answered with the graded report
+            chosen.append(chapter)
+            aw.import_file(ui.Gio.File.new_for_path(str(GRADED)), chapter)
+
+        with mock.patch.object(AssessmentsWindow, "choose_file", choose_file):
+            ui.real_drag((button, button.get_width() / 2, button.get_height() / 2))
+            ui.wait_for(lambda: self.win._assessments is not None, "the Assessments window")
+            self.aw = self.win._assessments
+            ui._watch_input(self.aw)
+            page = self.page()
+        self.assertEqual([ch.path for ch in chosen], [other])
+        self.assertIsNone(self.aw.get_visible_dialog(), "no question which chapter")
+        self.assertEqual(page.title.get_subtitle(), f"{BOOK} · Chapter 4")
+        link = json.loads((page.a.folder / "report.json").read_text(encoding="utf-8"))["chapter"]
+        self.assertEqual((link["file"], link["number"], link["title"]), (f"{BOOK}/04 Leaky Buckets.notz", 4, "Leaky Buckets"))
+        self.assertEqual(self.win.doc.path if self.win.doc else None, opened, "the click didn't open the chapter")
+        ui.wait_for(lambda: self.win.has_assessment(other), "the chapter to know its assessment")
+        self.assertFalse(self.win.has_assessment(self.chapter))
+        button = self.chapter_button(other)
+        self.assertEqual((button.get_action_name(), button.get_tooltip_text()),
+                         ("win.chapter-practice", "Practice this chapter's assessment"))
+        self.assertFalse(button.has_css_class("dim-label"))
+
+    def test_a_chapter_with_an_assessment_opens_it_from_its_button(self):
+        self.imported()  # goes with chapter 3, whose title it has
+        ui.wait_for(lambda: self.win.has_assessment(self.chapter), "the chapter to know its assessment")
+        self.close_for_real_clicks()
+        button = self.chapter_button(self.chapter)
+        self.assertEqual((button.get_action_name(), button.get_action_target_value().get_string()),
+                         ("win.chapter-practice", str(self.chapter)))
+        ui.real_drag((button, button.get_width() / 2, button.get_height() / 2))
+        ui.wait_for(lambda: self.win._assessments is not None, "the Assessments window")
+        self.aw = self.win._assessments
+        ui._watch_input(self.aw)
+        page = self.page()
+        self.assertEqual((page.a.report.title, page.title.get_subtitle()), ("Design a Rate Limiter", f"{BOOK} · Chapter 3"))
+        self.assertEqual(self.folders(), ["design_a_rate_limiter_2026-11-23T19-05-51"], "nothing imported again")
 
     def test_an_assessment_follows_its_chapter_when_it_is_renamed(self):
         page = self.imported()
