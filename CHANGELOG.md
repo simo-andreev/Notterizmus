@@ -6,6 +6,7 @@
 - A chapter that can't be saved now says so until it can: a banner under the header bar gives the reason and a **Retry** button, the title starts with "•", and the app retries by itself every few seconds, then every minute. A failed autosave used to be one 3-second toast that named a hidden temporary file.
 - Opening another chapter while the open one can't be saved writes your edits to `~/.local/share/notterizmus/unsaved/` and says where. They used to be dropped without a word.
 - Your typing is saved when the session ends (logging out, shutting down) and when the app is stopped by a signal (`kill`, Ctrl+C in the terminal it was started from, that terminal closing); until now the last second of typing was lost. Typing that never pauses is saved at least every 5 seconds; the save used to wait for an 800 ms pause.
+- **Keep Mine** no longer overwrites the other program's version when Earlier Versions can't keep it (a full or read-only data folder): yours is saved beside it as `NN Title (conflict YYYY-MM-DD).notz`, and the window goes on editing that file. **Reload** keeps yours the same way. Both used to say the other version was in Earlier Versions when it wasn't.
 
 ## 1.8.1 — 2026-11-26
 

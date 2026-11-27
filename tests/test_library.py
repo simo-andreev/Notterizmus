@@ -496,5 +496,38 @@ class InterruptedChangeTest(ChaptersCase):
         self.assertEqual(Document.load(self.c).chapter_title, "C", "the chapter with that name is untouched")
 
 
+class ConflictPathTest(unittest.TestCase):
+    """Where this version of a chapter goes when the other one can't be kept (RV4 in PLAN.md)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.chapter = Path(self.tmp.name) / "03 Глава.notz"
+
+    def test_beside_the_chapter_with_the_day(self):
+        from datetime import date
+        from notterizmus.library import conflict_path
+        self.assertEqual(conflict_path(self.chapter, date(2026, 11, 27)),
+                         self.chapter.with_name("03 Глава (conflict 2026-11-27).notz"))
+
+    def test_never_a_name_that_is_taken(self):
+        from datetime import date
+        from notterizmus.library import conflict_path
+        day = date(2026, 11, 27)
+        first = conflict_path(self.chapter, day)
+        first.write_text("x")
+        self.assertEqual(conflict_path(self.chapter, day), self.chapter.with_name("03 Глава (conflict 2026-11-27 2).notz"))
+
+    def test_a_long_name_still_fits(self):
+        from datetime import date
+        from notterizmus.library import conflict_path
+        from notterizmus.model import NAME_MAX, chapter_filename
+        long = self.chapter.with_name(chapter_filename(3, "Дълго заглавие " * 30))
+        path = conflict_path(long, date(2026, 11, 27))
+        self.assertLessEqual(len(path.name.encode()), NAME_MAX)
+        self.assertTrue(path.name.endswith(" (conflict 2026-11-27).notz"))
+        self.assertEqual(parse_name(path.stem)[0], 3, "still numbered as the chapter")
+
+
 if __name__ == "__main__":
     unittest.main()

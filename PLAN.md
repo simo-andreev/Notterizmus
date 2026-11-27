@@ -104,10 +104,14 @@ is done.
   `query-end` call `Window.save_for_exit()`. Tests: `tests/ui/test_exit.py` (4, all failed
   first). Checked on the real app through `run()` in a private session: SIGTERM, SIGINT
   and SIGHUP each end it with status 0. Not released.
-- [ ] **RV4 (C4)** "Keep Mine" can overwrite the other version when it can't be kept.
+- [x] **RV4 (C4)** "Keep Mine" can overwrite the other version when it can't be kept.
   When `backups.keep` fails, don't overwrite: write this version next to it as
   `NN Title (conflict YYYY-MM-DD).notz` and say so. The same for Reload. UI test with an
   unwritable data folder.
+  Done 2026-11-27: `_save_as_conflict` in `ui/window_saving.py`, `library.conflict_path`;
+  the window goes on editing the conflict copy. Tests: `EarlierVersionsUnwritableTest` in
+  `tests/ui/test_disk.py` (3, all failed first), `ConflictPathTest` in
+  `tests/test_library.py`. Not released.
 - [ ] **RV5 (C5)** `_after_move` reads the moved chapter unguarded
   (`ui/window_chapters.py:292`). Catch `OSError` and `ValueError`, keep the new path
   anyway and show a toast. Correct CODE_REVIEW.md's CR27 entry, which says this was

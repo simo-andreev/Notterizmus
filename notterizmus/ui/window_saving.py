@@ -16,10 +16,10 @@ from pathlib import Path
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from .. import backups, paths
+from .. import backups, library, paths
 from ..files import atomic_write
 from ..model import Document
-from .helpers import notes_root
+from .helpers import notes_root, save_state
 
 
 SAVE_DELAY = 0.8  # seconds after the last change before an autosave
@@ -144,9 +144,9 @@ class WindowSaving:
         if changed and ask:
             self._ask_about_disk_change()
             return False
-        if changed:
-            self._keep_disk_version()
-        else:
+        if changed and not self._keep_disk_version():
+            return self._save_as_conflict()  # never over a version that wasn't kept (RV4)
+        if not changed:
             self._backup()  # at most every few minutes: the version about to be overwritten
         try:
             self.doc.save()
@@ -162,12 +162,32 @@ class WindowSaving:
 
     def _keep_disk_version(self):
         """Put the file another program changed in Earlier Versions before this version
-        replaces it: always, even in the second the last copy was taken."""
+        replaces it: always, even in the second the last copy was taken. Returns whether it
+        was kept (or needn't be: the guide's practice copy)."""
         if self.doc.path and not self._is_guide():
             try:
                 backups.keep(Path(self.doc.path).read_bytes(), self._backup_folder())
             except OSError:
-                pass
+                return False
+        return True
+
+    def _save_as_conflict(self):
+        """The version on disk couldn't be kept in Earlier Versions, so it stays where it
+        is, and this one is saved beside it as a conflict copy, which the window goes on
+        editing (RV4 in PLAN.md). Returns whether it was saved."""
+        target = library.conflict_path(self.doc.path)
+        try:
+            self.doc.save(target)  # the open chapter is that file now
+        except OSError as e:
+            self._saved_state(e)
+            return False
+        self._saved_state(None)
+        self.state["last_file"] = str(target)
+        save_state(self.state)
+        self._reload_sidebar()
+        self.toast(f"The other version couldn't be kept in Earlier Versions, so it stays as it is "
+                   f"and yours is saved as “{target.name}”")
+        return True
 
     def _ask_about_disk_change(self):
         if self._disk_dialog is not None:
@@ -197,8 +217,9 @@ class WindowSaving:
         if doc is not self.doc:
             return
         if response == "keep":
-            self.save(quiet=True, ask=False)
-            self.toast("Saved yours: the other version is in Earlier Versions")
+            path = doc.path
+            if self.save(quiet=True, ask=False) and doc.path == path:  # not saved as a conflict copy (RV4)
+                self.toast("Saved yours: the other version is in Earlier Versions")
         elif response == "reload":
             self._reload_from_disk()
 
@@ -211,18 +232,29 @@ class WindowSaving:
         except (OSError, ValueError) as e:
             self.toast(f"Could not reload {Path(doc.path).name}: {e}")
             return
+        kept = None  # where yours went, if not to Earlier Versions (RV4)
         if not self._is_guide():
             try:
                 backups.keep(doc.dumps().encode("utf-8"), self._backup_folder())
             except OSError:
-                pass
+                kept = library.conflict_path(doc.path)
+                try:
+                    with atomic_write(kept) as f:
+                        f.write(doc.dumps())
+                except OSError as e:
+                    self.toast(f"Not reloaded: your version couldn't be kept anywhere ({_why(e)})")
+                    return
         self.editor.replace_content(fresh.root)
         doc.lang, doc.format, doc.extra, doc.chapter_extra = fresh.lang, fresh.format, fresh.extra, fresh.chapter_extra
         doc.remember_disk()
         if self._save_src:  # nothing to write: the chapter is now what the file holds
             GLib.source_remove(self._save_src)
             self._save_src = None
-        self.toast("Reloaded from disk: Ctrl+Z brings back your version")
+        if kept is None:
+            self.toast("Reloaded from disk: Ctrl+Z brings back your version")
+        else:
+            self._reload_sidebar()
+            self.toast(f"Reloaded from disk: yours is saved as “{kept.name}”, and Ctrl+Z brings it back")
 
     def _on_close(self, *_):
         """Save before the window closes. If that fails, the window stays open: the edits

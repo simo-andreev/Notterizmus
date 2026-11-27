@@ -8,9 +8,10 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
-from .model import Document, chapter_filename, fit_name
+from .model import NAME_MAX, Document, chapter_filename, fit_name
 
 _NAME = re.compile(r"^(\d+)(?:\s+(.*))?$")
 
@@ -94,6 +95,22 @@ def neighbor(books, path, delta):
 # -- changing chapters and books ----------------------------------------------------------
 # The open chapter must be saved before any of these and pointed at its new path after
 # (each returns {old path: new path}); otherwise autosave would bring the old file back.
+
+def conflict_path(path, day=None):
+    """Where this version of a chapter goes when the version on disk can't be kept before
+    it would be overwritten (RV4 in PLAN.md): beside it, as 'NN Title (conflict
+    YYYY-MM-DD).notz', with a count when that is taken, shortened to fit a file name."""
+    path = Path(path)
+    day = day or date.today()
+    n = 1
+    while True:
+        tag = f" (conflict {day.isoformat()}{'' if n == 1 else f' {n}'})"
+        stem = fit_name(path.stem, NAME_MAX - len(tag.encode()) - len(path.suffix.encode()))
+        candidate = path.with_name(f"{stem}{tag}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
 
 def safe_name(name):
     """A book name as a folder name: without "/", "\\" or NUL, never hidden (scan() skips

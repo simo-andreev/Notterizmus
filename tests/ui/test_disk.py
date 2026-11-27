@@ -1,4 +1,5 @@
 """A chapter changed on disk by another program while it is open here (CR10, R16)."""
+import os
 from pathlib import Path
 
 from notterizmus import backups, paths
@@ -8,9 +9,8 @@ from notterizmus.model import Document, Run
 from . import support as ui
 
 
-class DiskChangeTest(ui.UITestCase):
-    """Autosave overwrote a chapter that another program (a sync tool, a second machine)
-    had changed since it was opened here (CR10 in CODE_REVIEW.md, R16)."""
+class OnDisk:
+    """Helpers for a chapter open here whose file another program changes."""
 
     def setUp(self):
         super().setUp()
@@ -49,6 +49,11 @@ class DiskChangeTest(ui.UITestCase):
         from notterizmus.ui.window import notes_root
         folder = backups.folder_for(path or self.path, notes_root(), paths.backups_dir())
         return [Document.load(b.path).root.children[0].text for b in backups.list_backups(folder)]
+
+
+class DiskChangeTest(OnDisk, ui.UITestCase):
+    """Autosave overwrote a chapter that another program (a sync tool, a second machine)
+    had changed since it was opened here (CR10 in CODE_REVIEW.md, R16)."""
 
     def test_a_change_on_disk_is_asked_about_and_reload_takes_that_version(self):
         self.change_on_disk()
@@ -113,3 +118,56 @@ class DiskChangeTest(ui.UITestCase):
         self.assertNotEqual(renamed, self.path)
         ui.wait_for(lambda: self.on_disk(renamed) == "Mine typed", "the autosave, without a question")
         self.assertIsNone(self.win.get_visible_dialog())
+
+
+class EarlierVersionsUnwritableTest(OnDisk, ui.UITestCase):
+    """Keep Mine and Reload said the other version was in Earlier Versions even when it
+    couldn't be put there, and Keep Mine then overwrote it (RV4 in PLAN.md, C4 in REVIEW.md).
+    The chapter's Earlier Versions folder is read-only here."""
+
+    def setUp(self):
+        super().setUp()
+        from notterizmus.ui.window import notes_root
+        self.versions = backups.folder_for(self.path, notes_root(), paths.backups_dir())
+        self.versions.mkdir(parents=True, exist_ok=True)
+        os.chmod(self.versions, 0o555)
+        self.addCleanup(os.chmod, self.versions, 0o755)
+        self.toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: self.toasts.append(msg)
+        self.addCleanup(lambda: self.win.__dict__.pop("toast", None))
+
+    def conflict(self):
+        found = sorted(self.path.parent.glob(f"{self.path.stem} (conflict *).notz"))
+        self.assertEqual(len(found), 1, found)
+        return found[0]
+
+    def test_keep_mine_saves_yours_beside_the_other_and_keeps_editing_it(self):
+        self.change_on_disk()
+        self.type(" typed")
+        self.answer("keep")
+        self.assertEqual(self.on_disk(), "Theirs", "the other version isn't overwritten")
+        conflict = self.conflict()
+        self.assertEqual(self.on_disk(conflict), "Mine typed")
+        self.assertEqual(Path(self.win.doc.path), conflict)
+        self.assertTrue(any(conflict.name in t for t in self.toasts), self.toasts)
+        self.assertFalse(any("is in Earlier Versions" in t for t in self.toasts), "no claim that it was kept")
+        self.type(" more")
+        ui.wait_for(lambda: self.on_disk(conflict) == "Mine typed more", "the autosave, into the copy")
+        self.assertEqual(self.on_disk(), "Theirs")
+
+    def test_opening_another_chapter_does_the_same_without_asking(self):
+        self.change_on_disk()
+        self.type(" typed")
+        ui.open_chapter([h("Elsewhere")], title="Other", book="Disk")  # before the autosave
+        self.assertEqual(self.on_disk(), "Theirs")
+        self.assertEqual(self.on_disk(self.conflict()), "Mine typed")
+
+    def test_reload_keeps_yours_beside_the_chapter(self):
+        self.change_on_disk()
+        self.type(" typed")
+        self.answer("reload")
+        self.assertEqual(self.win.doc.root.children[0].text, "Theirs")
+        self.assertEqual(Path(self.win.doc.path), self.path, "the chapter stays the one open")
+        conflict = self.conflict()
+        self.assertEqual(self.on_disk(conflict), "Mine typed")
+        self.assertTrue(any(conflict.name in t for t in self.toasts), self.toasts)
