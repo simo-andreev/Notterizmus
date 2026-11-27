@@ -275,6 +275,8 @@ Publishing both the snap and the Flatpak has no major drawback. The costs are:
 8. Added 2026-11-18: the R32 fix, at any time; R33 with the richer notes in
    step 5. Both are **done** and released in 1.6.0, R33 ahead of step 5 (R32 as
    CR9, to confirm on the desktop).
+9. From 2026-11-27, the order is [PLAN.md](PLAN.md): it combines every open item here
+   with the findings of REVIEW.md (the 1.7.0 review), data safety first.
 
 ## Open questions
 
