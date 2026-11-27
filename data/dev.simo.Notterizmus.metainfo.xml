@@ -36,6 +36,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.8.2" date="2026-11-27">
+      <description>
+        <p>Your notes are kept when they can't be saved, and saved when the app is ended rather than closed.</p>
+        <ul>
+          <li>Closing the window with a chapter that can't be saved keeps the window open, writes your edits to the app's data folder and asks what to do. It used to close without saving.</li>
+          <li>A chapter that can't be saved shows a banner with the reason and Retry, and a dot before its title; the app retries by itself.</li>
+          <li>Your typing is saved when you log out or shut down, when the app is stopped by a signal, and at least every 5 seconds while you type.</li>
+          <li>Keep Mine no longer overwrites another program's version that Earlier Versions couldn't keep: yours is saved beside it as a conflict copy.</li>
+          <li>Earlier Versions copies are written in one step, failures are logged to the journal, and the app says once when Earlier Versions can't be written.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.8.1" date="2026-11-26">
       <description>
         <p>Assessments from the chapter list, scores in TopCoding's colors, and a question list you can resize.</p>

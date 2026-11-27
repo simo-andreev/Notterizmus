@@ -1,3 +1,16 @@
+notterizmus (1.8.2) resolute; urgency=medium
+
+  * Keep the window open and write the edits aside when the last save
+    fails.
+  * Show a banner with Retry while a chapter can't be saved.
+  * Save at logout, on SIGTERM, SIGINT and SIGHUP, and every 5 s while
+    typing.
+  * Save a conflict copy instead of overwriting a version that can't be
+    kept.
+  * Write Earlier Versions copies atomically and log failures.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Fri, 27 Nov 2026 22:40:04 +0200
+
 notterizmus (1.8.1) resolute; urgency=medium
 
   * Open or import a chapter's assessment from its button in the chapter
