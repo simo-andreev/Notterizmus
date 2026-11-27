@@ -39,6 +39,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.state = load_state()
         self.doc = None
         self._save_src = None
+        self._save_since = 0.0  # when the first change the waiting autosave is for came (RV3)
         self._disk_dialog = None  # asking what to do about a chapter changed on disk (CR10)
         self._save_error = None  # the OSError of the last save that failed, until one works (RV2)
         self._save_failures = 0  # failed saves in a row: how long until the next retry (RV2)

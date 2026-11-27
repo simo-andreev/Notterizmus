@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from .. import gpu
 
 gpu.prefer_gpu()  # before GTK loads: GTK and WebKit read what it sets once, at the start
 
-from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gtk  # noqa: E402  (their versions: __init__.py)
+from gi.repository import Adw, Gdk, Gio, GLib, GLibUnix, Graphene, Gtk  # noqa: E402  (their versions: __init__.py)
 
 from .. import APP_ID, APP_NAME  # noqa: E402
 from ..commands import accelerators  # noqa: E402
@@ -32,9 +33,13 @@ def use_hinted_text(settings):
 
 class App(Adw.Application):
     def __init__(self):
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        # register_session: the session manager tells the app it is ending (query-end),
+        # so the chapter is saved before a logout or shutdown (RV3 in PLAN.md)
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN,
+                         register_session=True)
         GLib.set_application_name(APP_NAME)
         self.win = None
+        self.connect("query-end", lambda *_: self.win and self.win.save_for_exit())
 
     def do_startup(self):
         Adw.Application.do_startup(self)
@@ -51,6 +56,16 @@ class App(Adw.Application):
         self.add_action(q)
         for action, accels in accelerators():  # CR37: from the one command table
             self.set_accels_for_action(action, accels)
+        for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):  # RV3: save, then quit
+            GLibUnix.signal_add(GLib.PRIORITY_HIGH, signum, self._quit_on_signal)
+
+    def _quit_on_signal(self):
+        """A signal (kill, Ctrl+C in a terminal, the terminal closing) ends the app without
+        closing its window: save first, without asking anything."""
+        if self.win is not None:
+            self.win.save_for_exit()
+        self.quit()
+        return GLib.SOURCE_CONTINUE  # a second signal while quitting does the same
 
     def do_shutdown(self):
         drawing_web.shutdown()  # the hidden preview page, and WebKit's processes with it

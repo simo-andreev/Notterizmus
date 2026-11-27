@@ -4,12 +4,14 @@ another program changed the file (CR10, R16), and closing when the chapter can't
 saved (RV1 in PLAN.md).
 
 Uses the window's doc, editor, state, toast(), _is_guide() and _update_title(); keeps
-_save_src (the waiting autosave), save_banner, _save_error, _save_failures and _retry_src
+_save_src and _save_since (the waiting autosave, and when the first change it waits for
+came), save_banner, _save_error, _save_failures and _retry_src
 (a save that failed: the banner and the retries, RV2), _disk_dialog (the question about a
 change on disk), and _unsaved_dialog, _ask_unsaved_again, _copy_chooser, _aside
 and _closing (closing when the chapter can't be saved)."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from gi.repository import Adw, Gio, GLib, Gtk
@@ -20,6 +22,9 @@ from ..model import Document
 from .helpers import notes_root
 
 
+SAVE_DELAY = 0.8  # seconds after the last change before an autosave
+SAVE_MAX_WAIT = 5.0  # seconds an autosave may be put off by changes that keep coming (RV3)
+_now = time.monotonic  # the autosave's clock (tests replace it)
 RETRY_MAX = 60  # seconds between retries of a failed save, at most (RV2)
 
 
@@ -113,9 +118,15 @@ class WindowSaving:
             self.toast(f"“{label}” couldn't be saved, nor kept elsewhere: {_why(e)}")
 
     def _schedule_save(self):
+        """Save SAVE_DELAY after the last change, but no later than SAVE_MAX_WAIT after the
+        first one not yet saved: typing that never pauses put it off for good (RV3)."""
+        now = _now()
         if self._save_src:
             GLib.source_remove(self._save_src)
-        self._save_src = GLib.timeout_add(800, self._autosave)
+        else:
+            self._save_since = now
+        wait = max(0.0, min(SAVE_DELAY, SAVE_MAX_WAIT - (now - self._save_since)))
+        self._save_src = GLib.timeout_add(int(wait * 1000), self._autosave)
 
     def _autosave(self):
         self._save_src = None
@@ -229,6 +240,22 @@ class WindowSaving:
             return True
         self._close_assessments()
         return False
+
+    def save_for_exit(self):
+        """The session is ending or a signal asks the app to quit (RV3): save the chapter
+        and the assessment's draft now. Nothing is asked, since no one may be there to
+        answer: a chapter that can't be saved is written to the unsaved folder."""
+        if self.doc is not None and not self._flush_save():
+            try:
+                self._write_aside()
+            except OSError:
+                pass  # nowhere left to write it; RV7 will log this
+        page = getattr(self._assessments, "page", None)
+        if page is not None:
+            try:
+                page.flush(wait=True)
+            except OSError:
+                pass
 
     def _close_assessments(self):
         if self._assessments is not None:  # the app quits as one: its drafts are saved as it closes

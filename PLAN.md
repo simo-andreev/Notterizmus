@@ -95,11 +95,15 @@ is done.
   `set_doc` writes the chapter to the unsaved folder and says where. Test:
   `test_opening_another_chapter_writes_the_edits_aside_and_says_where` (failed first).
   Done 2026-11-27, not released.
-- [ ] **RV3 (C3)** Nothing is saved at logout, shutdown or SIGTERM, and the 800 ms
+- [x] **RV3 (C3)** Nothing is saved at logout, shutdown or SIGTERM, and the 800 ms
   debounce can wait for ever while you type. Save at most every 5 s while changes keep
   coming; `GLib.unix_signal_add` for SIGTERM, SIGINT and SIGHUP saves and quits;
   `register_session=True` and a save on `query-end`. Unit test for the maximum wait; UI
   test that sends SIGTERM to the harness's app.
+  Done 2026-11-27: `SAVE_MAX_WAIT` (5 s) in `_schedule_save`; `App._quit_on_signal` and
+  `query-end` call `Window.save_for_exit()`. Tests: `tests/ui/test_exit.py` (4, all failed
+  first). Checked on the real app through `run()` in a private session: SIGTERM, SIGINT
+  and SIGHUP each end it with status 0. Not released.
 - [ ] **RV4 (C4)** "Keep Mine" can overwrite the other version when it can't be kept.
   When `backups.keep` fails, don't overwrite: write this version next to it as
   `NN Title (conflict YYYY-MM-DD).notz` and say so. The same for Reload. UI test with an
