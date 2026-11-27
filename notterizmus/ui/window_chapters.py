@@ -279,8 +279,8 @@ class WindowChapters:
         """Point the open chapter at its new file and refresh the list."""
         try:
             backups.move(moved, notes_root(), paths.backups_dir())  # earlier versions follow
-        except OSError:
-            pass
+        except OSError as e:
+            self._versions_failed("Earlier Versions couldn't follow the renamed chapters", e)
         if moved:  # and assessments, in the background
             WORKER.run(lambda m=dict(moved), root=assessments_root(), notes=notes_root():
                        assessments.follow_moves(root, m, notes),

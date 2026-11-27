@@ -11,6 +11,14 @@ class PathsTest(unittest.TestCase):
     def test_native_uses_glib(self):
         self.assertEqual(documents_dir({}, "/home/u/Документи"), Path("/home/u/Документи"))
 
+    def test_a_user_dirs_file_that_cannot_be_read_is_logged(self):
+        from notterizmus.paths import _from_user_dirs
+        with tempfile.TemporaryDirectory() as home:
+            os.makedirs(Path(home) / ".config" / "user-dirs.dirs")  # a folder: can't be read
+            with self.assertLogs("notterizmus.paths", "WARNING") as logged:
+                self.assertIsNone(_from_user_dirs(home))
+            self.assertIn("user-dirs.dirs", logged.output[0])
+
     def test_snap_reads_real_home_user_dirs(self):
         with tempfile.TemporaryDirectory() as home:
             os.makedirs(Path(home) / ".config")

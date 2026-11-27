@@ -1,9 +1,12 @@
 """Where chapter notes live (no GTK, so it can be unit-tested)."""
 from __future__ import annotations
 
+import logging
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 def _from_user_dirs(home, key="XDG_DOCUMENTS_DIR"):
@@ -15,8 +18,10 @@ def _from_user_dirs(home, key="XDG_DOCUMENTS_DIR"):
                 if line.startswith(key + "="):
                     value = line.split("=", 1)[1].strip().strip('"')
                     return Path(value.replace("$HOME", str(home)))
-    except OSError:
-        pass
+    except FileNotFoundError:  # no such file is usual: the default folder is used
+        log.debug("no %s", Path(home) / ".config" / "user-dirs.dirs")
+    except OSError as e:
+        log.warning("can't read %s: %s", Path(home) / ".config" / "user-dirs.dirs", e)
     return None
 
 

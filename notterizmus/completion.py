@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import bisect
 import codecs
+import logging
 from collections import Counter
 from pathlib import Path
 
 from .model import Document
 from .paths import data_dirs
 from .spell import WORD_RE
+
+log = logging.getLogger(__name__)
 
 MIN_WORD = 3        # shorter words aren't worth completing
 MIN_DICT_PREFIX = 2  # dictionary completions only after this many letters
@@ -99,8 +102,8 @@ def dictionary_words(tag):
                     if words_on_line and words_on_line[0] == "SET":
                         enc = words_on_line[1].replace("microsoft-", "") if len(words_on_line) > 1 else "utf-8"
                         break
-        except OSError:
-            pass
+        except OSError as e:
+            log.warning("can't read %s (%s); reading its dictionary as UTF-8", d / f"{tag}.aff", e)
         try:
             codecs.lookup(enc)
         except LookupError:  # an encoding Python doesn't know: this dictionary is left out (CR27)

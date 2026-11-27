@@ -209,6 +209,13 @@ class DictionaryWordsTest(unittest.TestCase):
         self.dictionary("yy_YY", ["word"], aff="SET no-such-encoding-9\n")
         self.assertEqual(dictionary_words("yy_YY"), [])
 
+    def test_an_aff_file_that_cannot_be_read_is_logged_and_the_words_read_as_utf8(self):
+        self.dictionary("xx_XX", ["wörd"])
+        (self.share / "hunspell" / "xx_XX.aff").mkdir()  # can't be opened as a file
+        with self.assertLogs("notterizmus.completion", "WARNING") as logged:
+            self.assertEqual([w for _k, w in dictionary_words("xx_XX")], ["wörd"])
+        self.assertIn("xx_XX.aff", logged.output[0])
+
     def test_the_encoding_comes_from_the_aff_file(self):
         self.dictionary("bg_XX", ["котка/AB", "куче", "Кирил/X"], encoding="cp1251",
                         aff="# Bulgarian\nSET microsoft-cp1251\nTRY abc\n")

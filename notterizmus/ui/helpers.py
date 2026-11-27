@@ -1,12 +1,15 @@
 """Small helpers shared by the UI modules (CR48 in CODE_REVIEW.md)."""
 from __future__ import annotations
 
+import logging
 import weakref
 from concurrent.futures import ThreadPoolExecutor
 
 from gi.repository import GLib
 
 from .. import paths, state
+
+log = logging.getLogger(__name__)
 
 
 def run_once(fn, *args):
@@ -110,5 +113,5 @@ def load_state():
 def save_state(settings):
     try:
         state.save(settings)
-    except OSError:
-        pass  # not remembered this time; nothing else depends on it
+    except OSError as e:  # not remembered this time; nothing else depends on it
+        log.warning("can't save the settings: %s", e)

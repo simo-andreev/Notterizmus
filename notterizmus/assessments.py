@@ -32,6 +32,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -46,6 +47,8 @@ from . import assessment_txt, library
 from .assessment_txt import MAX_BYTES, PARSER_VERSION, Report
 from .files import atomic_write, sync_folder
 from .model import fit_name
+
+log = logging.getLogger(__name__)
 
 FORMAT = "notterizmus-assessment/1"
 ATTEMPT_FORMAT = "notterizmus-attempt/1"
@@ -321,8 +324,8 @@ def load(folder):
                 a = replace(a, report=report, sha256=digest, parser_version=PARSER_VERSION)
                 try:
                     _write_json(folder / REPORT_JSON, a.to_json())
-                except OSError:
-                    pass  # read again next time
+                except OSError as e:  # read again next time
+                    log.warning("can't update %s: %s", folder / REPORT_JSON, e)
     a.attempts = len(_attempt_names(folder))
     a.has_draft = (folder / DRAFT).is_file()
     return a
@@ -583,8 +586,8 @@ def resolve_links(found, books, notes_root):
         if ch is not None and a.chapter.file != _relative(ch.path, notes_root):
             try:
                 a = set_chapter(a, link_for(ch.path, notes_root))
-            except (OSError, ValueError):
-                pass  # it is found again next time
+            except (OSError, ValueError) as e:  # it is found again next time
+                log.warning("can't update the chapter of %s: %s", a.folder, e)
         out.append((a, ch))
     return out
 

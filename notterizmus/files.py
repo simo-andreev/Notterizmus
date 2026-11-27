@@ -1,11 +1,14 @@
 """Writing a file in one step, so that it is never half written (no GTK)."""
 from __future__ import annotations
 
+import logging
 import os
 import stat
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -41,8 +44,8 @@ def atomic_write(path, binary=False):
     except BaseException:
         try:
             os.unlink(tmp)
-        except OSError:
-            pass
+        except OSError as e:  # the error that brought us here is raised anyway
+            log.debug("can't remove %s: %s", tmp, e)
         raise
     _sync_folder(path.parent)
 
@@ -62,7 +65,7 @@ def _sync_folder(folder):
         return
     try:
         os.fsync(fd)
-    except OSError:
-        pass
+    except OSError as e:
+        log.debug("can't sync the folder %s: %s", folder, e)
     finally:
         os.close(fd)

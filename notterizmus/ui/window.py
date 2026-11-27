@@ -49,6 +49,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self._copy_chooser = None  # choosing where Save a Copy… writes it (RV1)
         self._aside = None  # (text, path) of the copy last written to the unsaved folder (RV1)
         self._closing = False  # set once the window may close without saving again (RV1)
+        self._versions_warned = False  # Earlier Versions failed and a toast said so (RV7)
         self._assessments = None  # the Assessments window, while it is open
         self._linked = {}  # {chapter file, resolved: the folder of its newest assessment}
         self.speller = Speller()

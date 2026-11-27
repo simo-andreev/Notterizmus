@@ -7,10 +7,12 @@ Uses the window's doc, editor, state, toast(), _is_guide() and _update_title(); 
 _save_src and _save_since (the waiting autosave, and when the first change it waits for
 came), save_banner, _save_error, _save_failures and _retry_src
 (a save that failed: the banner and the retries, RV2), _disk_dialog (the question about a
-change on disk), and _unsaved_dialog, _ask_unsaved_again, _copy_chooser, _aside
+change on disk), _versions_warned (Earlier Versions failed and that was said, RV7), and
+_unsaved_dialog, _ask_unsaved_again, _copy_chooser, _aside
 and _closing (closing when the chapter can't be saved)."""
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 
@@ -20,6 +22,8 @@ from .. import backups, library, paths
 from ..files import atomic_write
 from ..model import Document
 from .helpers import notes_root, save_state
+
+log = logging.getLogger(__name__)
 
 
 SAVE_DELAY = 0.8  # seconds after the last change before an autosave
@@ -84,8 +88,16 @@ class WindowSaving:
             return
         try:
             backups.backup(self.doc.path, self._backup_folder(), force=force)
-        except OSError:
-            pass
+        except OSError as e:
+            self._versions_failed(f"can't copy {self.doc.path} to Earlier Versions", e)
+
+    def _versions_failed(self, what, error):
+        """Earlier Versions couldn't be written: logged each time, and said once a session,
+        so the copies don't stop without a word (RV7 in PLAN.md)."""
+        log.warning("%s: %s", what, error)
+        if not self._versions_warned:
+            self._versions_warned = True
+            self.toast(f"Earlier Versions aren't being kept: {_why(error)}")
 
     def _flush_save(self):
         """Write the open chapter now: file operations read chapters from disk. Nothing
@@ -280,14 +292,15 @@ class WindowSaving:
         if self.doc is not None and not self._flush_save():
             try:
                 self._write_aside()
-            except OSError:
-                pass  # nowhere left to write it; RV7 will log this
+            except OSError as e:  # nowhere left to write it
+                log.error("%s couldn't be saved or written aside at exit; its edits are lost: %s",
+                          self.doc.path, e)
         page = getattr(self._assessments, "page", None)
         if page is not None:
             try:
                 page.flush(wait=True)
-            except OSError:
-                pass
+            except OSError as e:
+                log.error("the assessment's draft couldn't be saved at exit: %s", e)
 
     def _close_assessments(self):
         if self._assessments is not None:  # the app quits as one: its drafts are saved as it closes

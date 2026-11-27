@@ -11,7 +11,7 @@ gpu.prefer_gpu()  # before GTK loads: GTK and WebKit read what it sets once, at 
 
 from gi.repository import Adw, Gdk, Gio, GLib, GLibUnix, Graphene, Gtk  # noqa: E402  (their versions: __init__.py)
 
-from .. import APP_ID, APP_NAME  # noqa: E402
+from .. import APP_ID, APP_NAME, logs  # noqa: E402
 from ..commands import accelerators  # noqa: E402
 from . import drawing_web  # noqa: E402
 from .window import Window  # noqa: E402
@@ -115,4 +115,5 @@ class App(Adw.Application):
 
 
 def main():
+    logs.setup()
     return App().run(sys.argv)

@@ -157,6 +157,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
 | Getting Started practice copy, rewritten each time it's opened | `~/.local/share/notterizmus/Getting Started.notz` |
 | Earlier versions of each chapter (thinned with age, kept for good) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
+| Warnings and errors (Earlier Versions or settings that couldn't be written, and the like) | The journal, as the app's standard error: `journalctl --user -g notterizmus`, or the terminal it was started from; `NOTTERIZMUS_DEBUG=1` logs more |
 | Edits that couldn't be saved (a read-only folder, a full disk), written here when the window closes or another chapter opens | `~/.local/share/notterizmus/unsaved/<Book>/<NN> <Title> <UTC time>Z.notz` |
 | Imported assessment reports and your practice on them: each report's `.txt` as downloaded, what was read from it and its chapter (`report.json`), the attempt in progress (`draft.json`) and finished attempts (`attempts/<UTC time>Z.json`) | `<Documents>/Notterizmus/.assessments/<title>_<completed>/` (hidden, so it isn't listed as a book; to remove an assessment, delete its folder) |
 
@@ -206,6 +207,7 @@ changes are verified are in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 | `notterizmus/paths.py` | Documents folder (also inside a snap), guide and metainfo paths |
 | `notterizmus/gpu.py` | Drawing with the GPU on NVIDIA's driver: what WebKit and GTK are told before they start |
 | `notterizmus/files.py` | Writing a file in one step: on the disk before it replaces the old one, with its permissions kept |
+| `notterizmus/logs.py` | The app's log: warnings to standard error, everything with `NOTTERIZMUS_DEBUG=1` |
 | `notterizmus/state.py` | What the window remembers between runs (`state.json`); a broken file can't stop the app |
 | `notterizmus/library.py`, `notterizmus/ui/sidebar.py` | Books and chapters in the notes folder; the chapter list |
 | `notterizmus/backups.py` | Earlier versions of chapters: when copies are kept, where, and how many |

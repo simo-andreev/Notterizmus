@@ -5,6 +5,7 @@ named "<NN> <Title>.notz" by model.chapter_filename().
 """
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -12,6 +13,8 @@ from datetime import date
 from pathlib import Path
 
 from .model import NAME_MAX, Document, chapter_filename, fit_name
+
+log = logging.getLogger(__name__)
 
 _NAME = re.compile(r"^(\d+)(?:\s+(.*))?$")
 
@@ -260,8 +263,8 @@ def _put_back(staged, renamed):
     for _path, tmp, _n, new in reversed(renamed):  # first off the new names: they may be others' old ones
         try:
             new.rename(tmp)
-        except OSError:
-            pass  # it stays under its new name: changed, but still listed
+        except OSError as e:  # it stays under its new name: changed, but still listed
+            log.warning("can't put %s back under its old number: %s", new, e)
     hidden = []
     for path, tmp, old_number, _new in staged:
         if not tmp.exists():
@@ -331,8 +334,8 @@ def rename_book(book_dir, new_name, failed=None):
         if not f.name.startswith("."):
             try:
                 _rewrite(f, f, book=new_name)
-            except ValueError:
-                pass  # not a chapter
+            except ValueError:  # not a chapter
+                log.debug("%s isn't a chapter: its book name is left as it is", f)
             except OSError:
                 if failed is not None:
                     failed.append(f)

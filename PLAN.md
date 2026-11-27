@@ -119,9 +119,13 @@ is done.
   Done 2026-11-27: the read in `_after_move` (`ui/window_chapters.py`) is guarded; CR27's
   entry in CODE_REVIEW.md is corrected. Test: `UnreadableAfterMoveTest` in
   `tests/ui/test_unsaved.py` (failed first). Not released.
-- [ ] **RV7** Logging: the `logging` module to stderr (journald), and the 13 silent
+- [x] **RV7** Logging: the `logging` module to stderr (journald), and the 13 silent
   `except …: pass` either log or, for backups (`_backup`, `backups.move`), log and show
   one toast per session that Earlier Versions isn't being kept.
+  Done 2026-11-27: `notterizmus/logs.py`; every `except …: pass` in the package logs
+  (debug where nothing is lost); `Window._versions_failed` toasts once a session. Tests:
+  `tests/ui/test_logging.py` (4, all failed first), `tests/test_logs.py`, and one each in
+  `test_completion` and `test_paths`. Not released.
 - [ ] **RV8** Backup copies written atomically (`files.atomic_write` in place of
   `shutil.copy2` and `write_bytes` in `backups.py`), and stale `.<hex>.tmp` files older
   than a day removed from a book folder when it is scanned. Unit tests.

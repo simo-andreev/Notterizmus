@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 
 from . import paths
 from .files import atomic_write
+
+log = logging.getLogger(__name__)
 
 SCENE_KEYS = ("elements", "appState", "files")
 # What a drawing keeps of Excalidraw's view state: only what changes how it looks
@@ -122,11 +125,11 @@ def _prune(folder):
     for p in folder.glob("*.png"):
         try:
             files.append((p.stat().st_mtime, p))
-        except OSError:
-            pass
+        except OSError as e:  # gone already, most likely
+            log.debug("preview cache: %s", e)
     files.sort(reverse=True)
     for _mtime, p in files[CACHE_KEEP:]:
         try:
             p.unlink()
-        except OSError:
-            pass
+        except OSError as e:
+            log.debug("preview cache: can't remove %s: %s", p, e)
