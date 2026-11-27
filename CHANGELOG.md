@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Closing the window no longer loses your edits when the chapter can't be saved, for example in a read-only folder or on a full disk. The window stays open, your edits are written to `~/.local/share/notterizmus/unsaved/`, and you choose **Retry**, **Save a Copy…** or **Quit Without Saving**. It used to close without saving.
+
 ## 1.8.1 — 2026-11-26
 
 - **Assessments from the chapter list**: each chapter ends in a button that opens its assessment. A chapter without one gets a button that imports a report for that chapter, without asking which chapter, and opens it.

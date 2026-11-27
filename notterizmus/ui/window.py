@@ -40,6 +40,12 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.doc = None
         self._save_src = None
         self._disk_dialog = None  # asking what to do about a chapter changed on disk (CR10)
+        self._save_error = None  # the OSError of the last save that failed
+        self._unsaved_dialog = None  # asking what to do when the chapter can't be saved on close (RV1)
+        self._ask_unsaved_again = False  # a Retry failed: ask again once the question has closed
+        self._copy_chooser = None  # choosing where Save a Copy… writes it (RV1)
+        self._aside = None  # (text, path) of the copy last written to the unsaved folder (RV1)
+        self._closing = False  # set once the window may close without saving again (RV1)
         self._assessments = None  # the Assessments window, while it is open
         self._linked = {}  # {chapter file, resolved: the folder of its newest assessment}
         self.speller = Speller()

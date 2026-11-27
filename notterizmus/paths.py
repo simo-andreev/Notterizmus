@@ -84,6 +84,12 @@ def backups_dir(env=None):
     return data_dir(env) / "backups"
 
 
+def unsaved_dir(env=None):
+    """Chapters that couldn't be saved where they belong, written here before the window
+    may close without them (RV1 in PLAN.md)."""
+    return data_dir(env) / "unsaved"
+
+
 def metainfo_path(app_id, env=None):
     """The AppStream metainfo file: the source checkout's, else the installed one
     (found through XDG_DATA_DIRS, which also covers snaps)."""

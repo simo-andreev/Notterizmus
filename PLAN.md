@@ -74,12 +74,15 @@ then what the review found broken. Phase 8's order is fixed by its own dependenc
 Nothing here changes how the app looks while saves work. Release as 1.8.2 as soon as it
 is done.
 
-- [ ] **RV1 (C1)** Closing the window loses edits when the last save fails.
+- [x] **RV1 (C1)** Closing the window loses edits when the last save fails.
   `_on_close` (`ui/window_saving.py`) keeps the window open when its save fails, first
   writes the unsaved chapter to `<data dir>/unsaved/`, and asks **Retry**, **Save a
   Copy…** or **Quit Without Saving**. Ctrl+Q goes the same way, and the assessments
   window closes only once the answer is given. UI test: a read-only book folder, type,
   close; the window stays and the text is in `unsaved/`.
+  Done 2026-11-27: `_on_close` and `_ask_unsaved` in `ui/window_saving.py`,
+  `backups.keep_unsaved`, `paths.unsaved_dir()`. Tests: `tests/ui/test_unsaved.py` (8, all
+  failed first), `UnsavedTest` in `tests/test_backups.py`. Not released.
 - [ ] **RV2 (C2)** A failed autosave is a 3-second toast. Keep a "not saved" state: an
   `Adw.Banner` with the chapter's name, the reason (`e.strerror`, not the temporary
   file's name) and **Retry**; a "•" before the title; retries at growing intervals; the

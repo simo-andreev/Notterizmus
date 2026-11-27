@@ -317,5 +317,36 @@ class SwapTest(unittest.TestCase):
         self.assertEqual([p.name for p in self.root.rglob(".*")], [], "nothing is left aside")
 
 
+class UnsavedTest(unittest.TestCase):
+    """A chapter that couldn't be saved where it belongs, written aside before the window
+    may close without it (RV1 in PLAN.md)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.folder = Path(self.tmp.name) / "unsaved"
+        self.chapter = Path(self.tmp.name) / "Notterizmus" / "Книга" / "03 Глава.notz"
+
+    def test_kept_by_book_and_chapter_with_the_time_in_utc(self):
+        path = backups.keep_unsaved("текст", self.chapter, self.folder,
+                                    now=datetime(2026, 11, 27, 10, 0, 0, tzinfo=timezone.utc))
+        self.assertEqual(path, self.folder / "Книга" / "03 Глава 2026-11-27T10-00-00Z.notz")
+        self.assertEqual(path.read_text(encoding="utf-8"), "текст")
+
+    def test_a_second_copy_in_the_same_second_does_not_replace_the_first(self):
+        now = datetime(2026, 11, 27, 10, 0, 0, tzinfo=timezone.utc)
+        first = backups.keep_unsaved("one", self.chapter, self.folder, now=now)
+        second = backups.keep_unsaved("two", self.chapter, self.folder, now=now)
+        self.assertNotEqual(first, second)
+        self.assertEqual((first.read_text(), second.read_text()), ("one", "two"))
+
+    def test_nothing_half_written_is_left_when_it_fails(self):
+        self.folder.mkdir()
+        (self.folder / "Книга").write_text("a file where the folder should be")
+        with self.assertRaises(OSError):
+            backups.keep_unsaved("x", self.chapter, self.folder)
+        self.assertEqual(sorted(p.name for p in self.folder.iterdir()), ["Книга"])
+
+
 if __name__ == "__main__":
     unittest.main()

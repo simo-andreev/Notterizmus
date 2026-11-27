@@ -47,6 +47,8 @@ class DataFoldersTest(unittest.TestCase):
         self.assertEqual(data_dir({"XDG_DATA_HOME": "", "HOME": "/h"}), Path("/h/.local/share/notterizmus"))
         self.assertEqual(data_dir({}), Path.home() / ".local" / "share" / "notterizmus")
         self.assertEqual(backups_dir({"HOME": "/h"}), Path("/h/.local/share/notterizmus/backups"))
+        from notterizmus.paths import unsaved_dir
+        self.assertEqual(unsaved_dir({"HOME": "/h"}), Path("/h/.local/share/notterizmus/unsaved"))
         self.assertEqual(guide_path({"XDG_DATA_HOME": "/d"}).parent, data_dir({"XDG_DATA_HOME": "/d"}))
 
     def test_config_data_and_cache_follow_one_rule(self):

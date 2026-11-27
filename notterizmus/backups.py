@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .files import atomic_write
+
 BACKUP_EVERY = 600   # seconds between copies while editing
 # (copies younger than this, keep the newest per slot); slot None keeps every copy
 TIERS = [
@@ -112,6 +114,20 @@ def keep(data, folder, now=None):
     target = folder / _name(now)
     target.write_bytes(data)
     thin(folder, now)
+    return target
+
+
+def keep_unsaved(text, chapter, folder, now=None):
+    """Write text (a chapter file's content that couldn't be saved over chapter) into
+    folder/<book>/<chapter stem> <time in UTC>Z.notz, never over an earlier one, and
+    return that path (RV1 in PLAN.md). Raises OSError if it can't be written either."""
+    chapter = Path(chapter)
+    now = _local(now)
+    book = Path(folder) / chapter.parent.name
+    while (target := book / f"{chapter.stem} {_name(now)}").exists():
+        now += timedelta(seconds=1)
+    with atomic_write(target) as f:
+        f.write(text)
     return target
 
 

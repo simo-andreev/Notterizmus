@@ -157,6 +157,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Last open chapter, spelling choices | `~/.config/notterizmus/state.json` |
 | Getting Started practice copy, rewritten each time it's opened | `~/.local/share/notterizmus/Getting Started.notz` |
 | Earlier versions of each chapter (thinned with age, kept for good) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
+| Edits that couldn't be saved (a read-only folder, a full disk), written here when the window closes | `~/.local/share/notterizmus/unsaved/<Book>/<NN> <Title> <UTC time>Z.notz` |
 | Imported assessment reports and your practice on them: each report's `.txt` as downloaded, what was read from it and its chapter (`report.json`), the attempt in progress (`draft.json`) and finished attempts (`attempts/<UTC time>Z.json`) | `<Documents>/Notterizmus/.assessments/<title>_<completed>/` (hidden, so it isn't listed as a book; to remove an assessment, delete its folder) |
 
 Rules cover numbering format per level, connector characters, spacing, spacer
