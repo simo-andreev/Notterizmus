@@ -109,6 +109,19 @@ class DiskChangeTest(OnDisk, ui.UITestCase):
         self.assertEqual(self.on_disk(), "Mine typed")
         self.assertEqual(self.earlier()[0], "Theirs")
 
+    def test_reload_of_a_file_that_cannot_be_read_keeps_yours_and_says_why(self):
+        """A sync tool may leave a half-written file: Reload then changes nothing here."""
+        self.path.write_text("{not json", encoding="utf-8")
+        self.type(" typed")
+        toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: toasts.append(msg)
+        self.addCleanup(lambda: self.win.__dict__.pop("toast", None))
+        self.answer("reload")
+        self.assertEqual(self.win.doc.root.children[0].text, "Mine typed")
+        self.assertEqual(self.path.read_text(encoding="utf-8"), "{not json", "nothing written over it either")
+        self.assertEqual(len(toasts), 1, toasts)
+        self.assertTrue(toasts[0].startswith(f"Could not reload {self.path.name}"), toasts)
+
     def test_renaming_the_open_chapter_here_is_not_a_change_on_disk(self):
         no = self.win.doc.chapter_no
         self.win.apply_chapter_props(self.path, self.path.parent, no, "Renamed")

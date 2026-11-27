@@ -74,6 +74,20 @@ class SaveTest(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), before)
         self.assertEqual(self.leftovers(), [], "no temporary file stays behind")
 
+    def test_a_file_whose_permissions_cannot_be_set_is_left_as_it_was(self):
+        """The new file takes the old one's permissions before anything is written; if that
+        fails, the temporary file is closed and removed, and the chapter stays as it was."""
+        from notterizmus.files import atomic_write
+        self.doc.save()
+        before = self.path.read_bytes()
+        fds = len(os.listdir("/proc/self/fd"))
+        with mock.patch("os.fchmod", side_effect=PermissionError(1, "Operation not permitted")), \
+                self.assertRaises(PermissionError), atomic_write(self.path) as f:
+            f.write("never written")
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(self.leftovers(), [], "no temporary file stays behind")
+        self.assertEqual(len(os.listdir("/proc/self/fd")), fds, "its file descriptor is closed")
+
     def test_binary_content_is_written_as_it_is(self):
         from notterizmus.files import atomic_write
         data = bytes(range(256))

@@ -133,8 +133,12 @@ is done.
   `files.remove_stale_temp`, run by `library.scan` and `backups.thin`. Tests:
   `AtomicCopiesTest` (test_backups), `StaleTempTest` (test_files), `ScanTest`
   (test_library); all but one failed first. Not released.
-- [ ] The failure paths get tests (REVIEW.md §4.9): `window_saving.py`'s save, backup and
+- [x] The failure paths get tests (REVIEW.md §4.9): `window_saving.py`'s save, backup and
   reload failures, and `files.py`'s clean-up on failure.
+  Done 2026-11-27: the tests of RV1–RV8 cover the save, backup and reload failures;
+  added `test_a_file_whose_permissions_cannot_be_set_is_left_as_it_was` (test_files) and
+  `test_reload_of_a_file_that_cannot_be_read_keeps_yours_and_says_why` (test_disk), both
+  for code that was already right, each checked to fail when its guard is taken out.
 
 ## Phase 2: Assessment practice follow-ups (M)
 
