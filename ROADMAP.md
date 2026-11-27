@@ -32,12 +32,15 @@ Sizes: **S** one focused change · **M** several changes across modules ·
 
 ## Where things stand
 
-As of 2026-11-26:
+As of 2026-11-27:
 
-- 1.8.1 was uploaded to the PPA on 2026-11-26, for Ubuntu 26.04 only: follow-ups to
-  assessment practice (R35): a button for each chapter's assessment in the chapter
-  list, scores in TopCoding's colors, and a resizable question list. Its build on
-  Launchpad is still to be confirmed.
+- 1.8.2 was uploaded to the PPA on 2026-11-27, for Ubuntu 26.04 only: data safety
+  (phase 1 of PLAN.md): a banner and retries when a save fails, a question before
+  closing with changes not saved, saving at logout and on signals, conflict copies,
+  and failures written to the journal. Its build on Launchpad is still to be confirmed.
+- 1.8.1 was uploaded the day before: follow-ups to assessment practice (R35): a button
+  for each chapter's assessment in the chapter list, scores in TopCoding's colors, and
+  a resizable question list.
 - 1.8.0 was uploaded the day before: assessment practice (R35), pastes that replace
   the selected text, and bullets after a numbered sub-item set apart.
 - 1.7.0 was on the PPA before it, built 2026-11-19 (its log shows the
