@@ -3,9 +3,10 @@ before anything reads the chapter from disk, Earlier Versions copies, and what t
 another program changed the file (CR10, R16), and closing when the chapter can't be
 saved (RV1 in PLAN.md).
 
-Uses the window's doc, editor, state, toast() and _is_guide(); keeps _save_src (the
-waiting autosave), _save_error (why the last save failed), _disk_dialog (the question
-about a change on disk), and _unsaved_dialog, _ask_unsaved_again, _copy_chooser, _aside
+Uses the window's doc, editor, state, toast(), _is_guide() and _update_title(); keeps
+_save_src (the waiting autosave), save_banner, _save_error, _save_failures and _retry_src
+(a save that failed: the banner and the retries, RV2), _disk_dialog (the question about a
+change on disk), and _unsaved_dialog, _ask_unsaved_again, _copy_chooser, _aside
 and _closing (closing when the chapter can't be saved)."""
 from __future__ import annotations
 
@@ -19,15 +20,55 @@ from ..model import Document
 from .helpers import notes_root
 
 
+RETRY_MAX = 60  # seconds between retries of a failed save, at most (RV2)
+
+
 def _why(error):
     """An OSError in words, without the file it names: that is a hidden temporary file."""
     return error.strerror or str(error)
 
 
 class WindowSaving:
+    def _build_save_banner(self):
+        """A banner that stays while the chapter isn't saved (RV2 in PLAN.md)."""
+        self.save_banner = Adw.Banner(button_label="Retry", use_markup=False)
+        self.save_banner.connect("button-clicked", lambda *_: self._retry_save())
+        return self.save_banner
+
     def _chapter_label(self, doc=None):
         doc = doc or self.doc
         return doc.chapter_title or f"Chapter {doc.chapter_no}"
+
+    def _saved_state(self, error):
+        """After a save: error is its OSError, or None when it worked. A failure shows the
+        banner, marks the title and retries after 2, 4, 8 … seconds, at most RETRY_MAX."""
+        was = self._save_error
+        self._save_error = error
+        if error is None:
+            self._save_failures = 0
+            if self._retry_src:
+                GLib.source_remove(self._retry_src)
+                self._retry_src = None
+            self.save_banner.set_revealed(False)
+        else:
+            self._save_failures += 1
+            self.save_banner.set_title(f"“{self._chapter_label()}” isn't saved: {_why(error)}. "
+                                       "Your edits are kept while the app is open.")
+            self.save_banner.set_revealed(True)
+            if self._retry_src:
+                GLib.source_remove(self._retry_src)
+            self._retry_src = GLib.timeout_add_seconds(min(RETRY_MAX, 2 ** self._save_failures),
+                                                       self._retry_save)
+        if (was is None) != (error is None) and self.doc is not None:
+            self._update_title()
+
+    def _retry_save(self):
+        if self._retry_src:
+            GLib.source_remove(self._retry_src)
+            self._retry_src = None
+        if self.doc is not None and self._save_error is not None:
+            self.save(quiet=True)
+        return False
 
     def _backup_folder(self):
         return backups.folder_for(self.doc.path, notes_root(), paths.backups_dir())
@@ -85,9 +126,11 @@ class WindowSaving:
         try:
             self.doc.save()
         except OSError as e:
-            self._save_error = e
-            self.toast(f"Save failed: {e}")
+            self._saved_state(e)
+            if not quiet:  # the banner says it for autosaves
+                self.toast(f"Save failed: {_why(e)}")
             return False
+        self._saved_state(None)
         if not quiet:
             self.toast("Saved")
         return True
@@ -180,6 +223,9 @@ class WindowSaving:
     def _close_now(self):
         """Close the window without trying to save again."""
         self._closing = True
+        if self._retry_src:
+            GLib.source_remove(self._retry_src)
+            self._retry_src = None
         self.close()
 
     def _write_aside(self):

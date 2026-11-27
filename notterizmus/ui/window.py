@@ -40,7 +40,9 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.doc = None
         self._save_src = None
         self._disk_dialog = None  # asking what to do about a chapter changed on disk (CR10)
-        self._save_error = None  # the OSError of the last save that failed
+        self._save_error = None  # the OSError of the last save that failed, until one works (RV2)
+        self._save_failures = 0  # failed saves in a row: how long until the next retry (RV2)
+        self._retry_src = None  # the retry after a failed save (RV2)
         self._unsaved_dialog = None  # asking what to do when the chapter can't be saved on close (RV1)
         self._ask_unsaved_again = False  # a Retry failed: ask again once the question has closed
         self._copy_chooser = None  # choosing where Save a Copy… writes it (RV1)
@@ -54,6 +56,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.toasts = Adw.ToastOverlay()
         tv = Adw.ToolbarView()
         tv.add_top_bar(self._build_header())
+        tv.add_top_bar(self._build_save_banner())
         self._build_editor(tv)
         tv.set_content(self._build_stack())
         self._build_sidebar(tv)
@@ -366,12 +369,15 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         else:
             title = f"Chapter {d.chapter_no}" + (f" — {d.chapter_title}" if d.chapter_title else "")
             subtitle = d.book
+        if self._save_error is not None:  # not saved (RV2)
+            title = f"• {title}"
         self.wtitle.set_title(title)
         self.wtitle.set_subtitle(subtitle)
         self.set_title(f"{title} · {APP_NAME}")
 
     def set_doc(self, doc):
         self._save_pending()  # the chapter being replaced (e.g. by New Chapter)
+        self._saved_state(None)  # the banner was about the chapter being replaced
         if self._disk_dialog is not None:  # a question about the chapter being replaced
             self._disk_dialog.force_close()
         self.doc = doc
@@ -415,6 +421,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         if self._save_src:
             GLib.source_remove(self._save_src)
             self._save_src = None
+        self._saved_state(None)  # the banner was about this chapter
         self.doc = None
         self.stack.set_visible_child_name("empty")
         for act in DOC_ACTIONS:

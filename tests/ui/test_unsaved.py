@@ -1,5 +1,6 @@
 """Closing the window when the chapter can't be saved (RV1 in PLAN.md, C1 in REVIEW.md):
 it used to close anyway, and everything typed since the last save that worked was lost."""
+import errno
 import os
 from pathlib import Path
 
@@ -120,3 +121,54 @@ class UnsavedOnCloseTest(ui.UITestCase):
         self.assertEqual(self.on_disk(), "Intro typed")
         self.assertIsNone(self.win.get_visible_dialog())
         self.assertEqual(self.aside(), [])
+
+
+class FailedAutosaveTest(ui.UITestCase):
+    """A failed autosave was a 3-second toast naming a hidden temporary file, and nothing
+    else (RV2 in PLAN.md, C2 in REVIEW.md); opening another chapter then dropped the edits
+    without a word (RV34)."""
+
+    def setUp(self):
+        super().setUp()
+        self.doc = ui.open_chapter([h("Intro")], title="Banner", book="Banner book")
+        self.path = Path(self.doc.path)
+        self.folder = self.path.parent
+        self.addCleanup(lambda: os.chmod(self.folder, 0o755))
+        self.toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: self.toasts.append(msg)
+        self.addCleanup(lambda: self.win.__dict__.pop("toast", None))
+
+    def on_disk(self, path=None):
+        return Document.load(path or self.path).root.children[0].text
+
+    def fail_autosave(self):
+        """Make the book folder read-only and type: the autosave fails."""
+        os.chmod(self.folder, 0o555)
+        ui.type_text(ui.focus(self.win.doc.root.children[0]).view, " typed")
+        ui.wait_for(lambda: self.win.save_banner.get_revealed(), "the banner")
+
+    def test_a_failed_autosave_shows_a_banner_and_marks_the_title(self):
+        self.fail_autosave()
+        title = self.win.save_banner.get_title()
+        self.assertIn("“Banner”", title)
+        self.assertIn(os.strerror(errno.EACCES), title, "the reason, in words")
+        self.assertNotIn(".tmp", title, "not the temporary file's name")
+        self.assertTrue(self.win.wtitle.get_title().startswith("• "))
+        self.assertTrue(self.win.get_title().startswith("• "))
+        self.assertEqual(self.toasts, [], "the banner says it; no toast as well")
+
+    def test_retry_saves_and_the_banner_and_the_mark_go(self):
+        self.fail_autosave()
+        os.chmod(self.folder, 0o755)
+        self.win.save_banner.emit("button-clicked")
+        self.assertEqual(self.on_disk(), "Intro typed")
+        self.assertFalse(self.win.save_banner.get_revealed())
+        self.assertFalse(self.win.wtitle.get_title().startswith("•"))
+        self.assertFalse(self.win.get_title().startswith("•"))
+
+    def test_it_retries_by_itself(self):
+        self.fail_autosave()
+        os.chmod(self.folder, 0o755)
+        ui.wait_for(lambda: not self.win.save_banner.get_revealed(), "a retry that works", timeout=15)
+        self.assertEqual(self.on_disk(), "Intro typed")
+

@@ -83,10 +83,12 @@ is done.
   Done 2026-11-27: `_on_close` and `_ask_unsaved` in `ui/window_saving.py`,
   `backups.keep_unsaved`, `paths.unsaved_dir()`. Tests: `tests/ui/test_unsaved.py` (8, all
   failed first), `UnsavedTest` in `tests/test_backups.py`. Not released.
-- [ ] **RV2 (C2)** A failed autosave is a 3-second toast. Keep a "not saved" state: an
+- [x] **RV2 (C2)** A failed autosave is a 3-second toast. Keep a "not saved" state: an
   `Adw.Banner` with the chapter's name, the reason (`e.strerror`, not the temporary
   file's name) and **Retry**; a "•" before the title; retries at growing intervals; the
   banner goes on the next save that works. UI test for each.
+  Done 2026-11-27: `_saved_state`, `save_banner` and `_retry_save` in
+  `ui/window_saving.py`; `FailedAutosaveTest` in `tests/ui/test_unsaved.py`. Not released.
 - [ ] **RV3 (C3)** Nothing is saved at logout, shutdown or SIGTERM, and the 800 ms
   debounce can wait for ever while you type. Save at most every 5 s while changes keep
   coming; `GLib.unix_signal_add` for SIGTERM, SIGINT and SIGHUP saves and quits;
