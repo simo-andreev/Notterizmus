@@ -496,6 +496,22 @@ class InterruptedChangeTest(ChaptersCase):
         self.assertEqual(Document.load(self.c).chapter_title, "C", "the chapter with that name is untouched")
 
 
+class ScanTest(unittest.TestCase):
+    def test_a_scan_removes_old_temporary_files_from_book_folders(self):
+        """(RV8 in PLAN.md) A crash in the middle of a save leaves one behind."""
+        import os
+        from notterizmus.library import scan
+        with tempfile.TemporaryDirectory() as root:
+            book = Path(root) / "Book"
+            book.mkdir()
+            Document.new("Book", 1, "One", book / "01 One.notz").save()
+            stale = book / ".0123456789ab.tmp"
+            stale.write_text("half")
+            os.utime(stale, (0, 0))
+            self.assertEqual([b.name for b in scan(root)], ["Book"])
+            self.assertFalse(stale.exists())
+
+
 class ConflictPathTest(unittest.TestCase):
     """Where this version of a chapter goes when the other one can't be kept (RV4 in PLAN.md)."""
 

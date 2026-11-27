@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .files import atomic_write
+from .files import atomic_write, remove_stale_temp
 
 BACKUP_EVERY = 600   # seconds between copies while editing
 # (copies younger than this, keep the newest per slot); slot None keeps every copy
@@ -94,7 +94,9 @@ def backup(chapter, folder, now=None, force=False, every=None):
     target = folder / _name(now)
     if target.exists():  # two copies in the same second: keep the first
         return None
-    shutil.copy2(chapter, target)
+    data = chapter.read_bytes()
+    with atomic_write(target, binary=True) as f:  # never a half-written copy (RV8)
+        f.write(data)
     thin(folder, now)
     return target
 
@@ -112,7 +114,8 @@ def keep(data, folder, now=None):
     while (folder / _name(now)).exists():
         now += timedelta(seconds=1)
     target = folder / _name(now)
-    target.write_bytes(data)
+    with atomic_write(target, binary=True) as f:  # never a half-written copy (RV8)
+        f.write(data)
     thin(folder, now)
     return target
 
@@ -139,6 +142,7 @@ def thin(folder, now=None):
     """Delete copies the tiers don't keep. Returns the number deleted. Ages are the time
     that really passed; slots are hours, days and weeks of local time."""
     now = _local(now)
+    remove_stale_temp(folder)  # a copy a crash interrupted (RV8)
     seen, gone = set(), 0
     for b in list_backups(folder):  # newest first, so each slot keeps its newest copy
         age = now - b.when

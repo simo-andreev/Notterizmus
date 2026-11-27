@@ -83,6 +83,39 @@ class SaveTest(unittest.TestCase):
         self.assertEqual(self.leftovers(), [])
 
 
+class StaleTempTest(unittest.TestCase):
+    """Temporary files left by a crash between writing and renaming them were never
+    removed (RV8 in PLAN.md, REVIEW.md §4.2)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.folder = Path(self.tmp.name)
+
+    def file(self, name, age_hours):
+        p = self.folder / name
+        p.write_text("x")
+        t = 1_800_000_000 - age_hours * 3600
+        os.utime(p, (t, t))
+        return p
+
+    def test_only_old_temporary_files_of_atomic_write_go(self):
+        from notterizmus.files import remove_stale_temp
+        self.file(".0123456789ab.tmp", 25)
+        self.file(".fedcba987654.tmp", 2)            # may be a save in progress
+        self.file(".moving-01-x.notz", 48)           # a renumbering's: restore_stranded() gives it back
+        self.file(".notes.tmp", 48)                  # not one of ours
+        self.file("01 Chapter.notz", 48)
+        gone = remove_stale_temp(self.folder, now=1_800_000_000)
+        self.assertEqual([p.name for p in gone], [".0123456789ab.tmp"])
+        self.assertEqual(sorted(p.name for p in self.folder.iterdir()),
+                         [".fedcba987654.tmp", ".moving-01-x.notz", ".notes.tmp", "01 Chapter.notz"])
+
+    def test_a_folder_that_cannot_be_read_is_no_error(self):
+        from notterizmus.files import remove_stale_temp
+        self.assertEqual(remove_stale_temp(self.folder / "missing"), [])
+
+
 class DiskChangeTest(unittest.TestCase):
     """A chapter notices when another program changed its file since it was read or
     written (a sync tool, a second machine), so autosave doesn't overwrite that version

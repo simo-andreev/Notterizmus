@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from .files import remove_stale_temp
 from .model import NAME_MAX, Document, chapter_filename, fit_name
 
 log = logging.getLogger(__name__)
@@ -48,13 +49,15 @@ def parse_name(stem):
 
 
 def scan(root):
-    """Books (folders with at least one chapter) sorted by name, chapters by number."""
+    """Books (folders with at least one chapter) sorted by name, chapters by number. Also
+    removes old temporary files a crash left in book folders."""
     try:
         folders = [d for d in Path(root).iterdir() if d.is_dir() and not d.name.startswith(".")]
     except OSError:
         return []
     books = []
     for d in folders:
+        remove_stale_temp(d)  # left by a save a crash interrupted (RV8)
         chapters = []
         for f in d.glob("*.notz"):
             if f.name.startswith(".") or not f.is_file():

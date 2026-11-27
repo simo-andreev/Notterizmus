@@ -3,12 +3,17 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import stat
+import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
+_TEMP = re.compile(r"^\.[0-9a-f]{12}\.tmp$")  # atomic_write's temporary files
+STALE_AFTER = 24 * 3600  # seconds: older temporary files were left by a crash, not a save in progress
 
 
 @contextmanager
@@ -69,3 +74,27 @@ def _sync_folder(folder):
         log.debug("can't sync the folder %s: %s", folder, e)
     finally:
         os.close(fd)
+
+
+def remove_stale_temp(folder, older_than=STALE_AFTER, now=None):
+    """Remove atomic_write's temporary files from folder that are older than older_than
+    seconds: a crash between writing one and renaming it leaves it behind (RV8 in
+    PLAN.md). Returns the files removed."""
+    now = time.time() if now is None else now
+    gone = []
+    try:
+        entries = list(Path(folder).iterdir())
+    except OSError as e:
+        log.debug("can't look for temporary files in %s: %s", folder, e)
+        return gone
+    for p in entries:
+        if not _TEMP.match(p.name):
+            continue
+        try:
+            if now - p.stat().st_mtime > older_than:
+                p.unlink()
+                gone.append(p)
+                log.info("removed %s, left by an interrupted save", p)
+        except OSError as e:
+            log.debug("can't remove %s: %s", p, e)
+    return gone

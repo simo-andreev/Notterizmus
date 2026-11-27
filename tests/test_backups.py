@@ -317,6 +317,46 @@ class SwapTest(unittest.TestCase):
         self.assertEqual([p.name for p in self.root.rglob(".*")], [], "nothing is left aside")
 
 
+class AtomicCopiesTest(unittest.TestCase):
+    """A copy was written in place (shutil.copy2, write_bytes): a crash halfway left a
+    truncated "newest" copy that Earlier Versions couldn't read (RV8 in PLAN.md)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.chapter = Path(self.tmp.name) / "01 Intro.notz"
+        self.chapter.write_text("v1", encoding="utf-8")
+        self.folder = Path(self.tmp.name) / "copies"
+
+    def failing_sync(self):
+        import errno
+        from unittest import mock
+        return mock.patch("os.fsync", side_effect=OSError(errno.ENOSPC, "No space left on device"))
+
+    def test_a_copy_reaches_the_disk_before_it_is_named_and_a_failure_leaves_none(self):
+        with self.failing_sync(), self.assertRaises(OSError):
+            backups.backup(self.chapter, self.folder, now=T0, force=True)
+        self.assertEqual(list(self.folder.iterdir()), [], "no copy, and no temporary file")
+
+    def test_a_kept_version_does_the_same(self):
+        with self.failing_sync(), self.assertRaises(OSError):
+            backups.keep(b"v2", self.folder, now=T0)
+        self.assertEqual(list(self.folder.iterdir()), [])
+
+    def test_copies_are_still_whole_and_listed(self):
+        backups.backup(self.chapter, self.folder, now=T0, force=True)
+        backups.keep(b"v2", self.folder, now=T0 + timedelta(minutes=1))
+        self.assertEqual([b.path.read_text() for b in backups.list_backups(self.folder)], ["v2", "v1"])
+
+    def test_thinning_removes_old_temporary_files_too(self):
+        backups.backup(self.chapter, self.folder, now=T0, force=True)
+        stale = self.folder / ".0123456789ab.tmp"
+        stale.write_text("half")
+        os.utime(stale, (0, 0))
+        backups.thin(self.folder, now=T0)
+        self.assertFalse(stale.exists())
+
+
 class UnsavedTest(unittest.TestCase):
     """A chapter that couldn't be saved where it belongs, written aside before the window
     may close without it (RV1 in PLAN.md)."""

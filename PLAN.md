@@ -126,9 +126,13 @@ is done.
   (debug where nothing is lost); `Window._versions_failed` toasts once a session. Tests:
   `tests/ui/test_logging.py` (4, all failed first), `tests/test_logs.py`, and one each in
   `test_completion` and `test_paths`. Not released.
-- [ ] **RV8** Backup copies written atomically (`files.atomic_write` in place of
+- [x] **RV8** Backup copies written atomically (`files.atomic_write` in place of
   `shutil.copy2` and `write_bytes` in `backups.py`), and stale `.<hex>.tmp` files older
   than a day removed from a book folder when it is scanned. Unit tests.
+  Done 2026-11-27: `backups.backup` and `keep` write through `atomic_write`;
+  `files.remove_stale_temp`, run by `library.scan` and `backups.thin`. Tests:
+  `AtomicCopiesTest` (test_backups), `StaleTempTest` (test_files), `ScanTest`
+  (test_library); all but one failed first. Not released.
 - [ ] The failure paths get tests (REVIEW.md §4.9): `window_saving.py`'s save, backup and
   reload failures, and `files.py`'s clean-up on failure.
 

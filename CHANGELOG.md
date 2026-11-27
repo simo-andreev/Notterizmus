@@ -9,6 +9,7 @@
 - **Keep Mine** no longer overwrites the other program's version when Earlier Versions can't keep it (a full or read-only data folder): yours is saved beside it as `NN Title (conflict YYYY-MM-DD).notz`, and the window goes on editing that file. **Reload** keeps yours the same way. Both used to say the other version was in Earlier Versions when it wasn't.
 - A renamed or renumbered chapter whose file can't be read back right after the change no longer raises an error and ends up saved twice, under its old name and its new one. The window follows it to its new name and says the file couldn't be read.
 - Failures that used to pass without a trace are logged to the journal (the app's standard error), and `NOTTERIZMUS_DEBUG=1` logs more. When Earlier Versions can't be written, the app also says so once a session; the copies used to stop without a word.
+- Earlier Versions copies are written in one step, like chapters, so a crash or power cut can't leave a half-written copy that Earlier Versions can't read. Temporary files left behind by a save that a crash interrupted are removed after a day.
 
 ## 1.8.1 — 2026-11-26
 
