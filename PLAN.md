@@ -31,7 +31,7 @@ TopCoding is tried in assignment 2522, chapter 999 only.
 | Phase | Theme | Items | Size | Release |
 |---|---|---|---|---|
 | 0 | With you: checks and decisions | 1.8.1 build, R32, decisions below | S | |
-| 1 | Data safety | RV1–RV8 | M | 1.8.2, at once |
+| 1 | Data safety | RV1–RV8, RV34 | M | 1.8.2, at once |
 | 2 | Assessment practice follow-ups | R35a–R35e | M | 1.9.0 |
 | 3 | Desktop basics and readable errors | RV6, RV9–RV15 | M | 1.9.0 |
 | 4 | Speed of large chapters and the chapter list | RV16–RV20, R15 | M | 1.10.0 |
@@ -89,6 +89,12 @@ is done.
   banner goes on the next save that works. UI test for each.
   Done 2026-11-27: `_saved_state`, `save_banner` and `_retry_save` in
   `ui/window_saving.py`; `FailedAutosaveTest` in `tests/ui/test_unsaved.py`. Not released.
+- [x] **RV34** (found while doing RV2) With the last autosave failed and none waiting,
+  opening another chapter dropped the edits silently: `_save_pending` only flushed a
+  waiting autosave. It now flushes while a save has failed too, and when that fails
+  `set_doc` writes the chapter to the unsaved folder and says where. Test:
+  `test_opening_another_chapter_writes_the_edits_aside_and_says_where` (failed first).
+  Done 2026-11-27, not released.
 - [ ] **RV3 (C3)** Nothing is saved at logout, shutdown or SIGTERM, and the 800 ms
   debounce can wait for ever while you type. Save at most every 5 s while changes keep
   coming; `GLib.unix_signal_add` for SIGTERM, SIGINT and SIGHUP saves and quits;

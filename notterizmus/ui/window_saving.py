@@ -84,19 +84,33 @@ class WindowSaving:
 
     def _flush_save(self):
         """Write the open chapter now: file operations read chapters from disk. Nothing
-        can wait for an answer here, so a version changed on disk goes to Earlier Versions."""
+        can wait for an answer here, so a version changed on disk goes to Earlier Versions.
+        Returns whether the chapter is on disk."""
         if self._save_src:
             GLib.source_remove(self._save_src)
             self._save_src = None
-        self.save(quiet=True, ask=False)
+        return self.save(quiet=True, ask=False)
 
     def _save_pending(self):
         """Write the open chapter now if an autosave is waiting: before another chapter
         replaces it, or the autosave would write that one instead and these edits would be
         lost (CR4 in CODE_REVIEW.md). An open question about a change on disk counts too:
-        an autosave asked it, so its edits aren't written yet."""
-        if self._save_src or self._disk_dialog is not None:
-            self._flush_save()
+        an autosave asked it, so its edits aren't written yet, and so does a save that
+        failed (RV34). Returns whether the chapter is on disk."""
+        if self._save_src or self._disk_dialog is not None or self._save_error is not None:
+            return self._flush_save()
+        return True
+
+    def _put_aside_before_leaving(self):
+        """The open chapter couldn't be saved and is about to be replaced: write it to the
+        unsaved folder and say where (RV34 in PLAN.md)."""
+        if self.doc is None:
+            return
+        label = self._chapter_label()
+        try:
+            self.toast(f"“{label}” couldn't be saved: your edits are in {self._write_aside()}")
+        except OSError as e:
+            self.toast(f"“{label}” couldn't be saved, nor kept elsewhere: {_why(e)}")
 
     def _schedule_save(self):
         if self._save_src:

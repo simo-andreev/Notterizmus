@@ -172,3 +172,13 @@ class FailedAutosaveTest(ui.UITestCase):
         ui.wait_for(lambda: not self.win.save_banner.get_revealed(), "a retry that works", timeout=15)
         self.assertEqual(self.on_disk(), "Intro typed")
 
+    def test_opening_another_chapter_writes_the_edits_aside_and_says_where(self):
+        self.fail_autosave()
+        other = ui.open_chapter([h("Other")], title="Other", book="Other book")
+        self.assertIs(self.win.doc, other)
+        folder = paths.unsaved_dir() / self.folder.name
+        aside = sorted(folder.glob(f"{self.path.stem} *.notz"))
+        self.assertEqual([Document.load(p).root.children[0].text for p in aside][-1:], ["Intro typed"])
+        self.assertTrue(any(str(aside[-1]) in t for t in self.toasts), self.toasts)
+        self.assertFalse(self.win.save_banner.get_revealed(), "the new chapter is saved")
+        self.assertFalse(self.win.wtitle.get_title().startswith("•"))

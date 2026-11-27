@@ -376,7 +376,8 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.set_title(f"{title} · {APP_NAME}")
 
     def set_doc(self, doc):
-        self._save_pending()  # the chapter being replaced (e.g. by New Chapter)
+        if not self._save_pending():  # the chapter being replaced (e.g. by New Chapter)
+            self._put_aside_before_leaving()
         self._saved_state(None)  # the banner was about the chapter being replaced
         if self._disk_dialog is not None:  # a question about the chapter being replaced
             self._disk_dialog.force_close()
