@@ -182,3 +182,33 @@ class FailedAutosaveTest(ui.UITestCase):
         self.assertTrue(any(str(aside[-1]) in t for t in self.toasts), self.toasts)
         self.assertFalse(self.win.save_banner.get_revealed(), "the new chapter is saved")
         self.assertFalse(self.win.wtitle.get_title().startswith("•"))
+
+
+class UnreadableAfterMoveTest(ui.UITestCase):
+    """A renamed or renumbered chapter is read back to update the window; when that read
+    failed, the error went into GTK, the window kept the old path, and the next autosave
+    wrote the chapter back under its old name: two files for one chapter (RV5 in PLAN.md,
+    C5 in REVIEW.md)."""
+
+    def setUp(self):
+        super().setUp()
+        self.doc = ui.open_chapter([h("Intro")], title="Moved", book="Moved book")
+        self.path = Path(self.doc.path)
+        self.toasts = []
+        self.win.toast = lambda msg, button=None, cb=None: self.toasts.append(msg)
+        self.addCleanup(lambda: self.win.__dict__.pop("toast", None))
+
+    def test_the_window_follows_the_chapter_and_says_it_could_not_read_it(self):
+        number = self.doc.chapter_no + 50
+        new = self.path.with_name(f"{number:02d} Renamed.notz")
+        self.path.rename(new)
+        new.write_text("{not json", encoding="utf-8")  # changed by something else in between
+        self.win._after_move({self.path: new})
+        self.assertEqual(Path(self.win.doc.path), new)
+        self.assertEqual((self.win.doc.chapter_no, self.win.doc.chapter_title), (number, "Renamed"),
+                         "the number and title from its new name")
+        self.assertTrue(any(new.name in t for t in self.toasts), self.toasts)
+        ui.type_text(ui.focus(self.win.doc.root.children[0]).view, " typed")
+        ui.wait_for(lambda: new.read_text(encoding="utf-8").startswith("{\n"), "the autosave, to the new name")
+        self.assertEqual(Document.load(new).root.children[0].text, "Intro typed")
+        self.assertFalse(self.path.exists(), "not written back under its old name")

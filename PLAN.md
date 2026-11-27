@@ -112,10 +112,13 @@ is done.
   the window goes on editing the conflict copy. Tests: `EarlierVersionsUnwritableTest` in
   `tests/ui/test_disk.py` (3, all failed first), `ConflictPathTest` in
   `tests/test_library.py`. Not released.
-- [ ] **RV5 (C5)** `_after_move` reads the moved chapter unguarded
+- [x] **RV5 (C5)** `_after_move` reads the moved chapter unguarded
   (`ui/window_chapters.py:292`). Catch `OSError` and `ValueError`, keep the new path
   anyway and show a toast. Correct CODE_REVIEW.md's CR27 entry, which says this was
   done. UI test.
+  Done 2026-11-27: the read in `_after_move` (`ui/window_chapters.py`) is guarded; CR27's
+  entry in CODE_REVIEW.md is corrected. Test: `UnreadableAfterMoveTest` in
+  `tests/ui/test_unsaved.py` (failed first). Not released.
 - [ ] **RV7** Logging: the `logging` module to stderr (journald), and the 13 silent
   `except …: pass` either log or, for backups (`_backup`, `backups.move`), log and show
   one toast per session that Earlier Versions isn't being kept.

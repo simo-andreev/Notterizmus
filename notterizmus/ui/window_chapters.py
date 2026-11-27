@@ -289,13 +289,26 @@ class WindowChapters:
         if self.doc and self.doc.path:
             new = next((n for o, n in moved.items() if library.same_file(o, self.doc.path)), None)
             if new is not None:
-                fresh = Document.load(new)
-                self.doc.path = Path(new)
-                self.doc.book, self.doc.chapter_no, self.doc.chapter_title = \
-                    fresh.book, fresh.chapter_no, fresh.chapter_title
+                new = Path(new)
+                try:
+                    fresh = Document.load(new)
+                    book, number, title = fresh.book, fresh.chapter_no, fresh.chapter_title
+                except (OSError, ValueError) as e:
+                    # Follow it anyway, or the next autosave would write the chapter back under
+                    # its old name, beside the moved one (RV5 in PLAN.md): the number and title
+                    # come from the new name, and the next save writes this version there.
+                    number, title = library.parse_name(new.stem)
+                    number = self.doc.chapter_no if number is None else number
+                    same_book = library.same_file(new.parent, Path(self.doc.path).parent)
+                    book = self.doc.book if same_book else library.book_name(new.parent)
+                    self.toast(f"“{new.name}” couldn't be read back after the change "
+                               f"({e.strerror if isinstance(e, OSError) and e.strerror else 'not a chapter file'}): "
+                               "this window's version will be saved there")
+                self.doc.path = new
+                self.doc.book, self.doc.chapter_no, self.doc.chapter_title = book, number, title
                 self.doc.remember_disk()  # written by the move, not by another program
                 self.state["last_file"] = str(new)
-                self.state["last_book"] = fresh.book
+                self.state["last_book"] = book
                 save_state(self.state)
                 self._update_title()
         self._reload_sidebar()

@@ -605,8 +605,9 @@ Done 2026-11-19, except the snap (CR30). Each fix has tests that failed before i
   with letters at the top level so does a single part, so the app's own labels still
   round-trip.
 - CR27: a file opened from outside this computer, the rules template, Undo's write-back,
-  a moved chapter that can't be read, a broken metainfo file and an `.aff` file with a
-  bare `SET` or an unknown encoding now give a toast or are skipped.
+  a broken metainfo file and an `.aff` file with a bare `SET` or an unknown encoding now
+  give a toast or are skipped. Correction (2026-11-27): a moved chapter that can't be read
+  was not guarded, as REVIEW.md found (C5); it is since RV5 in PLAN.md.
 - CR31: the narrower CSP (no frames, objects, forms; `img-src data: blob:` for pictures),
   download responses refused and downloads cancelled. Clipboard access stays on until
   copy and paste in the drawing window have been tried without it. WebKit's console
