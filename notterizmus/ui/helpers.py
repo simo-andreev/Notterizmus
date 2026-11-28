@@ -5,7 +5,7 @@ import logging
 import weakref
 from concurrent.futures import ThreadPoolExecutor
 
-from gi.repository import GLib
+from gi.repository import Gio, GLib
 
 from .. import paths, state
 
@@ -61,6 +61,32 @@ def notes_root():
 
 def assessments_root():
     return paths.assessments_dir(glib_documents=GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS))
+
+
+def trash_path(path):
+    """Move a file or folder to the Trash (GLib.Error if it can't be)."""
+    Gio.File.new_for_path(str(path)).trash(None)
+
+
+def restore_from_trash(path):
+    """Move the most recently trashed copy of path back. False if it can't be found."""
+    try:
+        trash = Gio.File.new_for_uri("trash:///")
+        found = None
+        it = trash.enumerate_children("standard::name,trash::orig-path,trash::deletion-date",
+                                      Gio.FileQueryInfoFlags.NONE, None)
+        for info in it:
+            if info.get_attribute_byte_string("trash::orig-path") == str(path):
+                date = info.get_attribute_string("trash::deletion-date") or ""
+                if found is None or date > found[0]:
+                    found = (date, it.get_child(info))
+        if found is None:
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        found[1].move(Gio.File.new_for_path(str(path)), Gio.FileCopyFlags.NONE, None, None, None)
+        return True
+    except GLib.Error:
+        return False
 
 
 class Worker:

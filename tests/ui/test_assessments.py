@@ -544,6 +544,64 @@ class AssessmentsTest(ui.UITestCase):
         self.assertFalse(hidden(1), "revealed in this attempt, which was saved")
         self.assertTrue(hidden(2))
 
+    def test_the_trash_button_moves_an_assessment_to_the_trash_and_undo_brings_it_back(self):
+        """R35c: a row's trash button moves the assessment's folder, its draft too, to the
+        Trash; Undo on the toast puts it back."""
+        from notterizmus.ui import assessments_window as module
+        trash = Path(self.tmp.name) / "Trash"
+        trash.mkdir()
+        saved = module.trash_path, module.restore_from_trash
+        self.addCleanup(lambda: setattr(module, "trash_path", saved[0]) or setattr(module, "restore_from_trash", saved[1]))
+
+        def to_trash(path):  # a stand-in Trash: the real one would show test files in Files
+            shutil.move(str(path), trash / Path(path).name)
+
+        def restore(path):
+            src = trash / Path(path).name
+            return src.exists() and bool(shutil.move(str(src), path))
+        module.trash_path, module.restore_from_trash = to_trash, restore
+
+        page = self.imported()
+        page.view.get_buffer().set_text("Token bucket")
+        self.saved(page)
+        folder = page.a.folder
+        self.aw.nav.pop_to_tag("list")
+        ui.wait_for(lambda: self.aw.page is None and self.aw.nav.find_page("practice") is None, "the list")
+        idle()
+        ui.wait_for(lambda: self.win.has_assessment(self.chapter), "the chapter to know its assessment")
+
+        def rows():
+            return [w for w in ui.walk(self.aw.prefs) if isinstance(w, ui.Adw.ActionRow)]
+        row = next(r for r in rows() if r.get_title() == "Design a Rate Limiter")
+        button = next(w for w in ui.walk(row) if isinstance(w, ui.Gtk.Button)
+                      and w.get_action_name() == "win.remove")
+        self.assertEqual((button.get_tooltip_text(), button.get_action_target_value().get_string()),
+                         ("Move to Trash", str(folder)))
+        self.real_clicks_here()
+        ui.real_click(button, button.get_width() / 2, button.get_height() / 2)
+        ui.wait_for(lambda: not folder.exists(), "the folder to go to the Trash")
+        idle()
+        self.assertTrue((trash / folder.name / "draft.json").exists(), "the draft goes with it")
+        ui.wait_for(lambda: self.aw.list_stack.get_visible_child_name() == "empty", "the list without it")
+        self.assertFalse(self.win.has_assessment(self.chapter))
+        self.assertIn("“Design a Rate Limiter” moved to Trash", self.toasts())
+
+        undo = next(w for w in ui.walk(self.aw.toasts) if isinstance(w, ui.Gtk.Button) and w.get_label() == "Undo")
+        ui.wait_for(lambda: undo.get_mapped() and ui.point_in(undo, self.aw)[1] + undo.get_height()
+                    <= self.aw.get_height(), "the toast inside the window")
+        for _ in range(60):  # and done sliding: where it was a frame before
+            at = ui.point_in(undo, self.aw)
+            ui.frames(1)
+            if ui.point_in(undo, self.aw) == at:
+                break
+        ui.real_click(undo, undo.get_width() / 2, undo.get_height() / 2)
+        ui.wait_for(lambda: folder.exists(), "the folder back from the Trash")
+        idle()
+        ui.wait_for(lambda: any(r.get_title() == "Design a Rate Limiter" for r in rows()), "the row back")
+        self.assertTrue(self.win.has_assessment(self.chapter))
+        self.aw.open_folder(folder)
+        self.assertEqual(self.text(self.page()), "Token bucket", "the draft back with it")
+
     def test_earlier_attempts_shows_each_answer_and_compares_it_with_the_sample(self):
         page = self.imported()
         page.view.get_buffer().set_text("first try")

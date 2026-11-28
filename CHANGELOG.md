@@ -4,6 +4,7 @@
 
 - Assessment answers are spell-checked as you type, in the language of the chapter the assessment goes with (the one chosen for it, or else by its text), with the same right-click suggestions, **Add to Dictionary** and **Ignore** as the notes. A replaced word comes back with Ctrl+Z, and **Check Spelling** in the main menu turns it off and on for both windows.
 - The question list shows what you did with each question in your last finished attempt, under its prompt: "Last time: 42 words" or "Last time: left blank", with "· revealed" if you revealed it. It never shows the original score or the sample answer: those still wait for **Reveal** in the attempt you're on.
+- The trash button on an assessment in the Assessments window moves it, with its drafts and attempts, to the Trash; **Undo** on the message brings it back. A folder the app can't read has the button too. You used to have to delete the folder in `.assessments` yourself.
 
 ## 1.8.2 — 2026-11-27
 

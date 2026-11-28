@@ -13,6 +13,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 from .. import assessments, backups, guide, library, paths
 from ..model import Document, chapter_filename
 from .helpers import WORKER, assessments_root, notes_root, run_once, save_state
+from .helpers import restore_from_trash as _restore_from_trash, trash_path as _trash_file
 
 
 class WindowChapters:
@@ -377,28 +378,3 @@ class WindowChapters:
         if reopen:
             self.open_path(path)
         self._reload_sidebar()
-
-
-def _trash_file(path):
-    Gio.File.new_for_path(str(path)).trash(None)
-
-
-def _restore_from_trash(path):
-    """Move the most recently trashed copy of path back. False if it can't be found."""
-    try:
-        trash = Gio.File.new_for_uri("trash:///")
-        found = None
-        it = trash.enumerate_children("standard::name,trash::orig-path,trash::deletion-date",
-                                      Gio.FileQueryInfoFlags.NONE, None)
-        for info in it:
-            if info.get_attribute_byte_string("trash::orig-path") == str(path):
-                date = info.get_attribute_string("trash::deletion-date") or ""
-                if found is None or date > found[0]:
-                    found = (date, it.get_child(info))
-        if found is None:
-            return False
-        path.parent.mkdir(parents=True, exist_ok=True)
-        found[1].move(Gio.File.new_for_path(str(path)), Gio.FileCopyFlags.NONE, None, None, None)
-        return True
-    except GLib.Error:
-        return False

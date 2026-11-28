@@ -118,8 +118,9 @@ Attempts**, where **Compare with Sample Answer** shows one beside the sample, an
 starts a blank attempt. The question list then shows, under each prompt, how many
 words you wrote last time (or that you left it blank), but not the score. A report
 downloaded before TopCoding graded it has no scores or feedback; import the graded
-download later and choose **Replace**: your drafts and attempts stay. Right-click a chapter in the list for **Practice Assessment** and
-**Import Assessment Report…**. The app reads only the downloaded file; it never
+download later and choose **Replace**: your drafts and attempts stay. The trash
+button on an assessment in the list moves it to the Trash, with **Undo**. Right-click
+a chapter in the list for **Practice Assessment** and **Import Assessment Report…**. The app reads only the downloaded file; it never
 contacts TopCoding and doesn't grade your practice answers.
 
 **Spelling.** The language button in the header bar (e.g. `EN-US`) switches
@@ -162,7 +163,7 @@ then the dictionary; on a misspelled word it lists fixes.
 | Earlier versions of each chapter (thinned with age, kept for good) | `~/.local/share/notterizmus/backups/<Book>/<NN> <Title>/` |
 | Warnings and errors (Earlier Versions or settings that couldn't be written, and the like) | The journal, as the app's standard error: `journalctl --user -g notterizmus`, or the terminal it was started from; `NOTTERIZMUS_DEBUG=1` logs more |
 | Edits that couldn't be saved (a read-only folder, a full disk), written here when the window closes or another chapter opens | `~/.local/share/notterizmus/unsaved/<Book>/<NN> <Title> <UTC time>Z.notz` |
-| Imported assessment reports and your practice on them: each report's `.txt` as downloaded, what was read from it and its chapter (`report.json`), the attempt in progress (`draft.json`) and finished attempts (`attempts/<UTC time>Z.json`) | `<Documents>/Notterizmus/.assessments/<title>_<completed>/` (hidden, so it isn't listed as a book; to remove an assessment, delete its folder) |
+| Imported assessment reports and your practice on them: each report's `.txt` as downloaded, what was read from it and its chapter (`report.json`), the attempt in progress (`draft.json`) and finished attempts (`attempts/<UTC time>Z.json`) | `<Documents>/Notterizmus/.assessments/<title>_<completed>/` (hidden, so it isn't listed as a book; the trash button in the Assessments window moves one to the Trash) |
 
 Rules cover numbering format per level, connector characters, spacing, spacer
 and blank lines, and your own bullet markers.

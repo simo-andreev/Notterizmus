@@ -184,7 +184,9 @@ def build(rules=None):
              key("F9"), " shows or hides the question list. Drag the edge of the list to make it wider.")),
           b("Finish Attempt keeps your answers in Earlier Attempts, where you can compare them with the sample "
             "answer, and starts a blank attempt. The question list then shows how many words you wrote for "
-            "each question last time, or that you left it unanswered, but not its score.")),
+            "each question last time, or that you left it blank, but not its score."),
+          b("The trash button on an assessment in the list moves it, with your attempts, to the Trash; Undo "
+            "brings it back.")),
 
         h("More",
           b((key("Ctrl+N"), " creates a chapter and ", key("Ctrl+O"), " opens one. Each chapter of a book is "

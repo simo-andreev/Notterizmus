@@ -7,7 +7,8 @@ main window closes it when it closes, so the app still quits as one, with the dr
 disk first.
 
 Files are read and written by helpers.WORKER, never on the main loop: listing, importing
-(read, parse, look for the same report, then write) and the practice page's saves."""
+(read, parse, look for the same report, then write), moving one to the Trash and back,
+and the practice page's saves."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,7 +20,7 @@ from .. import assessments as store, library
 from ..assessment_txt import Report
 from ..spell import Speller
 from .assessment_page import PracticePage
-from .helpers import WORKER, assessments_root, notes_root
+from .helpers import WORKER, assessments_root, notes_root, restore_from_trash, trash_path
 
 PRACTICE_ACTIONS = ("prev-question", "next-question", "sidebar", "finish", "attach", "attempts", "highlights")
 
@@ -64,6 +65,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         self.released = False
         self._discard = False   # close without saving: the user said so, after a save failed
         self._groups = []       # the list page's groups, to take away on the next listing
+        self._titles = {}       # the listed assessments' titles by folder, for the trash buttons' toasts
         self._handlers = []
 
         self.toasts = Adw.ToastOverlay()
@@ -128,6 +130,10 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         a = Gio.SimpleAction.new_stateful("highlights", None, GLib.Variant.new_boolean(True))
         a.connect("activate", lambda act, _p: self.set_highlights(not act.get_state().get_boolean()))
         self.add_action(a)
+        # A row's trash button: its folder to the Trash
+        a = Gio.SimpleAction.new("remove", GLib.VariantType.new("s"))
+        a.connect("activate", lambda _a, folder: self.remove(Path(folder.get_string())))
+        self.add_action(a)
 
     @property
     def highlights(self):
@@ -178,6 +184,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         t = Adw.Toast(title=msg, timeout=6 if button else 4, use_markup=False)  # titles and errors, not markup (CR8)
         if button:
             t.set_button_label(button)
+            t.set_priority(Adw.ToastPriority.HIGH)  # an Undo shows at once, not after the toasts before it
             t.connect("button-clicked", lambda *_: callback())
         self.toasts.add_toast(t)
         return t
@@ -196,6 +203,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         for g in self._groups:
             self.prefs.remove(g)
         self._groups = []
+        self._titles = {a.folder: a.report.title for a, _ch in resolved} | {f: f.name for f, _r in broken}
         books = {}
         for a, ch in resolved:
             books.setdefault(ch.path.parent.name if ch is not None else None, []).append((a, ch))
@@ -206,6 +214,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
             for a, ch in rows:
                 row = AssessmentRow(a, ch, title=a.report.title, subtitle=_row_subtitle(a, ch),
                                     activatable=True, use_markup=False)
+                row.add_suffix(_trash_button(a.folder, a.report.title))
                 row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
                 row.connect("activated", _row_activated)
                 group.add(row)
@@ -215,7 +224,9 @@ class AssessmentsWindow(Adw.ApplicationWindow):
                                          description="These folders in the assessments folder aren't assessments "
                                                      "this version can read.")
             for folder, reason in broken:
-                group.add(Adw.ActionRow(title=folder.name, subtitle=reason, use_markup=False))
+                row = Adw.ActionRow(title=folder.name, subtitle=reason, use_markup=False)
+                row.add_suffix(_trash_button(folder, folder.name))
+                group.add(row)
             self._add_group(group)
         self.list_stack.set_visible_child_name("list" if self._groups else "empty")
 
@@ -228,6 +239,39 @@ class AssessmentsWindow(Adw.ApplicationWindow):
             return
         self.list_stack.set_visible_child_name("empty")
         self.toast(f"Couldn't list the assessments: {getattr(error, 'strerror', None) or error}")
+
+    def remove(self, folder):
+        """A row's trash button: move the assessment's folder, its report, draft and
+        attempts, to the Trash, with Undo on the toast."""
+        if self.page is not None and self.page.a.folder == folder:
+            return  # the list is shown only once its page has gone
+        title = self._titles.get(folder, folder.name)
+        WORKER.run(lambda: trash_path(folder), done=lambda _r: self._removed(folder, title),
+                   failed=lambda e: self.released or self.toast(
+                       f"Couldn't move “{title}” to Trash: {getattr(e, 'message', None) or getattr(e, 'strerror', None) or e}"))
+
+    def _removed(self, folder, title):
+        if self.released:
+            return
+        self.toast(f"“{title}” moved to Trash", "Undo", lambda: self.restore(folder, title))
+        self.refresh()
+        self.assessments_changed()
+
+    def restore(self, folder, title):
+        """Undo on the toast: the folder back from the Trash."""
+        WORKER.run(lambda: _untrash(folder), done=lambda result: self._restored(folder, title, result),
+                   failed=lambda e: self.released or self.toast(
+                       f"Couldn't put “{title}” back: {getattr(e, 'strerror', None) or e}"))
+
+    def _restored(self, folder, title, result):
+        if self.released:
+            return
+        if result == "exists":
+            self.toast(f"{folder.name} exists again, so “{title}” was left in the Trash")
+        elif result == "missing":
+            self.toast(f"“{title}” wasn't found in the Trash")
+        self.refresh()
+        self.assessments_changed()
 
     def assessments_changed(self):
         """An import, a Replace, a finished attempt or a new link: the list and the main
@@ -529,6 +573,13 @@ def _replaced(imp, notes):
     return a, store.resolve(a.chapter, library.scan(notes), notes)
 
 
+def _untrash(folder):
+    """'restored', 'exists' (something is in its place again) or 'missing' (not in the Trash)."""
+    if folder.exists():
+        return "exists"
+    return "restored" if restore_from_trash(folder) else "missing"
+
+
 def _chapters(a, notes):
     books = library.scan(notes)
     return books, store.resolve(a.chapter, books, notes)
@@ -566,6 +617,15 @@ def _row_activated(row):
 def _dropped(target, value, _x, _y):
     win = target.get_widget().get_root()
     return isinstance(win, AssessmentsWindow) and win.drop_files(value.get_files())
+
+
+def _trash_button(folder, title):
+    """A row's button that moves its assessment (folder) to the Trash."""
+    button = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Move to Trash", valign=Gtk.Align.CENTER,
+                        css_classes=["flat"], action_name="win.remove",
+                        action_target=GLib.Variant.new_string(str(folder)))
+    button.update_property([Gtk.AccessibleProperty.LABEL], [f"Move “{title}” to Trash"])
+    return button
 
 
 # -- text ---------------------------------------------------------------------------------

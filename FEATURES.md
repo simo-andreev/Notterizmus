@@ -69,6 +69,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Revealed scores show in the question list and on the revealed answer in TopCoding's colors: green from 0.8, amber from 0.5, red below, which includes an unanswered question (it scores 0); an ungraded one has none. The original score at the top is colored by its percentage, as on TopCoding: green from 80%, amber from 65%, red below. The score is always written as well, and the colors are readable in light and dark. The color button in the header bar turns them off until the window opens again.
 - Answers are saved as you type (800 ms after you stop), in the background. **Finish Attempt** keeps the attempt and starts a blank one; **Earlier Attempts** shows each attempt's answer, read-only, beside the sample answer if you like.
 - Importing the same report again (same title and completion time) asks: **Skip**, or **Replace**, which keeps your drafts and attempts, so the graded download can follow an ungraded one.
+- The trash button on an assessment in the list moves it, with its drafts and attempts, to the Trash, and **Undo** on the message brings it back; a folder that can't be read has one too.
 - Everything is kept in a hidden `.assessments` folder in your notes folder, written in one step so a crash can't leave a half-written file; a draft another computer changed (through a sync tool) is kept as an attempt rather than overwritten.
 
 ## Files and desktop

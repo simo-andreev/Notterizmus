@@ -166,8 +166,14 @@ What you asked for on 2026-11-26 first.
   `tests/test_assessments.py`, and in `tests/ui/test_assessments.py`
   `test_the_list_shows_your_last_attempt_and_the_original_score_stays_hidden_until_reveal`.
   Not released.
-- [ ] **R35c** Remove an assessment from the app: a row action that moves its folder in
+- [x] **R35c** Remove an assessment from the app: a row action that moves its folder in
   `.assessments` to the Trash, with Undo. UI test.
+  Done 2026-11-28: a trash button on each row, unreadable folders' too (`win.remove`,
+  `AssessmentsWindow.remove`/`restore`, on WORKER); the Trash helpers moved from
+  `window_chapters.py` to `helpers.trash_path`/`restore_from_trash`; a toast with Undo
+  shows at once instead of after earlier toasts. Test:
+  `test_the_trash_button_moves_an_assessment_to_the_trash_and_undo_brings_it_back` in
+  `tests/ui/test_assessments.py`, real clicks, with a stand-in Trash.
 - [ ] **R35d** A key of its own for the assessments window, in `commands.COMMANDS`,
   README, FEATURES, the guide and the Shortcuts dialog.
 - [ ] **R35e** Drafts edited on two computers: merge per question (the newer text of each
