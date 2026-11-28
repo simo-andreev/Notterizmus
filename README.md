@@ -2,7 +2,7 @@
 
 &nbsp;
 
-# Notterizmus 1.8
+# Notterizmus 1.9
 
 A GNOME outline editor for book chapter notes. Numbering (`Ⅱ.1.a)`) and tree
 connectors (`├ └ │`) are generated as you type, and **Copy for TopCoding** puts

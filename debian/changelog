@@ -1,3 +1,13 @@
+notterizmus (1.9.0) resolute; urgency=medium
+
+  * Spell-check assessment answers.
+  * Show the last attempt in the question list.
+  * Move an assessment to the Trash from its row, with Undo.
+  * Open the Assessments window with Ctrl+Shift+T.
+  * Merge drafts changed on two computers question by question.
+
+ -- Simo Andreev <simeon.zlatanov.andreev@pm.me>  Sat, 28 Nov 2026 16:21:31 +0200
+
 notterizmus (1.8.2) resolute; urgency=medium
 
   * Keep the window open and write the edits aside when the last save

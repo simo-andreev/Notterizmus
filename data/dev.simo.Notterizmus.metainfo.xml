@@ -36,6 +36,18 @@
   <url type="homepage">https://launchpad.net/~simeonandreev/+archive/ubuntu/ppa-library</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.9.0" date="2026-11-28">
+      <description>
+        <p>Assessment practice: spell checking, your last attempt in the question list, a key of its own, and drafts merged across computers.</p>
+        <ul>
+          <li>Assessment answers are spell-checked as you type, in the chapter's language, with the same suggestions, Add to Dictionary and Ignore as the notes.</li>
+          <li>The question list shows what you did with each question in your last finished attempt: how many words, or left blank.</li>
+          <li>The trash button on an assessment moves it, with its drafts and attempts, to the Trash; Undo brings it back.</li>
+          <li>Ctrl+Shift+T opens the Assessments window.</li>
+          <li>A practice draft changed on two computers is merged question by question; an answer set aside goes to Earlier Attempts.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.8.2" date="2026-11-27">
       <description>
         <p>Your notes are kept when they can't be saved, and saved when the app is ended rather than closed.</p>
