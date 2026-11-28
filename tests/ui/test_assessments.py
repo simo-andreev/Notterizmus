@@ -712,6 +712,25 @@ class AssessmentsTest(ui.UITestCase):
         ui.wait_for(lambda: self.win._assessments is None, "the Assessments window to close")
         ui.pointer_to(self.win)
 
+    def test_ctrl_shift_t_opens_the_assessments_window_from_an_item_being_edited(self):
+        """R35d: a key of its own, which the outline editor (whose Ctrl+A takes Shift too)
+        leaves to the window; on a chapter with an assessment it opens that."""
+        from notterizmus.commands import command
+        self.imported()  # goes with chapter 3
+        ui.wait_for(lambda: self.win.has_assessment(self.chapter), "the chapter to know its assessment")
+        self.close_for_real_clicks()
+        self.aw = None
+        self.win.open_path(self.chapter)
+        ui.settle()
+        ui.focus(self.win.doc.root.children[0])
+        ui._watch_input(self.win)
+        ui.real_key("t", ctrl=True, shift=True)
+        ui.wait_for(lambda: self.win._assessments is not None, "the Assessments window")
+        self.aw = self.win._assessments
+        ui._watch_input(self.aw)
+        self.assertEqual(self.page().a.report.title, "Design a Rate Limiter")
+        self.assertEqual(command("win.assessments").key, "<Ctrl><Shift>t")
+
     def test_a_chapter_without_an_assessment_imports_one_for_itself_from_its_button(self):
         """The import goes with the chapter whose button it came from, without asking,
         though the report's title matches another chapter; then the report opens."""

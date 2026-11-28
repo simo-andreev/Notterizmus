@@ -93,7 +93,8 @@ COMMANDS = (
     Spec("Next Chapter", "win.next-chapter", "Chapter", "forward book", ("<Ctrl>Page_Down",), needs="book"),
     Spec("Chapter Properties…", "win.rename", "Chapter", "rename number title move book", ("F2",), needs="book"),
     Spec("Earlier Versions…", "win.versions", "Chapter", "backup restore history undo", needs="book"),
-    Spec("Assessments…", "win.assessments", "Assessment", "topcoding practice test quiz exam report attempt"),
+    Spec("Assessments…", "win.assessments", "Assessment", "topcoding practice test quiz exam report attempt",
+         ("<Ctrl><Shift>t",)),
     Spec("Import Assessment Report…", "win.import-assessment", "Assessment", "topcoding txt download practice"),
     Spec("Copy for TopCoding", "win.copy", "Chapter", "export html paste clipboard", ("<Ctrl><Shift>c",)),
     Spec("Show Plain Text", "win.show-plain", "Chapter", "export preview"),
@@ -214,6 +215,7 @@ SHORTCUTS = (
         ("Copy for TopCoding", ("win.copy",)),
     ]),
     ("Assessments window", [
+        ("Open it (the open chapter's assessment, if it has one)", ("win.assessments",)),
         ("Previous / next question", ("<Ctrl>Page_Up", "<Ctrl>Page_Down")),
         ("Show or hide the question list", ("F9",)),
     ]),

@@ -174,8 +174,12 @@ What you asked for on 2026-11-26 first.
   shows at once instead of after earlier toasts. Test:
   `test_the_trash_button_moves_an_assessment_to_the_trash_and_undo_brings_it_back` in
   `tests/ui/test_assessments.py`, real clicks, with a stand-in Trash.
-- [ ] **R35d** A key of its own for the assessments window, in `commands.COMMANDS`,
+- [x] **R35d** A key of its own for the assessments window, in `commands.COMMANDS`,
   README, FEATURES, the guide and the Shortcuts dialog.
+  Done 2026-11-28: Ctrl+Shift+T (Ctrl+Shift+A is the editor's Select All, which takes
+  Shift+A too); in the Shortcuts dialog's "Assessments window" section. Test:
+  `test_ctrl_shift_t_opens_the_assessments_window_from_an_item_being_edited` in
+  `tests/ui/test_assessments.py`, a real key press.
 - [ ] **R35e** Drafts edited on two computers: merge per question (the newer text of each
   question wins, the other goes to the attempts) instead of keeping the whole other
   draft as an attempt. Unit test in `tests/test_assessments.py`.

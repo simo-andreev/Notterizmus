@@ -80,7 +80,7 @@ walks through the controls; each time you open it, it starts fresh.
 | In the chapter list: reorder, move to Trash, more | drag, or Alt+↑ / Alt+↓; Delete; right-click |
 | Resize the chapter list (double-click the edge for the default width) | drag the edge between the list and the text |
 | Getting Started: a practice chapter that shows the controls | F1 |
-| Practice a TopCoding assessment: import its report, answer from memory, then reveal | menu → **Assessments…** (see below) |
+| Practice a TopCoding assessment: import its report, answer from memory, then reveal | menu → **Assessments…** or Ctrl+Shift+T (see below) |
 | In the Assessments window: previous / next question; show or hide the question list | Ctrl+PgUp / Ctrl+PgDn; F9 |
 | Search every command by name (each shows its key) | Ctrl+Shift+P |
 | All shortcuts | Ctrl+? |

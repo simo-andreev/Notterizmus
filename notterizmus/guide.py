@@ -172,6 +172,7 @@ def build(rules=None):
             "the file in and asks which chapter it goes with; you can also drop the file on the Assessments "
             "window. The button at the end of a chapter in the chapter list opens its assessment or, if it has "
             "none, imports one for that chapter without asking."),
+          b((key("Ctrl+Shift+T"), " opens the Assessments window, at this chapter's assessment if it has one.")),
           b("Each question starts with a blank answer, to write from memory. Reveal shows the answer you gave, "
             "its score, the sample answer and the feedback; Load My Original Answer puts your answer in the "
             "editor. Answers are saved as you type, and checked for spelling in the chapter's language: "
