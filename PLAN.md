@@ -144,11 +144,12 @@ is done.
 
 What you asked for on 2026-11-26 first.
 
-- [ ] **R35a** Spell checking in the answer editor: the editor's `richtext.Spelling`, in
-  the chapter's language, with the same right-click suggestions. UI test.
-- [ ] **R35b** The last score next to each question in the list, from your last finished
-  attempt, without revealing the sample answer or the original score. UI test that the
-  original score stays hidden until Reveal.
+- [ ] **R35a** Spell checking in the answer editor (asked again 2026-11-26): the editor's
+  `richtext.Spelling`, in the chapter's language, with the same right-click suggestions.
+  UI test.
+- [ ] **R35b** The last score next to each question in the list (asked 2026-11-26), from
+  your last finished attempt, without revealing the sample answer or the original score.
+  UI test that the original score stays hidden until Reveal.
 - [ ] **R35c** Remove an assessment from the app: a row action that moves its folder in
   `.assessments` to the Trash, with Undo. UI test.
 - [ ] **R35d** A key of its own for the assessments window, in `commands.COMMANDS`,
