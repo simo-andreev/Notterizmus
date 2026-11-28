@@ -275,6 +275,19 @@ class FinishTest(StoreTest):
             store.read_attempt(listed[0].path)
         self.assertEqual(store.read_attempt(listed[1].path).answer(1).text, "10")
 
+    def test_the_last_attempt_is_the_newest_you_finished_that_can_be_read(self):
+        """For the question list's "Last time" line (R35b)."""
+        a = self.add()
+        self.assertIsNone(store.last_attempt(a))
+        store.finish(a, Attempt(answers={1: Answer("older")}), now=NOW)
+        store.finish(a, Attempt(answers={1: Answer("newer"), 2: Answer(revealed=True)}), now=NOW + timedelta(minutes=5))
+        theirs = Attempt(answers={1: Answer("from the laptop")}, origin=store.ELSEWHERE, finished=NOW + timedelta(minutes=8))
+        (a.folder / "attempts" / "2026-11-25T12-08-00Z.json").write_text(json.dumps(theirs.to_json()), encoding="utf-8")
+        (a.folder / "attempts" / "2026-11-25T12-09-00Z.json").write_text("{broken", encoding="utf-8")
+        last = store.last_attempt(a)
+        self.assertEqual(last.answers, {1: Answer("newer"), 2: Answer(revealed=True)})
+        self.assertEqual(last.finished, NOW + timedelta(minutes=5))
+
     def test_two_attempts_finished_in_the_same_second_are_both_kept(self):
         a = self.add()
         first, _ = store.finish(a, Attempt(answers={1: Answer("one")}), now=NOW)

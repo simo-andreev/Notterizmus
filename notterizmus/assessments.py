@@ -489,6 +489,19 @@ def read_attempt(path):
     return Attempt.from_json(_read_json(path))
 
 
+def last_attempt(a):
+    """The attempt you finished last, or None: the newest one that can be read, leaving
+    out drafts kept from another computer (ELSEWHERE), which you didn't finish here."""
+    for f in list_attempts(a):
+        try:
+            attempt = read_attempt(f.path)
+        except (OSError, ValueError):
+            continue
+        if attempt.origin != ELSEWHERE:
+            return attempt
+    return None
+
+
 def _attempt_names(folder):
     try:
         names = os.listdir(Path(folder) / ATTEMPTS)

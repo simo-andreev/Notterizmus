@@ -115,9 +115,10 @@ top by its percentage (green from 80%, amber from 65%); the color button in the
 header bar turns the colors off, and the scores stay. Drag the list's edge to make
 it wider. Answers are saved as you type. **Finish Attempt** keeps them in **Earlier
 Attempts**, where **Compare with Sample Answer** shows one beside the sample, and
-starts a blank attempt. A report downloaded before TopCoding graded it has no scores
-or feedback; import the graded download later and choose **Replace**: your drafts
-and attempts stay. Right-click a chapter in the list for **Practice Assessment** and
+starts a blank attempt. The question list then shows, under each prompt, how many
+words you wrote last time (or that you left it blank), but not the score. A report
+downloaded before TopCoding graded it has no scores or feedback; import the graded
+download later and choose **Replace**: your drafts and attempts stay. Right-click a chapter in the list for **Practice Assessment** and
 **Import Assessment Report…**. The app reads only the downloaded file; it never
 contacts TopCoding and doesn't grade your practice answers.
 

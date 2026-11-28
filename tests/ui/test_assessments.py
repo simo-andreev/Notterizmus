@@ -495,6 +495,55 @@ class AssessmentsTest(ui.UITestCase):
         self.assertFalse(page.rows[1].drafted.get_visible())
         self.assertFalse(self.aw.lookup_action("finish").get_enabled(), "nothing to finish yet")
 
+    def test_the_list_shows_your_last_attempt_and_the_original_score_stays_hidden_until_reveal(self):
+        """R35b: what you did with each question last time, never its original score or the
+        sample answer until you reveal it in this attempt."""
+        page = self.imported()
+
+        def row_labels(n):
+            return labels(page.rows[n])[1:]  # after its number
+
+        def hidden(n):
+            q = page.questions[n]
+            return not page.rows[n].score.get_visible() and q.sample not in row_labels(n) \
+                and q.score.got not in row_labels(n) and "original score" not in page.rows[n].get_tooltip_text()
+
+        self.assertFalse(any(r.last.get_visible() for r in page.rows.values()), "no attempt finished yet")
+        page.view.get_buffer().set_text("Token bucket refills at a fixed rate")
+        page.show_question(2)
+        page.reveal_btn.set_active(True)
+        self.assertFalse(hidden(2), "revealed in this attempt: its score shows")
+        self.saved(page)
+        self.aw.lookup_action("finish").activate(None)
+        self.respond("finish")
+        ui.wait_for(lambda: self.text(page) == "" and page.get_sensitive(), "a blank attempt")
+
+        self.assertEqual(page.rows[1].last.get_label(), "Last time: 7 words")
+        self.assertEqual(page.rows[2].last.get_label(), "Last time: left blank · revealed")
+        self.assertEqual(page.rows[3].last.get_label(), "Last time: left blank")
+        self.assertIn("last time: 7 words", page.rows[1].get_tooltip_text())
+        for n in (1, 2, 3):
+            self.assertTrue(hidden(n), f"question {n}: the new attempt hides it again")
+        self.assertFalse(page.revealer.get_reveal_child())
+
+        page.show_question(1)
+        page.reveal_btn.set_active(True)
+        ui.wait_for(lambda: not hidden(1), "Reveal shows question 1's score")
+        self.assertEqual(page.rows[1].score.get_label(), page.questions[1].score.got)
+        self.assertTrue(hidden(2))
+
+        # Opened again, the last attempt is read from its file
+        folder = page.a.folder
+        self.aw.nav.pop_to_tag("list")
+        ui.wait_for(lambda: self.aw.nav.find_page("practice") is None, "the page to be gone")
+        idle()
+        self.aw.open_folder(folder)
+        page = self.page()
+        ui.wait_for(lambda: page.rows[1].last.get_label() == "Last time: 7 words", "the last attempt read again")
+        self.assertEqual(page.rows[2].last.get_label(), "Last time: left blank · revealed")
+        self.assertFalse(hidden(1), "revealed in this attempt, which was saved")
+        self.assertTrue(hidden(2))
+
     def test_earlier_attempts_shows_each_answer_and_compares_it_with_the_sample(self):
         page = self.imported()
         page.view.get_buffer().set_text("first try")

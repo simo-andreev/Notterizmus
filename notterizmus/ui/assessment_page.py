@@ -193,22 +193,33 @@ class AnswerView(Gtk.TextView):
 
 class QuestionRow(Gtk.ListBoxRow):
     """A question in the list: its number, its prompt, icons for what you did with it in
-    this attempt (answered it, revealed it) and, once revealed, its original score."""
+    this attempt (answered it, revealed it), once revealed its original score, and under
+    the prompt what you did with it in your last finished attempt (set_last)."""
 
     def __init__(self, question, **props):
         super().__init__(**props)
         self.number = question.number
         box = Gtk.Box(spacing=8, margin_top=4, margin_bottom=4)
-        num = Gtk.Label(label=str(question.number), width_chars=2, xalign=1, css_classes=["dim-label", "numeric"])
-        prompt = Gtk.Label(label=" ".join(question.prompt.split()), xalign=0, hexpand=True,
-                           ellipsize=Pango.EllipsizeMode.END)
+        num = Gtk.Label(label=str(question.number), width_chars=2, xalign=1, valign=Gtk.Align.START,
+                        css_classes=["dim-label", "numeric"])
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
+        text.append(Gtk.Label(label=" ".join(question.prompt.split()), xalign=0, ellipsize=Pango.EllipsizeMode.END))
+        self.last = Gtk.Label(xalign=0, visible=False, ellipsize=Pango.EllipsizeMode.END,
+                              css_classes=["dim-label", "caption", "numeric"])
+        text.append(self.last)
         self.drafted = Gtk.Image(icon_name="document-edit-symbolic", visible=False)
         self.revealed = Gtk.Image(icon_name="view-reveal-symbolic", visible=False)
         self.score = Gtk.Label(visible=False, css_classes=["numeric"])
-        for w in (num, prompt, self.drafted, self.revealed, self.score):
+        for w in (num, text, self.drafted, self.revealed, self.score):
             box.append(w)
         self.set_child(box)
         self.set_state(False, False)
+
+    def set_last(self, text):
+        """What you did with the question in your last finished attempt ("Last time: 42
+        words"), or None without one. Set before set_state, which says it too."""
+        self.last.set_label(text or "")
+        self.last.set_visible(text is not None)
 
     def set_state(self, drafted, revealed, score=None, highlight=True):
         """score: the original score (None if ungraded), shown once the question is
@@ -221,7 +232,8 @@ class QuestionRow(Gtk.ListBoxRow):
         self.score.set_label((score.got if score.maximum == 1 else str(score)) if shown else "")
         _show_result(self.score, store.result_category(score) if shown and highlight else None)
         state = ("drafted" if drafted else "unanswered") + (", revealed" if revealed else "") \
-            + (f", original score {score}" if shown else "")
+            + (f", original score {score}" if shown else "") \
+            + (f"; {self.last.get_label().lower()}" if self.last.get_visible() else "")
         self.set_tooltip_text(f"Question {self.number}: {state}")
         self.update_property([Gtk.AccessibleProperty.DESCRIPTION], [state])
 
@@ -241,6 +253,7 @@ class PracticePage(Adw.NavigationPage):
         self.numbers = [q.number for q in assessment.report.questions]
         self.file = DraftFile(assessment)
         self.attempt = None   # the attempt in progress, once its draft is read
+        self.last = None      # the attempt you finished last (store.last_attempt), if any
         self.buffers = {}     # {question number: DraftBuffer}, made as each question is shown
         self.current = None   # the question shown
         self.shown = set()    # questions whose details are shown now (they are revealed for good)
@@ -279,6 +292,8 @@ class PracticePage(Adw.NavigationPage):
         self.set_report(assessment)
         self.set_chapter(chapter)
         WORKER.run(self.file.read, done=self._loaded, failed=self._load_failed)
+        WORKER.run(lambda a=assessment: store.last_attempt(a), done=self._last_found,
+                   failed=lambda _e: None)  # (unreadable attempts are left out: none to show)
 
     # -- building ---------------------------------------------------------------------
 
@@ -481,6 +496,13 @@ class PracticePage(Adw.NavigationPage):
         self._update_progress()
         self.win.update_actions()
 
+    def _last_found(self, attempt):
+        if self.released:
+            return
+        self.last = attempt
+        for n in self.rows:
+            self._update_row(n)
+
     def _load_failed(self, error):
         if self.released:
             return
@@ -635,13 +657,16 @@ class PracticePage(Adw.NavigationPage):
         snapshot = self._snapshot()
         self._dirty = self._again = False
         self.set_sensitive(False)  # nothing typed now would be in either attempt
-        WORKER.run(lambda f=self.file, s=snapshot: f.finish(s), done=self._finished, failed=self._finish_failed)
+        WORKER.run(lambda f=self.file, s=snapshot: f.finish(s),
+                   done=lambda result, s=snapshot: self._finished(result, s), failed=self._finish_failed)
 
-    def _finished(self, result):
+    def _finished(self, result, attempt):
+        """attempt: the one just finished, now the last (the list shows it)."""
         _path, kept = result
         if self.released:
             return
         self.set_sensitive(True)
+        self.last = attempt
         self.a.attempts += 1
         self.a.has_draft = False
         self.attempt = Attempt()
@@ -786,6 +811,7 @@ class PracticePage(Adw.NavigationPage):
         else:
             self._drafted.discard(number)
         q = self.questions.get(number)
+        self.rows[number].set_last(_last_label(self.last, number))
         self.rows[number].set_state(drafted, self.attempt.answer(number).revealed, q.score if q else None,
                                     self.win.highlights)
 
@@ -912,6 +938,17 @@ def _reveal_toggled(button):
     page = _page(button)
     if page is not None and page.current is not None and button.get_active() != (page.current in page.shown):
         page.toggle_details(button.get_active())
+
+
+def _last_label(attempt, number):
+    """What you did with question `number` in attempt (your last finished one): its
+    answer's length, not its text, and no score (the app doesn't grade). None without one."""
+    if attempt is None:
+        return None
+    answer = attempt.answer(number)
+    words = store.count_words(answer.text) if answer.text.strip() else 0
+    did = f"{words} word{'s' if words != 1 else ''}" if words else "left blank"
+    return f"Last time: {did}" + (" · revealed" if answer.revealed else "")
 
 
 def _language_hints(path, own):

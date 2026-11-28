@@ -154,9 +154,18 @@ What you asked for on 2026-11-26 first.
   language chosen for the chapter reach it (`AssessmentsWindow.set_spelling`,
   `language_chosen`). Tests: two in `tests/ui/test_assessments.py` (a real right-click),
   `PickLanguageTest` in `tests/test_spell.py`. Not released.
-- [ ] **R35b** The last score next to each question in the list (asked 2026-11-26), from
+- [x] **R35b** The last score next to each question in the list (asked 2026-11-26), from
   your last finished attempt, without revealing the sample answer or the original score.
   UI test that the original score stays hidden until Reveal.
+  Done 2026-11-28, without a score (asked 2026-11-28: attempts have none, as the app
+  doesn't grade): each row says under its prompt what you did last time, "Last time: 42
+  words" or "Last time: left blank", and "· revealed". `store.last_attempt` (the newest
+  readable attempt, not one kept from another computer), `QuestionRow.set_last`,
+  `assessment_page._last_label`. Tests:
+  `test_the_last_attempt_is_the_newest_you_finished_that_can_be_read` in
+  `tests/test_assessments.py`, and in `tests/ui/test_assessments.py`
+  `test_the_list_shows_your_last_attempt_and_the_original_score_stays_hidden_until_reveal`.
+  Not released.
 - [ ] **R35c** Remove an assessment from the app: a row action that moves its folder in
   `.assessments` to the Trash, with Undo. UI test.
 - [ ] **R35d** A key of its own for the assessments window, in `commands.COMMANDS`,
