@@ -215,6 +215,106 @@ class AssessmentsTest(ui.UITestCase):
         self.assertTrue(page.rows[1].drafted.get_visible())
         self.assertEqual(page.progress_label.get_label(), "Practice attempt 1 · 1 of 19 drafted · 0 revealed")
 
+    # -- spelling (R35a) -----------------------------------------------------------------
+
+    def chapter_in(self, lang, text=None):
+        """The assessment's chapter, its spelling language set to lang (None: not chosen)
+        and, if given, with this text; put back as it was when the test ends."""
+        from notterizmus.guide import h
+        before = self.chapter.read_bytes()
+        self.addCleanup(self.chapter.write_bytes, before)
+        doc = Document.load(self.chapter)
+        doc.lang = lang
+        if text is not None:
+            doc.root.children = [h(text)]
+        doc.save()
+
+    def underlined(self, view):
+        """The words underlined as misspelled in the answer's editor."""
+        buf = view.get_buffer()
+        text = buf.get_text(*buf.get_bounds(), False)
+        it, words = buf.get_start_iter(), []
+        while it.starts_tag(buf.tag_spell) or it.forward_to_tag_toggle(buf.tag_spell):
+            end = it.copy()
+            end.forward_to_tag_toggle(buf.tag_spell)
+            words.append(text[it.get_offset():end.get_offset()])
+            it = end
+        return words
+
+    def needs(self, lang):
+        if lang not in self.aw.languages:
+            self.skipTest(f"no {lang} dictionary")
+
+    def test_the_answer_is_spell_checked_in_the_chapters_language_with_suggestions_on_right_click(self):
+        self.needs("en_US")
+        self.chapter_in("en_US", "Мащабиране")  # the chapter's choice wins over its text's alphabet
+        page = self.imported()
+        self.assertEqual(self.aw.speller.lang, "en_US")
+        view, buf = page.view, page.view.get_buffer()
+        buf.set_text("a token buckett refills")
+        ui.wait_for(lambda: self.underlined(view) == ["buckett"], "the misspelled word to be underlined")
+
+        # A real right-click on it: the notes' suggestions, Add to Dictionary and Ignore
+        self.real_clicks_here()
+        rect = view.get_iter_location(buf.get_iter_at_offset(10))  # inside "buckett"
+        x, y = view.buffer_to_window_coords(ui.Gtk.TextWindowType.WIDGET, rect.x + 2, rect.y + rect.height // 2)
+        ui.real_click(view, x, y, button=3)
+
+        def menu():
+            return next((w for w in ui.walk(view) if isinstance(w, ui.Gtk.PopoverMenu) and w.get_visible()), None)
+        ui.wait_for(lambda: menu() is not None, "the right-click menu")
+        shown = labels(menu())
+        self.assertIn("bucket", shown)
+        self.assertIn("Add “buckett” to Dictionary", shown)
+        self.assertIn("Ignore", shown)
+        self.assertEqual(shown[-1], "Ignore", "below GTK's own items")
+        menu().popdown()
+        ui.wait_for(lambda: menu() is None, "the menu to close")
+
+        view.activate_action("answer.spell-replace", ui.GLib.Variant.new_string("bucket"))
+        self.assertEqual(self.text(page), "a token bucket refills")
+        ui.wait_for(lambda: self.underlined(view) == [], "the underline to go")
+        buf.undo()  # one step
+        self.assertEqual(self.text(page), "a token buckett refills")
+        self.saved(page)
+        self.assertEqual(self.draft(page)["answers"]["1"]["text"], "a token buckett refills")
+
+        # Ignore, then the main window's Check Spelling turns it off and on
+        ui.wait_for(lambda: self.underlined(view) == ["buckett"], "the underline back")
+        ui.real_click(view, x, y, button=3)
+        ui.wait_for(lambda: menu() is not None, "the right-click menu")
+        menu().popdown()
+        view.activate_action("answer.spell-ignore", ui.GLib.Variant.new_string("buckett"))
+        self.assertEqual(self.underlined(view), [])
+        buf.set_text("a sliding windo")
+        ui.wait_for(lambda: self.underlined(view) == ["windo"], "the new misspelled word underlined")
+        spell = self.win.lookup_action("spell")
+        self.addCleanup(lambda: spell.get_state().get_boolean() or spell.activate(None))
+        spell.activate(None)
+        self.assertEqual(self.underlined(view), [], "off: the underlines go at once")
+        page.show_question(2)
+        buf2 = view.get_buffer()
+        buf2.set_text("anothr answer")
+        ui.frames(2)
+        self.assertEqual(self.underlined(view), [], "and none come while it's off")
+        spell.activate(None)
+        self.assertEqual(self.underlined(view), ["anothr"], "on again")
+
+    def test_a_chapter_without_a_chosen_language_is_checked_by_its_text(self):
+        self.needs("en_US")
+        self.needs("bg_BG")
+        self.chapter_in(None, "Ограничаване на заявките")
+        page = self.imported()
+        self.assertEqual(self.aw.speller.lang, "bg_BG", "mostly Cyrillic: Bulgarian")
+        page.view.get_buffer().set_text("ограничаване на заявкиите with a buckett")
+        ui.wait_for(lambda: self.underlined(page.view) == ["заявкиите", "buckett"],
+                    "misspelled words in both alphabets underlined")
+        # A language chosen for the chapter in the main window (win.spell-lang): the answers follow
+        self.aw.language_chosen(self.chapter.parent / ".." / BOOK / self.chapter.name, "en_US")
+        self.assertEqual(self.aw.speller.lang, "en_US")
+        self.aw.language_chosen(self.chapter.with_name("other.notz"), "bg_BG")
+        self.assertEqual(self.aw.speller.lang, "en_US", "another chapter's choice isn't this one's")
+
     def test_ctrl_page_down_and_up_go_between_questions_and_f9_hides_the_list(self):
         page = self.imported()
         # Just opened, on the first question: no Previous. (The buttons follow their actions,

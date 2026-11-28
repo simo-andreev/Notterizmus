@@ -50,6 +50,22 @@ def guess_language(text, languages):
     return next((t for t in languages if script_of_lang(t) == want), None)
 
 
+def pick_language(wanted, text, languages, fallback=None):
+    """The dictionary for a chapter: its own language (`wanted`, the chapter's `lang`) if
+    installed, else by its text's alphabet, else `fallback` (the last one chosen), then
+    English, then any. None without dictionaries."""
+    if wanted in languages:
+        return wanted
+    if any(c.isalpha() for c in text):
+        guess = guess_language(text, languages)
+        if guess:
+            return guess
+    for cand in (fallback, "en_US", "en_GB", "en"):
+        if cand in languages:
+            return cand
+    return languages[0] if languages else None
+
+
 class Speller:
     def __init__(self):
         self.lib = None

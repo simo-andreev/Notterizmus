@@ -106,7 +106,9 @@ confirm it or pick another (or none). The button at the end of each chapter in t
 chapter list opens its assessment, or imports one for that chapter without asking.
 Each question starts with a blank answer, to write from memory; **Reveal** shows the
 answer you gave, its score, the sample answer and the feedback, and **Load My
-Original Answer** puts your answer in the editor (Ctrl+Z takes it back). A revealed
+Original Answer** puts your answer in the editor (Ctrl+Z takes it back). Answers
+are spell-checked in the chapter's language; right-click an underlined word for
+suggestions. A revealed
 score also shows in the question list, in TopCoding's colors (green from 0.8, amber
 from 0.5, red below, an unanswered question included), and the original score at the
 top by its percentage (green from 80%, amber from 65%); the color button in the

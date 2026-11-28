@@ -17,6 +17,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from .. import assessments as store, library
 from ..assessment_txt import Report
+from ..spell import Speller
 from .assessment_page import PracticePage
 from .helpers import WORKER, assessments_root, notes_root
 
@@ -46,12 +47,19 @@ class Import:
 class AssessmentsWindow(Adw.ApplicationWindow):
     __gtype_name__ = "NtzAssessmentsWindow"
 
-    def __init__(self, app, on_changed=None, on_closed=None):
+    def __init__(self, app, on_changed=None, on_closed=None, spell_on=True, spell_lang=None):
         """on_changed() after an import or a changed link (the main window's chapter buttons
-        and menus open an assessment's chapter); on_closed(window) once it is closed."""
+        and menus open an assessment's chapter); on_closed(window) once it is closed.
+        spell_on: the main window's Check Spelling (set_spelling follows it); spell_lang: the
+        language last chosen there, for a chapter whose language can't be told."""
         super().__init__(application=app, title="Assessments", default_width=1040, default_height=780)
         self.set_size_request(400, 360)
         self.on_changed, self.on_closed = on_changed, on_closed
+        # A speller of its own: the notes' follows the chapter open there, the answers'
+        # the assessment's chapter (PracticePage.set_chapter).
+        self.speller = Speller()
+        self.languages = self.speller.languages()
+        self.spell_on, self.spell_lang = spell_on and self.speller.available, spell_lang
         self.page = None        # the practice page, while one is open
         self.released = False
         self._discard = False   # close without saving: the user said so, after a save failed
@@ -131,6 +139,22 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         self.lookup_action("highlights").set_state(GLib.Variant.new_boolean(on))
         if self.page is not None:
             self.page.show_highlights()
+
+    def set_spelling(self, on, lang=None):
+        """The main window's Check Spelling was switched (on), or a language chosen there
+        (lang: the fallback for a chapter whose language can't be told)."""
+        self.spell_on = on and self.speller.available
+        if lang is not None:
+            self.spell_lang = lang
+        if self.page is not None:
+            self.page.spelling_changed()
+
+    def language_chosen(self, path, lang):
+        """A spelling language was chosen in the main window for the chapter at path: the
+        answers to its assessment are checked in it too."""
+        self.spell_lang = lang
+        if self.page is not None and path is not None and self.page.goes_with(Path(path)):
+            self.page.set_language(lang)
 
     def update_actions(self):
         """The practice page's actions work while it is shown and its draft was read."""
@@ -220,7 +244,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
             return
         if self.page is not None:
             self.nav.pop_to_tag("list")  # the old page is saved and let go when it pops
-        self.page = PracticePage(self, assessment, _chapter_label(chapter))
+        self.page = PracticePage(self, assessment, _chapter_label(chapter), chapter)
         self.nav.push(self.page)
         self.update_actions()
 
@@ -393,6 +417,7 @@ class AssessmentsWindow(Adw.ApplicationWindow):
         if page is self.page:
             page.a.chapter = assessment.chapter
             page.title.set_subtitle(_chapter_label(chapter))
+            page.set_chapter(chapter)
         self.toast(f"Attached to “{chapter.label}”" if chapter is not None else "Not attached to a chapter now")
         self.assessments_changed()
 

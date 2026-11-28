@@ -8,7 +8,7 @@ from .. import APP_ID, APP_NAME, assessments, guide, library, paths
 from ..layout import layout
 from ..model import Document
 from ..rules import Rules
-from ..spell import Speller, guess_language
+from ..spell import Speller, pick_language
 from .findbar import FindBar
 from .assessments_window import AssessmentsWindow
 from .helpers import WORKER, assessments_root, load_state, notes_root, run_once, save_state
@@ -317,16 +317,7 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
     # -- spelling ---------------------------------------------------------------------
 
     def _pick_lang(self, wanted, text=""):
-        if wanted in self.languages:
-            return wanted
-        if any(c.isalpha() for c in text):
-            g = guess_language(text, self.languages)
-            if g:
-                return g
-        for cand in (self.state.get("spell_lang"), "en_US", "en_GB", "en"):
-            if cand in self.languages:
-                return cand
-        return self.languages[0] if self.languages else None
+        return pick_language(wanted, text, self.languages, self.state.get("spell_lang"))
 
     def _apply_spelling(self, lang):
         enabled = self.lookup_action("spell").get_state().get_boolean()
@@ -347,6 +338,8 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         self.state["spell"] = on
         save_state(self.state)
         self._apply_spelling(self.speller.lang)
+        if self._assessments is not None:  # the answers' spelling follows it
+            self._assessments.set_spelling(on)
 
     def _on_spell_lang(self, action, param):
         tag = param.get_string()
@@ -357,6 +350,8 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
             self._schedule_save()
         self._apply_spelling(tag)
         self.toast(f"Spelling: {Speller.language_name(tag)}")
+        if self._assessments is not None:  # the open chapter's assessment checks its answers in it too
+            self._assessments.language_chosen(self.doc.path if self.doc else None, tag)
 
     # -- the open chapter ------------------------------------------------------------
 
@@ -441,7 +436,9 @@ class Window(WindowSaving, WindowChapters, WindowDialogs, WindowZoom, WindowSizi
         """The Assessments window, opened if it isn't."""
         if self._assessments is None:
             self._assessments = AssessmentsWindow(self.get_application(), on_changed=self.refresh_linked,
-                                                  on_closed=self._assessments_closed)
+                                                  on_closed=self._assessments_closed,
+                                                  spell_on=self.lookup_action("spell").get_state().get_boolean(),
+                                                  spell_lang=self.state.get("spell_lang"))
         self._assessments.present()
         return self._assessments
 

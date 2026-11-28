@@ -9,6 +9,7 @@ from gi.repository import Gdk, Gio, GLib, Graphene, Gtk
 from ..model import enclosing_heading, heading_numbers, is_text
 from .helpers import let_go_when_closed, run_once
 from .rows import TextRow, _mods
+from .richtext import spelling_section
 
 
 def _mi(label, action=None, target=None, accel=None):
@@ -293,15 +294,7 @@ class MenusMixin:
             if hit:
                 (s, e), word = hit
                 self._ctx = (weakref.ref(view), s, e)
-                sec = Gio.Menu()
-                sugg = sp.suggest(word)
-                for w in sugg:
-                    sec.append_item(_mi(w, "ed.spell-replace", w))
-                if not sugg:
-                    sec.append_item(_mi("No Suggestions", "ed.noop"))
-                sec.append_item(_mi(f"Add “{word}” to Dictionary", "ed.spell-add", word))
-                sec.append_item(_mi("Ignore", "ed.spell-ignore", word))
-                menu.append_section(None, sec)
+                menu.append_section(None, spelling_section(sp, word, "ed"))
         if self.sel:
             s = Gio.Menu()
             s.append_item(_mi("Copy Items", "ed.copy-items", accel="<Control>c"))

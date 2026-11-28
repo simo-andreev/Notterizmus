@@ -6,7 +6,8 @@ import unittest
 from unittest import mock
 
 from notterizmus import spell
-from notterizmus.spell import WORD_RE, Speller, guess_language, script_of_lang, script_of_word, should_check
+from notterizmus.spell import (WORD_RE, Speller, guess_language, pick_language, script_of_lang, script_of_word,
+                               should_check)
 
 
 def words(text):
@@ -55,6 +56,23 @@ class GuessLanguageTest(unittest.TestCase):
     def test_no_dictionary_for_the_alphabet(self):
         self.assertIsNone(guess_language("текст", ["en_US", "de_DE"]))
         self.assertIsNone(guess_language("text", []))
+
+
+class PickLanguageTest(unittest.TestCase):
+    """A chapter's dictionary, for its notes and for the answers to its assessment (R35a)."""
+    LANGS = ["bg_BG", "de_DE", "en_GB", "en_US"]
+
+    def test_the_chapters_own_choice_comes_first(self):
+        self.assertEqual(pick_language("de_DE", "Мащабирането е трудно", self.LANGS, "en_GB"), "de_DE")
+
+    def test_a_choice_whose_dictionary_is_gone_falls_back_to_the_text(self):
+        self.assertEqual(pick_language("fr_FR", "Мащабирането е трудно", self.LANGS), "bg_BG")
+
+    def test_without_text_the_last_choice_then_english_then_any(self):
+        self.assertEqual(pick_language(None, "", self.LANGS, "en_GB"), "en_GB")
+        self.assertEqual(pick_language(None, "123", self.LANGS, "fr_FR"), "en_US")
+        self.assertEqual(pick_language(None, "", ["de_DE", "fr_FR"]), "de_DE")
+        self.assertIsNone(pick_language("en_US", "text", []))
 
 
 class FakeEnchant:

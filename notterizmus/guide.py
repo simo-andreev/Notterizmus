@@ -174,7 +174,8 @@ def build(rules=None):
             "none, imports one for that chapter without asking."),
           b("Each question starts with a blank answer, to write from memory. Reveal shows the answer you gave, "
             "its score, the sample answer and the feedback; Load My Original Answer puts your answer in the "
-            "editor. Answers are saved as you type."),
+            "editor. Answers are saved as you type, and checked for spelling in the chapter's language: "
+            "right-click an underlined word for suggestions."),
           b("A revealed score also shows in the question list, in TopCoding's colors: green from 0.8, amber "
             "from 0.5 and red below, which includes a question left unanswered. The original score at the top "
             "is colored by its percentage: green from 80%, amber from 65% and red below. The color button in "

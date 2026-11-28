@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Assessment answers are spell-checked as you type, in the language of the chapter the assessment goes with (the one chosen for it, or else by its text), with the same right-click suggestions, **Add to Dictionary** and **Ignore** as the notes. A replaced word comes back with Ctrl+Z, and **Check Spelling** in the main menu turns it off and on for both windows.
+
 ## 1.8.2 — 2026-11-27
 
 - Closing the window no longer loses your edits when the chapter can't be saved, for example in a read-only folder or on a full disk. The window stays open, your edits are written to `~/.local/share/notterizmus/unsaved/`, and you choose **Retry**, **Save a Copy…** or **Quit Without Saving**. It used to close without saving.

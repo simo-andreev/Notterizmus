@@ -500,6 +500,22 @@ def real_drag(*points, steps=6, wait=0.02, hold=False):
         release_mouse()
 
 
+def real_click(widget, x, y, button=1):
+    """Click for real (Broadway) at (x, y) in widget, with this mouse button (3: right)."""
+    if _keyboard is None:
+        raise unittest.SkipTest("real mouse input needs the Broadway display (the default runner)")
+    _watch_modals()
+    px, py = surface_point(widget, x, y)
+    _keyboard.enter(px, py)
+    _arrived(_keyboard.move(px, py), "the pointer movement")
+    _arrived(_keyboard.button(px, py, True, button), "the mouse button press")
+    _input["pressed"] = time.monotonic()
+    for pop in walk(widget.get_root()):  # a menu the press opened gets the release
+        if isinstance(pop, Gtk.Popover) and pop.get_visible() and not getattr(pop, "_input_watched", False):
+            _watch_input(pop)
+    _arrived(_keyboard.button(px, py, False, button), "the mouse button release")
+
+
 def past_double_click():
     """Wait until a press is a click of its own, not the second of a double click: GTK
     counts a press within its double-click time (gtk-double-click-time) of the one before

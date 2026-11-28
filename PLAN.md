@@ -144,9 +144,16 @@ is done.
 
 What you asked for on 2026-11-26 first.
 
-- [ ] **R35a** Spell checking in the answer editor (asked again 2026-11-26): the editor's
+- [x] **R35a** Spell checking in the answer editor (asked again 2026-11-26): the editor's
   `richtext.Spelling`, in the chapter's language, with the same right-click suggestions.
   UI test.
+  Done 2026-11-28: `assessment_page.AnswerView` (a `richtext.Spelling` with the
+  Assessments window's own `Speller`; `PracticePage.set_chapter` picks the chapter's
+  language with the new `spell.pick_language`, which the main window uses too); the
+  menu's part is `richtext.spelling_section`, shared with the notes. Check Spelling and a
+  language chosen for the chapter reach it (`AssessmentsWindow.set_spelling`,
+  `language_chosen`). Tests: two in `tests/ui/test_assessments.py` (a real right-click),
+  `PickLanguageTest` in `tests/test_spell.py`. Not released.
 - [ ] **R35b** The last score next to each question in the list (asked 2026-11-26), from
   your last finished attempt, without revealing the sample answer or the original score.
   UI test that the original score stays hidden until Reveal.

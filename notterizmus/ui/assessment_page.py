@@ -3,6 +3,10 @@ one being answered, an editor for each answer that starts blank, and behind Reve
 TopCoding showed: your original answer with its score, the sample answer and the
 feedback.
 
+The answer editor (AnswerView) checks spelling as the notes do, in the language of the
+chapter the assessment goes with (its own choice, else its text's alphabet), with the
+same right-click suggestions; the main window's Check Spelling turns it off and on.
+
 The answers are a practice attempt (assessments.Attempt). It is saved as the assessment's
 draft 800 ms after a change, and when the page or the window goes: the text is copied
 here, on the main loop, and written by helpers.WORKER, one write at a time, the newest
@@ -17,14 +21,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from gi.repository import Adw, Gio, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
 from .. import assessments as store
 from ..assessments import Answer, Attempt
+from ..model import Document
+from ..spell import pick_language
 from .attempts import AttemptsDialog
 from .helpers import WORKER, set_class, weak_handler
+from .richtext import Spelling, add_spell_tag, mark_misspelled, spelling_section, word_at
 
 SAVE_DELAY = 800  # ms after the last change, as for chapters
+SPELL_DELAY = 400  # ms after the last change, as in the notes (richtext.RichText.schedule_spell)
 LIST_WIDTH = 260  # px: the question list's width when a page opens (it isn't kept)
 LIST_MIN = 200    # px: neither the list nor the question can be dragged narrower than its minimum
 
@@ -62,7 +70,125 @@ class DraftBuffer(Gtk.TextBuffer):
     def __init__(self, number, text):
         super().__init__(enable_undo=True)
         self.number = number
+        self.tag_spell = add_spell_tag(self)
         self.set_text(text)  # (not undoable: it was there when the page opened)
+
+
+class AnswerView(Gtk.TextView):
+    """The answer editor, showing one question's DraftBuffer at a time. Its words are
+    checked with `spelling` (richtext.Spelling) as the notes' are, and a right-click on an
+    underlined one (or the Menu key, Shift+F10 at the cursor) offers the same suggestions,
+    Add to Dictionary and Ignore (richtext.spelling_section), as actions answer.*. A
+    replacement is one step Ctrl+Z undoes."""
+    __gtype_name__ = "NtzAnswerView"
+
+    def __init__(self, spelling, **props):
+        super().__init__(**props)
+        self.spelling = spelling
+        self._spell_src = None
+        self._watched = None  # (buffer, handler id): the buffer shown, checked again as it changes
+        self._word = None     # (start, end): the misspelled word the menu was opened on
+        group = Gio.SimpleActionGroup()
+        for name, method in (("spell-replace", self._replace), ("spell-add", self._add),
+                             ("spell-ignore", self._ignore)):
+            action = Gio.SimpleAction.new(name, GLib.VariantType.new("s"))
+            action.connect("activate", weak_handler(method))
+            group.add_action(action)
+        noop = Gio.SimpleAction.new("noop", None)
+        noop.set_enabled(False)  # "No Suggestions"
+        group.add_action(noop)
+        self.insert_action_group("answer", group)
+        # Before GTK's own handler shows the menu, as in the notes (rows.py)
+        click = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY, propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        click.connect("pressed", weak_handler(self._pressed))
+        self.add_controller(click)
+        keys = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        keys.connect("key-pressed", weak_handler(self._key_pressed))
+        self.add_controller(keys)
+        self.connect("notify::buffer", weak_handler(self._buffer_set))
+
+    def _buffer_set(self, *_):
+        if self._watched is not None:
+            buf, handler = self._watched
+            buf.disconnect(handler)
+        buf = self.get_buffer()
+        self._watched = (buf, buf.connect("changed", weak_handler(self.schedule_spell)))
+        self.recheck_spelling()  # a question comes with its underlines
+
+    def schedule_spell(self, *_):
+        if self._spell_src:
+            GLib.source_remove(self._spell_src)
+        self._spell_src = GLib.timeout_add(SPELL_DELAY, weak_handler(self._spell_now))
+
+    def _spell_now(self):
+        self._spell_src = None
+        self.recheck_spelling()
+        return GLib.SOURCE_REMOVE
+
+    def recheck_spelling(self):
+        buf = self.get_buffer()
+        if isinstance(buf, DraftBuffer):
+            mark_misspelled(buf, buf.tag_spell, self.spelling)
+
+    def stop(self):
+        """The page is going: no check is due after it."""
+        if self._spell_src:
+            GLib.source_remove(self._spell_src)
+            self._spell_src = None
+        if self._watched is not None:
+            buf, handler = self._watched
+            buf.disconnect(handler)
+            self._watched = None
+
+    # -- the menu ---------------------------------------------------------------------
+
+    def _pressed(self, _gesture, _n, x, y):
+        bx, by = self.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(x), int(y))
+        ok, it = self.get_iter_at_location(bx, by)
+        self.prepare_menu(it if ok else None)
+
+    def _key_pressed(self, _ctl, keyval, _code, state):
+        if keyval == Gdk.KEY_Menu or (keyval == Gdk.KEY_F10 and state & Gdk.ModifierType.SHIFT_MASK):
+            buf = self.get_buffer()
+            self.prepare_menu(buf.get_iter_at_mark(buf.get_insert()))
+        return False
+
+    def prepare_menu(self, it):
+        """Fill the right-click menu (shown below GTK's cut, copy and paste) for the word at
+        it: suggestions if it is underlined."""
+        menu = Gio.Menu()
+        self._word = None
+        buf = self.get_buffer()
+        if self.spelling.active and it is not None and isinstance(buf, DraftBuffer) and it.has_tag(buf.tag_spell):
+            text = buf.get_text(*buf.get_bounds(), True)
+            bounds = word_at(text, it.get_offset())
+            if bounds is not None:
+                self._word = bounds
+                menu.append_section(None, spelling_section(self.spelling.speller, text[slice(*bounds)], "answer"))
+        self.set_extra_menu(menu)
+
+    def _replace(self, _action, param):
+        if self._word is None:
+            return
+        (start, end), self._word = self._word, None
+        buf = self.get_buffer()
+        if end > buf.get_char_count():
+            return
+        buf.begin_user_action()
+        buf.delete(buf.get_iter_at_offset(start), buf.get_iter_at_offset(end))
+        buf.insert(buf.get_iter_at_offset(start), param.get_string())
+        buf.end_user_action()
+        self.grab_focus()
+
+    def _add(self, _action, param):
+        if self.spelling.speller is not None:
+            self.spelling.speller.add(param.get_string())
+            self.recheck_spelling()
+
+    def _ignore(self, _action, param):
+        if self.spelling.speller is not None:
+            self.spelling.speller.ignore(param.get_string())
+            self.recheck_spelling()
 
 
 class QuestionRow(Gtk.ListBoxRow):
@@ -103,10 +229,14 @@ class QuestionRow(Gtk.ListBoxRow):
 class PracticePage(Adw.NavigationPage):
     __gtype_name__ = "NtzPracticePage"
 
-    def __init__(self, window, assessment, chapter_label):
+    def __init__(self, window, assessment, chapter_label, chapter=None):
+        """chapter: the library.Chapter it goes with (None: none found), whose language the
+        answers are checked in."""
         super().__init__(title=assessment.report.title, tag="practice")
         self.win = window
         self.a = assessment
+        self.spelling = Spelling()  # the answer editor's, in the chapter's language (set_chapter)
+        self.chapter = None         # the library.Chapter it goes with, if found
         self.questions = {q.number: q for q in assessment.report.questions}
         self.numbers = [q.number for q in assessment.report.questions]
         self.file = DraftFile(assessment)
@@ -147,6 +277,7 @@ class PracticePage(Adw.NavigationPage):
         self.bin.add_breakpoint(self.narrow)
         self.set_child(self.bin)
         self.set_report(assessment)
+        self.set_chapter(chapter)
         WORKER.run(self.file.read, done=self._loaded, failed=self._load_failed)
 
     # -- building ---------------------------------------------------------------------
@@ -189,8 +320,8 @@ class PracticePage(Adw.NavigationPage):
         self.heading = Gtk.Label(xalign=0, css_classes=["dim-label", "caption-heading"])
         self.prompt = Gtk.Label(xalign=0, wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR, selectable=True,
                                 css_classes=["title-4"])
-        self.view = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, top_margin=10, bottom_margin=10,
-                                 left_margin=12, right_margin=12)
+        self.view = AnswerView(self.spelling, wrap_mode=Gtk.WrapMode.WORD_CHAR, top_margin=10, bottom_margin=10,
+                               left_margin=12, right_margin=12)
         self.view.update_property([Gtk.AccessibleProperty.LABEL], ["Your answer"])
         editor = Gtk.ScrolledWindow(child=self.view, min_content_height=200, max_content_height=460,
                                     propagate_natural_height=True, hscrollbar_policy=Gtk.PolicyType.NEVER,
@@ -290,6 +421,49 @@ class PracticePage(Adw.NavigationPage):
 
     def _show_final_score(self):
         _show_result(self.final_score, store.final_category(self.a.report) if self.win.highlights else None)
+
+    # -- spelling ---------------------------------------------------------------------
+
+    def set_chapter(self, chapter):
+        """Check the answers in this chapter's language: the one chosen for it in the notes,
+        else by its text (as the main window picks it); with no chapter, or one that can't
+        be read, by the assessment's own text. Read on WORKER."""
+        self.chapter = chapter
+        own = self._report_text()
+        if chapter is None:
+            self._language_found((None, own))
+            return
+        WORKER.run(lambda path=chapter.path, own=own: _language_hints(path, own),
+                   done=self._language_found, failed=lambda _e: self._language_found((None, own)))
+
+    def goes_with(self, path):
+        """Whether this assessment goes with the chapter file at path."""
+        try:
+            return self.chapter is not None and self.chapter.path.resolve() == path.resolve()
+        except OSError:
+            return False
+
+    def set_language(self, lang):
+        """Check the answers in lang: chosen for the chapter in the main window."""
+        self._language_found((lang, ""))
+
+    def _report_text(self):
+        return " ".join(t for q in self.a.report.questions for t in (q.prompt, q.sample) if t)
+
+    def _language_found(self, hints):
+        if self.released:
+            return
+        wanted, text = hints
+        speller = self.win.speller
+        self.spelling.speller = speller
+        if speller.available:
+            speller.set_language(pick_language(wanted, text, self.win.languages, self.win.spell_lang))
+        self.spelling_changed()
+
+    def spelling_changed(self):
+        """Check Spelling was turned on or off in the main window (or the language set)."""
+        self.spelling.enabled = self.win.spell_on and self.spelling.speller is not None
+        self.view.recheck_spelling()
 
     # -- the attempt ------------------------------------------------------------------
 
@@ -691,6 +865,7 @@ class PracticePage(Adw.NavigationPage):
         if self._save_src:
             GLib.source_remove(self._save_src)
             self._save_src = None
+        self.view.stop()
         for obj, handler in self._handlers:
             obj.disconnect(handler)
         self._handlers = []
@@ -737,6 +912,16 @@ def _reveal_toggled(button):
     page = _page(button)
     if page is not None and page.current is not None and button.get_active() != (page.current in page.shown):
         page.toggle_details(button.get_active())
+
+
+def _language_hints(path, own):
+    """On WORKER: (the chapter's chosen language or None, its text) for pick_language; the
+    assessment's own text (own) if the chapter can't be read."""
+    try:
+        doc = Document.load(path)
+    except (OSError, ValueError):
+        return None, own
+    return doc.lang, " ".join(n.text for n in doc.root.walk())
 
 
 def _show_result(score_label, result):

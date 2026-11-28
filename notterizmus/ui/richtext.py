@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
-from gi.repository import Gdk, GLib, GObject, Graphene, Gtk, Pango
+from gi.repository import Gdk, Gio, GLib, GObject, Graphene, Gtk, Pango
 
 from ..model import Run, normalize_runs
 from ..spell import WORD_RE, should_check
@@ -19,6 +19,61 @@ class Spelling:
         self.speller = None
         self.enabled = False
 
+    @property
+    def active(self):
+        """Whether there is anything to check with: on, and a dictionary for the language."""
+        return self.enabled and self.speller is not None and bool(self.speller.dict)
+
+
+def add_spell_tag(buf):
+    """The tag that underlines a misspelled word in buf: a red wavy line."""
+    red = Gdk.RGBA()
+    red.parse("#e01b24")
+    return buf.create_tag("misspelled", underline=Pango.Underline.ERROR, underline_rgba=red)
+
+
+def mark_misspelled(buf, tag, spelling):
+    """Underline (tag) the words of buf's text that spelling's dictionary doesn't know; with
+    checking off, take the underlines away."""
+    buf.remove_tag(tag, *buf.get_bounds())
+    if not spelling.active:
+        return
+    sp = spelling.speller
+    for m in WORD_RE.finditer(buf.get_text(*buf.get_bounds(), True)):
+        w = m.group()
+        if should_check(w) and not sp.check(w):
+            buf.apply_tag(tag, buf.get_iter_at_offset(m.start()), buf.get_iter_at_offset(m.end()))
+
+
+def word_at(text, offset):
+    """(start, end) of the word at or touching offset in text, or None."""
+    for m in WORD_RE.finditer(text):
+        if m.start() <= offset <= m.end():
+            return m.start(), m.end()
+    return None
+
+
+def spelling_section(speller, word, group):
+    """The right-click menu's part for a misspelled word: the dictionary's suggestions,
+    then Add to Dictionary and Ignore, as actions spell-replace, spell-add, spell-ignore
+    (each taking the word) and noop in the action group named `group`. The notes and the
+    answer editor (assessment_page.AnswerView) show the same."""
+    sec = Gio.Menu()
+
+    def item(label, action, target=None):
+        it = Gio.MenuItem.new(label, None)
+        it.set_action_and_target_value(f"{group}.{action}", None if target is None else GLib.Variant.new_string(target))
+        sec.append_item(it)
+
+    suggestions = speller.suggest(word)
+    for w in suggestions:
+        item(w, "spell-replace", w)
+    if not suggestions:
+        item("No Suggestions", "noop")
+    item(f"Add “{word}” to Dictionary", "spell-add", word)
+    item("Ignore", "spell-ignore", word)
+    return sec
+
 
 class RichText(Gtk.TextView):
     __gtype_name__ = "NtzRichText"
@@ -33,9 +88,7 @@ class RichText(Gtk.TextView):
         buf.set_enable_undo(False)  # the editor keeps a document-wide history
         self.tag_bold = buf.create_tag("bold", weight=Pango.Weight.BOLD)
         self.tag_italic = buf.create_tag("italic", style=Pango.Style.ITALIC)
-        red = Gdk.RGBA()
-        red.parse("#e01b24")
-        self.tag_spell = buf.create_tag("misspelled", underline=Pango.Underline.ERROR, underline_rgba=red)
+        self.tag_spell = add_spell_tag(buf)
         # find bar highlights: every match, and the current one
         found, current = Gdk.RGBA(), Gdk.RGBA()
         found.parse("rgba(245, 194, 17, 0.35)")
@@ -173,12 +226,7 @@ class RichText(Gtk.TextView):
 
     def word_bounds(self, it):
         """(start, end) offsets of the word at/next to iter, or None."""
-        text = self.get_plain()
-        off = it.get_offset()
-        for m in WORD_RE.finditer(text):
-            if m.start() <= off <= m.end():
-                return m.start(), m.end()
-        return None
+        return word_at(self.get_plain(), it.get_offset())
 
     def iter_at_widget_point(self, x, y):
         bx, by = self.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(x), int(y))
@@ -291,15 +339,7 @@ class RichText(Gtk.TextView):
         return False
 
     def recheck_spelling(self):
-        buf = self.get_buffer()
-        buf.remove_tag(self.tag_spell, *buf.get_bounds())
-        sp = self.spelling.speller
-        if not self.spelling.enabled or sp is None or not sp.dict:
-            return
-        for m in WORD_RE.finditer(self.get_plain()):
-            w = m.group()
-            if should_check(w) and not sp.check(w):
-                buf.apply_tag(self.tag_spell, buf.get_iter_at_offset(m.start()), buf.get_iter_at_offset(m.end()))
+        mark_misspelled(self.get_buffer(), self.tag_spell, self.spelling)
 
     def misspelled_at(self, it):
         if not it.has_tag(self.tag_spell):
