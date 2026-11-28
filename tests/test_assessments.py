@@ -196,8 +196,9 @@ class DraftTest(StoreTest):
         self.assertEqual(again.started, NOW)
         self.assertEqual(again.answers, {2: Answer(text), 5: Answer(revealed=True)}, "a blank answer isn't kept")
         self.assertEqual((again.drafted(), again.revealed()), ({2}, {5}))
+        edited = NOW.astimezone().isoformat(timespec="seconds")
         self.assertEqual(self.stored(a, "draft.json")["answers"], {
-            "2": {"text": text, "revealed": False}, "5": {"text": "", "revealed": True}})
+            "2": {"text": text, "revealed": False, "edited": edited}, "5": {"text": "", "revealed": True, "edited": edited}})
         self.assertTrue(store.load(a.folder).has_draft)
 
     def test_fields_this_version_does_not_know_are_kept(self):
@@ -215,6 +216,7 @@ class DraftTest(StoreTest):
         d = self.stored(a)
         self.assertEqual((d["future"], d["chapter"]["anchor"], d["chapter"]["file"]), ({"x": 1}, "n1", "B/02 U.notz"))
         d = self.stored(a, "draft.json")
+        d["answers"]["1"].pop("edited")  # (dated when it changed: R35e)
         self.assertEqual((d["format"], d["timer"], d["answers"]["1"]), (
             "notterizmus-attempt/2", 300, {"text": "ab", "revealed": False, "ink": "blue"}))
 
@@ -317,33 +319,116 @@ class FinishTest(StoreTest):
 
 
 class ConflictTest(StoreTest):
-    def test_a_draft_another_computer_changed_is_kept_as_an_attempt(self):
-        a = self.add()
-        mine = Attempt(answers={1: Answer("mine")})
-        store.write_draft(a, mine, now=NOW - timedelta(hours=1))
-        self.write(a.folder / "draft.json", Attempt(answers={1: Answer("theirs")}).to_json())
-        mine.answers[1].text = "mine, more"
-        kept = store.write_draft(a, mine, now=NOW)
-        theirs = store.read_attempt(kept)
-        self.assertEqual((theirs.origin, theirs.finished, theirs.answer(1).text), (store.ELSEWHERE, NOW, "theirs"))
-        self.assertEqual(store.read_draft(a).answer(1).text, "mine, more")
-        self.assertIsNone(store.write_draft(a, mine), "once kept, the draft is ours again")
+    """A draft another computer changed (through a sync tool) is merged with this one
+    question by question (R35e)."""
 
-    def test_a_draft_another_computer_started_is_kept_too(self):
+    def theirs(self, a, answers):
+        """draft.json as the other computer wrote it: {number: (text, revealed, edited)}."""
+        self.write(a.folder / "draft.json", Attempt(started=NOW - timedelta(hours=2), answers={
+            n: Answer(text, revealed, edited=edited) for n, (text, revealed, edited) in answers.items()}).to_json())
+
+    def test_changed_answers_are_dated_when_saved_and_the_others_keep_their_date(self):
+        a = self.add()
+        mine = Attempt(answers={1: Answer("one"), 2: Answer("two")})
+        store.write_draft(a, mine, now=NOW)
+        mine.answers[2].text = "two, more"
+        mine.answers[3] = Answer(revealed=True)
+        store.write_draft(a, mine, now=NOW + timedelta(minutes=5))
+        again = store.read_draft(a)
+        self.assertEqual({n: x.edited for n, x in again.answers.items()},
+                         {1: NOW, 2: NOW + timedelta(minutes=5), 3: NOW + timedelta(minutes=5)})
+
+    def test_drafts_from_two_computers_are_merged_question_by_question(self):
+        """Each question takes the answer of the side that changed it; one both changed
+        takes the newer edit, and the other answer is kept as an attempt."""
+        a = self.add()
+        base = {1: "q1", 2: "q2", 3: "q3", 4: "q4"}
+        mine = Attempt(answers={n: Answer(t) for n, t in base.items()})
+        store.write_draft(a, mine, now=NOW - timedelta(hours=1))
+        early, late = NOW - timedelta(minutes=10), NOW - timedelta(minutes=5)
+        self.theirs(a, {1: ("q1", False, NOW - timedelta(hours=1)),       # unchanged there
+                        2: ("q2 from the laptop", False, early),           # changed only there
+                        3: ("q3 from the laptop", False, late),            # changed on both, newer there
+                        4: ("q4 from the laptop", False, early),           # changed on both, newer here
+                        5: ("", True, early)})                             # revealed only there
+        mine.answers[1].text = "q1 here"
+        mine.answers[3].text = "q3 here"
+        mine.answers[4].text = "q4 here"
+        mine.answers[6] = Answer("q6 here")
+        mine.answers[3].edited = mine.answers[4].edited = None
+        kept = self.write_at(a, mine, {3: early, 4: late})
+
+        merged = store.read_draft(a)
+        self.assertEqual({n: (x.text, x.revealed) for n, x in merged.answers.items()}, {
+            1: ("q1 here", False), 2: ("q2 from the laptop", False), 3: ("q3 from the laptop", False),
+            4: ("q4 here", False), 5: ("", True), 6: ("q6 here", False)})
+        self.assertEqual(sorted(mine.merged_in), [2, 3, 5], "the answers the page has to show")
+        self.assertEqual(mine.answers, merged.answers)
+        lost = store.read_attempt(kept)
+        self.assertEqual((lost.origin, lost.finished), (store.MERGED, NOW))
+        self.assertEqual({n: x.text for n, x in lost.answers.items()}, {3: "q3 here", 4: "q4 from the laptop"})
+        self.assertIsNone(store.write_draft(a, mine, now=NOW), "once merged, the draft is ours again")
+        self.assertEqual(len(store.list_attempts(a)), 1)
+        self.assertIsNone(store.last_attempt(a), "set aside in a merge, not finished")
+
+    def write_at(self, a, mine, edited):
+        """write_draft at NOW, as if the answers in `edited` ({number: time}) had been saved
+        here at that time (one write can date answers only now)."""
+        real = store._date_changes
+
+        def dated(attempt, now):
+            real(attempt, now)
+            for n, when in edited.items():
+                attempt.answers[n].edited = when
+        with mock.patch.object(store, "_date_changes", dated):
+            return store.write_draft(a, mine, now=NOW)
+
+    def test_an_answer_without_a_date_loses_to_a_dated_one(self):
+        """Written before R35e, by an older version: the other side's dated edit wins."""
+        a = self.add()
+        mine = Attempt(answers={1: Answer("base")})
+        store.write_draft(a, mine, now=NOW - timedelta(hours=1))
+        self.theirs(a, {1: ("from the laptop", False, None)})
+        mine.answers[1].text = "mine"
+        kept = store.write_draft(a, mine, now=NOW)
+        self.assertEqual(store.read_draft(a).answer(1).text, "mine")
+        self.assertEqual(store.read_attempt(kept).answer(1).text, "from the laptop")
+
+    def test_a_draft_another_computer_started_is_merged_in(self):
         a = self.add()
         mine = store.read_draft(a)
-        self.write(a.folder / "draft.json", Attempt(answers={3: Answer("theirs")}).to_json())
+        self.theirs(a, {3: ("theirs", False, NOW - timedelta(minutes=1))})
         mine.answers[1] = Answer("mine")
-        self.assertIsNotNone(store.write_draft(a, mine))
+        self.assertIsNone(store.write_draft(a, mine, now=NOW), "nothing lost: each changed its own question")
+        self.assertEqual({n: x.text for n, x in store.read_draft(a).answers.items()}, {1: "mine", 3: "theirs"})
 
-    def test_nothing_is_kept_when_the_other_draft_is_empty_or_the_same(self):
+    def test_nothing_is_kept_when_the_other_draft_has_the_same_answers(self):
         a = self.add()
         mine = Attempt(answers={1: Answer("same")})
         store.write_draft(a, mine)
-        for theirs in (Attempt(), Attempt(answers={1: Answer("same")}, started=NOW)):
-            self.write(a.folder / "draft.json", theirs.to_json())
-            self.assertIsNone(store.write_draft(a, mine))
-        self.assertEqual(store.list_attempts(a), [])
+        self.write(a.folder / "draft.json", Attempt(answers={1: Answer("same")}, started=NOW).to_json())
+        self.assertIsNone(store.write_draft(a, mine))
+        self.assertEqual((mine.merged_in, store.list_attempts(a)), ({}, []))
+
+    def test_an_answer_cleared_on_the_other_computer_is_cleared_here_and_kept(self):
+        """It finished the attempt there and began another, say: this one's answer stays
+        in the attempts, not lost."""
+        a = self.add()
+        mine = Attempt(answers={1: Answer("old"), 2: Answer("mine")})
+        store.write_draft(a, mine, now=NOW - timedelta(hours=1))
+        self.theirs(a, {2: ("mine", False, NOW - timedelta(hours=1))})
+        kept = store.write_draft(a, mine, now=NOW)
+        self.assertEqual({n: x.text for n, x in store.read_draft(a).answers.items() if x.text}, {2: "mine"})
+        self.assertEqual(store.read_attempt(kept).answer(1).text, "old")
+
+    def test_finishing_merges_first(self):
+        a = self.add()
+        mine = Attempt(answers={1: Answer("mine")})
+        store.write_draft(a, mine, now=NOW - timedelta(hours=1))
+        self.theirs(a, {1: ("mine", False, NOW - timedelta(hours=1)), 2: ("theirs", False, NOW - timedelta(minutes=1))})
+        done, kept = store.finish(a, mine, now=NOW)
+        self.assertIsNone(kept)
+        self.assertEqual({n: x.text for n, x in store.read_attempt(done).answers.items()}, {1: "mine", 2: "theirs"})
 
     def test_an_unreadable_draft_from_another_computer_is_kept_aside(self):
         a = self.add()

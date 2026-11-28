@@ -53,14 +53,15 @@ log = logging.getLogger(__name__)
 FORMAT = "notterizmus-assessment/1"
 ATTEMPT_FORMAT = "notterizmus-attempt/1"
 REPORT_TXT, REPORT_JSON, DRAFT, ATTEMPTS = "report.txt", "report.json", "draft.json", "attempts"
-ELSEWHERE = "another computer"  # the origin of a draft kept when this computer saved over it
+ELSEWHERE = "another computer"  # the origin of a draft kept when this computer saved over it (before R35e)
+MERGED = "merge"                 # the origin of the answers that lost when two drafts were merged
 STALE_IMPORT = 3600  # seconds: a hidden import folder this old was left by a crash
 MATCH = 0.8          # how alike (difflib's ratio) a chapter's title must be to be suggested
 _STAMP = "%Y-%m-%dT%H-%M-%S"  # then "Z": attempts are named in UTC (CR26)
 _REPORT_FIELDS = ("format", "parser_version", "imported", "source", "sha256", "chapter", "report")
 _ATTEMPT_FIELDS = ("format", "started", "finished", "origin", "answers")
 _LINK_FIELDS = ("file", "book", "number", "title")
-_ANSWER_FIELDS = ("text", "revealed")
+_ANSWER_FIELDS = ("text", "revealed", "edited")
 
 
 @dataclass
@@ -142,12 +143,24 @@ class Answer:
     text: str = ""
     revealed: bool = False  # the original answer, the sample answer, the score and feedback were shown
     extra: dict = field(default_factory=dict)
+    # when its text or revealed last changed (write_draft sets it), to merge drafts by
+    edited: datetime | None = field(default=None, compare=False)
 
     def is_blank(self):
-        return not self.text.strip() and not self.revealed and not self.extra
+        return not self.text.strip() and not self.revealed and not self.extra and self.edited is None
+
+    def same_as(self, other):
+        """The same text (all blank counts as none) and revealed alike."""
+        def content(answer):
+            return answer.text if answer.text.strip() else "", answer.revealed
+        return content(self) == content(other)
+
+    def copy(self):
+        return Answer(self.text, self.revealed, dict(self.extra), self.edited)
 
     def to_json(self):
-        return {**self.extra, "text": self.text, "revealed": self.revealed}
+        return {**self.extra, "text": self.text, "revealed": self.revealed,
+                **({"edited": _iso(self.edited)} if self.edited else {})}
 
 
 @dataclass
@@ -159,10 +172,14 @@ class Attempt:
     origin: str = ""                  # ELSEWHERE: a draft kept from another computer
     format: str = ATTEMPT_FORMAT
     extra: dict = field(default_factory=dict)
-    # Not stored. disk: draft.json as this attempt last read or wrote it (the conflict check).
-    # set_aside: an unreadable draft.json was kept under this name.
+    # Not stored. disk: draft.json as this attempt last read or wrote it (the conflict check);
+    # base: its answers then, which the other computer's changes are told from. set_aside: an
+    # unreadable draft.json was kept under this name. merged_in: {number: Answer} the last
+    # write took from the other computer's draft, for the page to show.
     disk: tuple | None = field(default=None, compare=False, repr=False)
+    base: dict | None = field(default=None, compare=False, repr=False)
     set_aside: Path | None = field(default=None, compare=False, repr=False)
+    merged_in: dict = field(default_factory=dict, compare=False, repr=False)
 
     def answer(self, number):
         return self.answers.get(number) or Answer()
@@ -179,8 +196,12 @@ class Attempt:
 
     def same_as(self, other):
         def content(attempt):
-            return {n: (a.text, a.revealed) for n, a in attempt.answers.items() if not a.is_blank()}
+            return {n: (a.text, a.revealed) for n, a in attempt.answers.items() if a.text.strip() or a.revealed}
         return content(self) == content(other)
+
+    def snapshot(self):
+        """{number: a copy of its Answer}: the base for the next write."""
+        return {n: a.copy() for n, a in self.answers.items()}
 
     def to_json(self):
         d = {
@@ -204,7 +225,8 @@ class Attempt:
                 if type(revealed) is not bool:
                     raise TypeError(f"{revealed!r} isn't true or false")
                 answers[int(key)] = Answer(_str(value.get("text")), revealed,
-                                           {k: v for k, v in value.items() if k not in _ANSWER_FIELDS})
+                                           {k: v for k, v in value.items() if k not in _ANSWER_FIELDS},
+                                           _when(value.get("edited")))
             return cls(started=_when(d.get("started")), finished=_when(d.get("finished")), answers=answers,
                        origin=_str(d.get("origin")), format=_str(d.get("format")) or ATTEMPT_FORMAT,
                        extra={k: v for k, v in d.items() if k not in _ATTEMPT_FIELDS})
@@ -419,40 +441,78 @@ def read_draft(a, now=None):
         _archive(path, attempt.finished)
         return Attempt()
     attempt.disk = disk
+    attempt.base = attempt.snapshot()
     return attempt
 
 
 def write_draft(a, attempt, now=None):
-    """Save attempt as the draft in progress. Returns the path of the attempt kept from
-    another computer, or None: if draft.json changed since attempt was read or written,
-    another computer (through a sync tool) changed it, and its version is kept as an
-    attempt before this one is written, unless it has nothing in it or the same answers."""
+    """Save attempt as the draft in progress, its changed answers dated now (Answer.edited).
+    If draft.json changed since attempt was read or written, another computer (through a
+    sync tool) changed it, and the two are merged question by question (R35e): a question
+    only one side changed takes that side's answer; one both changed takes the newer edit,
+    and the other answer is kept in an attempt (origin MERGED). The answers taken from the
+    other draft are in attempt.merged_in. Returns that attempt's path, or None."""
     now = _now(now)
     path = Path(a.folder) / DRAFT
+    _date_changes(attempt, now)
+    attempt.merged_in = {}
     kept = None
     disk = _disk_state(path)
     if disk is not None and disk != attempt.disk:
-        kept = _keep_theirs(path, attempt, now)
+        kept = _merge_theirs(path, attempt, now)
     if attempt.started is None:
         attempt.started = now
     _write_json(path, attempt.to_json())
     attempt.disk = _disk_state(path)
+    attempt.base = attempt.snapshot()
     return kept
 
 
-def _keep_theirs(path, attempt, now):
+def _date_changes(attempt, now):
+    """Date the answers that changed since attempt.base now; the others keep their date."""
+    base = attempt.base or {}
+    for n, answer in attempt.answers.items():
+        old = base.get(n, Answer())
+        if answer.same_as(old):
+            answer.edited = old.edited
+        else:
+            answer.edited = now
+
+
+def _merge_theirs(path, attempt, now):
     try:
         theirs = Attempt.from_json(_read_json(path))
     except ValueError:
         attempt.set_aside = _set_aside(path, now)
         return None
-    if theirs.is_empty() or theirs.same_as(attempt):
+    base = attempt.base or {}
+    lost = {}
+    for n in sorted(set(attempt.answers) | set(theirs.answers)):
+        mine, other, old = attempt.answer(n), theirs.answer(n), base.get(n, Answer())
+        if mine.same_as(other) or other.same_as(old):
+            continue  # the same, or only this computer changed it
+        if not mine.same_as(old) and _older(other, mine):
+            winner, loser = mine, other  # both changed it: this computer's edit is newer
+        else:
+            winner, loser = other, mine  # only they changed it, or theirs is newer
+            attempt.answers[n] = other.copy()
+            attempt.merged_in[n] = other.copy()
+        # kept: an edit that lost to a newer one, or text the winner cleared (else it's gone)
+        if loser.text.strip() and (not loser.same_as(old) or not winner.text.strip()) \
+                or loser.revealed and not loser.same_as(old):
+            lost[n] = loser.copy()
+    if not lost:
         return None
-    theirs.origin = ELSEWHERE
-    theirs.finished = theirs.finished or now
-    target = _attempt_path(path.parent, theirs.finished)
-    _write_json(target, theirs.to_json())
+    target = _attempt_path(path.parent, now)
+    _write_json(target, Attempt(started=theirs.started or attempt.started, finished=now, answers=lost,
+                                origin=MERGED).to_json())
     return target
+
+
+def _older(a, b):
+    """Whether answer a was edited before b. An answer with no date (written before
+    R35e) is the older; a tie goes to b."""
+    return (a.edited is None) or (b.edited is not None and a.edited <= b.edited)
 
 
 def finish(a, attempt, now=None):
@@ -491,13 +551,14 @@ def read_attempt(path):
 
 def last_attempt(a):
     """The attempt you finished last, or None: the newest one that can be read, leaving
-    out drafts kept from another computer (ELSEWHERE), which you didn't finish here."""
+    out drafts kept from another computer (ELSEWHERE) and answers set aside in a merge
+    (MERGED), which you didn't finish."""
     for f in list_attempts(a):
         try:
             attempt = read_attempt(f.path)
         except (OSError, ValueError):
             continue
-        if attempt.origin != ELSEWHERE:
+        if attempt.origin not in (ELSEWHERE, MERGED):
             return attempt
     return None
 

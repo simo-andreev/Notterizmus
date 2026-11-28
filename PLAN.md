@@ -180,9 +180,19 @@ What you asked for on 2026-11-26 first.
   Shift+A too); in the Shortcuts dialog's "Assessments window" section. Test:
   `test_ctrl_shift_t_opens_the_assessments_window_from_an_item_being_edited` in
   `tests/ui/test_assessments.py`, a real key press.
-- [ ] **R35e** Drafts edited on two computers: merge per question (the newer text of each
+- [x] **R35e** Drafts edited on two computers: merge per question (the newer text of each
   question wins, the other goes to the attempts) instead of keeping the whole other
   draft as an attempt. Unit test in `tests/test_assessments.py`.
+  Done 2026-11-28: each answer is dated when a save changes it (`Answer.edited`, stored
+  as "edited"); the merge compares both sides with the answers as this computer last
+  read or wrote them (`Attempt.base`, carried by `DraftFile`), so a question only one
+  side changed takes that side's answer and nothing is kept; one both changed takes the
+  newer date (none, from an older version, is the older), and the other answer goes to
+  an attempt with origin `MERGED`, as does text the other side cleared. The page shows
+  the answers merged in (`attempt.merged_in`), undoably, unless you typed there since.
+  Tests: `ConflictTest` in `tests/test_assessments.py`, and
+  `test_a_draft_changed_on_another_computer_is_merged_into_the_open_page` in
+  `tests/ui/test_assessments.py`.
 
 ## Phase 3: Desktop basics and readable errors (M)
 

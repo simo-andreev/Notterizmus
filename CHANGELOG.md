@@ -6,6 +6,7 @@
 - The question list shows what you did with each question in your last finished attempt, under its prompt: "Last time: 42 words" or "Last time: left blank", with "· revealed" if you revealed it. It never shows the original score or the sample answer: those still wait for **Reveal** in the attempt you're on.
 - The trash button on an assessment in the Assessments window moves it, with its drafts and attempts, to the Trash; **Undo** on the message brings it back. A folder the app can't read has the button too. You used to have to delete the folder in `.assessments` yourself.
 - Ctrl+Shift+T opens the Assessments window, at the open chapter's assessment if it has one, like **Assessments…** in the menu. It is in the Keyboard Shortcuts window and Search Commands too.
+- A practice draft changed on two computers (through a sync tool) is now merged question by question. Each question takes the answer from the computer that changed it, and a question changed on both takes the newer edit. The other answer goes to **Earlier Attempts**, marked "set aside when drafts were merged". The open page shows the answers that came in, and Ctrl+Z takes one back. The whole other draft used to be kept as an attempt, so its answers were missing from the one you were working on.
 
 ## 1.8.2 — 2026-11-27
 

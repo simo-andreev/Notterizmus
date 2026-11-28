@@ -167,7 +167,9 @@ class AssessmentsTest(ui.UITestCase):
         self.assertTrue(page.revealer.get_reveal_child())
         self.assertTrue(page.rows[1].revealed.get_visible())
         self.saved(page)
-        self.assertEqual(self.draft(page)["answers"]["1"], {"text": "", "revealed": True})
+        answer = self.draft(page)["answers"]["1"]
+        self.assertTrue(answer.pop("edited"), "dated, for merging drafts (R35e)")
+        self.assertEqual(answer, {"text": "", "revealed": True})
         page.show_question(8)  # no answer, a score of 0: no feedback
         self.assertFalse(page.revealer.get_reveal_child(), "each question starts hidden")
         page.reveal_btn.set_active(True)
@@ -601,6 +603,29 @@ class AssessmentsTest(ui.UITestCase):
         self.assertTrue(self.win.has_assessment(self.chapter))
         self.aw.open_folder(folder)
         self.assertEqual(self.text(self.page()), "Token bucket", "the draft back with it")
+
+    def test_a_draft_changed_on_another_computer_is_merged_into_the_open_page(self):
+        """R35e: an answer another computer wrote (through a sync tool) comes into the page
+        on the next save, beside what you typed here; nothing is set aside."""
+        from datetime import datetime
+        page = self.imported()
+        page.view.get_buffer().set_text("Token bucket")
+        self.saved(page)
+        d = self.draft(page)
+        d["answers"]["2"] = {"text": "Sliding window from the laptop", "revealed": True,
+                             "edited": datetime.now().astimezone().isoformat(timespec="seconds")}
+        (page.a.folder / "draft.json").write_text(json.dumps(d), encoding="utf-8")
+        page.view.get_buffer().insert_at_cursor(" refills", -1)
+        ui.wait_for(lambda: "Merged 1 answer changed on another computer into this draft." in self.toasts(),
+                    "the merge to be told")
+        self.saved(page)
+        self.assertTrue(page.rows[2].get_tooltip_text().startswith("Question 2: drafted, revealed"))
+        page.show_question(2)
+        self.assertEqual(self.text(page), "Sliding window from the laptop")
+        answers = self.draft(page)["answers"]
+        self.assertEqual((answers["1"]["text"], answers["2"]["text"]), ("Token bucket refills", "Sliding window from the laptop"))
+        self.assertEqual(self.folders(), ["design_a_rate_limiter_2026-11-23T19-05-51"])
+        self.assertFalse((page.a.folder / "attempts").exists(), "nothing set aside")
 
     def test_earlier_attempts_shows_each_answer_and_compares_it_with_the_sample(self):
         page = self.imported()

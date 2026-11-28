@@ -112,7 +112,7 @@ class AttemptsDialog(Adw.Dialog):
 
 
 def _summary(attempt, number):
-    """'142 words · revealed · from another computer', or 'no answer'."""
+    """'142 words · revealed · from another computer', or 'no answer'."""  # or '· set aside in a merge'
     a = attempt.answer(number)
     words = store.count_words(a.text)
     parts = [f"{words} word{'s' if words != 1 else ''}" if words else "no answer"]
@@ -120,6 +120,8 @@ def _summary(attempt, number):
         parts.append("revealed")
     if attempt.origin == store.ELSEWHERE:
         parts.append("from another computer")
+    elif attempt.origin == store.MERGED:
+        parts.append("set aside when drafts were merged")
     return " · ".join(parts)
 
 

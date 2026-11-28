@@ -71,7 +71,7 @@ TopCoding (`app.topcoding.bg/assignments`).
 - Answers are saved as you type (800 ms after you stop), in the background. **Finish Attempt** keeps the attempt and starts a blank one; **Earlier Attempts** shows each attempt's answer, read-only, beside the sample answer if you like.
 - Importing the same report again (same title and completion time) asks: **Skip**, or **Replace**, which keeps your drafts and attempts, so the graded download can follow an ungraded one.
 - The trash button on an assessment in the list moves it, with its drafts and attempts, to the Trash, and **Undo** on the message brings it back; a folder that can't be read has one too.
-- Everything is kept in a hidden `.assessments` folder in your notes folder, written in one step so a crash can't leave a half-written file; a draft another computer changed (through a sync tool) is kept as an attempt rather than overwritten.
+- Everything is kept in a hidden `.assessments` folder in your notes folder, written in one step so a crash can't leave a half-written file; a draft changed on two computers (through a sync tool) is merged question by question: each question takes the answer of the computer that changed it, and one changed on both takes the newer edit, with the other kept in **Earlier Attempts**. The open page shows the merged answers, and Ctrl+Z takes one back.
 
 ## Files and desktop
 - One autosaved `.notz` file (JSON) per book and chapter, under `Notterizmus/<Book>/` in your Documents folder (localized, e.g. `~/Документи`).

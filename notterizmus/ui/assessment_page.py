@@ -39,27 +39,28 @@ LIST_MIN = 200    # px: neither the list nor the question can be dragged narrowe
 
 class DraftFile:
     """One assessment's draft.json, used only on WORKER's thread: it knows the file as it
-    last read or wrote it, so a change another computer made is told from its own
-    (assessments.write_draft), however the page's writes queue up."""
+    last read or wrote it, and its answers then, so a change another computer made is told
+    from its own and merged with it (assessments.write_draft), however the page's writes
+    queue up."""
 
     def __init__(self, assessment):
-        self.assessment, self.disk = assessment, None
+        self.assessment, self.disk, self.base = assessment, None, None
 
     def read(self):
         attempt = store.read_draft(self.assessment)
-        self.disk = attempt.disk
+        self.disk, self.base = attempt.disk, attempt.base
         return attempt
 
     def write(self, attempt):
-        attempt.disk = self.disk
+        attempt.disk, attempt.base = self.disk, self.base
         kept = store.write_draft(self.assessment, attempt)
-        self.disk = attempt.disk
-        return kept, attempt.set_aside
+        self.disk, self.base = attempt.disk, attempt.base
+        return kept, attempt.set_aside, attempt.merged_in
 
     def finish(self, attempt):
-        attempt.disk = self.disk
+        attempt.disk, attempt.base = self.disk, self.base
         done, kept = store.finish(self.assessment, attempt)
-        self.disk = None
+        self.disk = self.base = None
         return done, kept
 
 
@@ -680,7 +681,8 @@ class PracticePage(Adw.NavigationPage):
         self._show_saved("")
         self.win.toast("Attempt finished. Its answers are in Earlier Attempts; this one starts blank.")
         if kept is not None:
-            self.win.toast("Another computer had changed this draft. Its version is kept in Earlier Attempts too.")
+            self.win.toast("This draft was changed on another computer too, and the two were merged first. Where "
+                           "both changed a question, the other answer is in Earlier Attempts too.")
         self.win.update_actions()
         self.win.assessments_changed()
         self.view.grab_focus()
@@ -733,7 +735,9 @@ class PracticePage(Adw.NavigationPage):
         snapshot = self._snapshot()
         self._dirty = False
         self._writing = True
-        return WORKER.run(lambda f=self.file, s=snapshot: f.write(s), done=self._saved, failed=self._save_failed)
+        typed = {n: a.text for n, a in snapshot.answers.items()}  # (the write may merge answers into snapshot)
+        return WORKER.run(lambda f=self.file, s=snapshot: f.write(s), done=lambda r, t=typed: self._saved(r, t),
+                          failed=self._save_failed)
 
     def flush(self, wait=False):
         """Write the draft now if it changed: before Earlier Attempts reads the folder,
@@ -748,14 +752,21 @@ class PracticePage(Adw.NavigationPage):
                 future.result()
             WORKER.wait()
 
-    def _saved(self, result):
+    def _saved(self, result, typed):
+        """typed: {number: the editor's text} when the write began."""
         self._writing = False
-        kept, set_aside = result
+        kept, set_aside, merged_in = result
         if self.released:
             return
         self.a.has_draft = True
+        if merged_in:
+            self._merge_in(merged_in, typed)
         if kept is not None:
-            self.win.toast("Another computer changed this draft. Its version is kept in Earlier Attempts.")
+            self.win.toast("This draft was changed on another computer too, and the two are merged. Where both "
+                           "changed a question, the newer answer is here and the other is in Earlier Attempts.")
+        elif merged_in:
+            self.win.toast(f"Merged {len(merged_in)} answer{'s' if len(merged_in) != 1 else ''} "
+                           "changed on another computer into this draft.")
         if set_aside is not None:
             self.win.toast(f"The draft on disk couldn't be read. It was kept as {set_aside.name}.")
         if self._again:
@@ -763,6 +774,26 @@ class PracticePage(Adw.NavigationPage):
             self.save()
         elif not self._dirty and not self._save_src:
             self._show_saved("Saved")
+
+    def _merge_in(self, merged_in, typed):
+        """Show the answers the save took from another computer's draft (R35e). An editor
+        typed in since the save began keeps its text: that edit is newer, and the next
+        save writes it. Ctrl+Z takes a merged-in answer back."""
+        for n, answer in merged_in.items():
+            mine = self.attempt.answers.setdefault(n, Answer())
+            mine.revealed = answer.revealed
+            buf = self.buffers.get(n)
+            if buf is None:
+                mine.text = answer.text
+            elif buf.get_text(*buf.get_bounds(), False) == typed.get(n, "") != answer.text:
+                buf.begin_user_action()
+                buf.set_text(answer.text)  # (its "changed" updates the row and saves it again)
+                buf.end_user_action()
+            self._update_row(n)
+        self._update_progress()
+        if self.current is not None:
+            self._update_counts()
+        self.win.update_actions()
 
     def _save_failed(self, error):
         self._writing = False
